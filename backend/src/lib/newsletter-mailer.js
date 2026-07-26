@@ -294,7 +294,8 @@ async function deliverMailThroughResend({ to, subject, html, text, unsubscribeUr
     method: "POST",
     headers: {
       Authorization: `Bearer ${env.resendApiKey}`,
-      "Content-Type": "application/json"
+      "Content-Type": "application/json",
+      "User-Agent": `colombiano-promedio-mailer/1.0 (+${env.publicSiteUrl})`
     },
     body: JSON.stringify({
       from: `${MAIL_BRAND_NAME} <${env.mailFromEmail}>`,
@@ -313,6 +314,15 @@ async function deliverMailThroughResend({ to, subject, html, text, unsubscribeUr
   const payload = await response.json().catch(() => null);
 
   if (!response.ok) {
+    console.error("Resend rechazo un envio de correo.");
+    console.error({
+      status: response.status,
+      from: env.mailFromEmail,
+      replyTo: env.mailReplyTo || "",
+      to,
+      subject,
+      payload
+    });
     const error = new Error(buildProviderErrorMessage(payload, response.status));
     error.status = 502;
     throw error;

@@ -434,7 +434,9 @@ async function logSubscriptionEvent(req, subscription, action, details = {}) {
 async function sendConfirmationOrThrow(subscription, tokens) {
   try {
     await sendNewsletterConfirmationEmail(subscription, tokens);
-  } catch {
+  } catch (error) {
+    console.error("No fue posible enviar el correo de confirmacion del boletin.");
+    console.error(error);
     throw createHttpError(502, "No fue posible enviar el correo de confirmacion. Intenta de nuevo en unos minutos.");
   }
 }
@@ -442,7 +444,9 @@ async function sendConfirmationOrThrow(subscription, tokens) {
 async function sendWelcomeOrThrow(subscription, tokens) {
   try {
     await sendNewsletterWelcomeEmail(subscription, tokens);
-  } catch {
+  } catch (error) {
+    console.error("No fue posible enviar el correo de bienvenida del boletin.");
+    console.error(error);
     throw createHttpError(502, "No fue posible enviar el correo de bienvenida. Intenta de nuevo en unos minutos.");
   }
 }

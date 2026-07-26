@@ -108,6 +108,20 @@ function uniqueList(values) {
   return [...new Set(values.filter(Boolean))];
 }
 
+function isPlausibleEmail(value) {
+  if (typeof value !== "string") {
+    return false;
+  }
+
+  const normalized = value.trim();
+
+  if (!normalized) {
+    return false;
+  }
+
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized);
+}
+
 const nodeEnv = String(process.env.NODE_ENV ?? "development")
   .trim()
   .toLowerCase();
@@ -243,6 +257,22 @@ if (!isLocal && env.allowedHosts.length === 0) {
 
 if (!isLocal && !env.jwtSecret) {
   throw new Error("JWT_SECRET es obligatorio fuera de entornos locales.");
+}
+
+if (env.mailProvider === "resend" && !isPlausibleEmail(env.resendFromEmail)) {
+  throw new Error("RESEND_FROM_EMAIL debe ser un correo completo, por ejemplo boletin@colombianopromedio.co.");
+}
+
+if (env.mailProvider === "resend" && env.resendReplyTo && !isPlausibleEmail(env.resendReplyTo)) {
+  throw new Error("RESEND_REPLY_TO debe ser un correo valido cuando se configura en produccion.");
+}
+
+if (env.mailProvider === "smtp" && !isPlausibleEmail(env.smtpFromEmail)) {
+  throw new Error("SMTP_FROM_EMAIL debe ser un correo valido cuando se usa SMTP.");
+}
+
+if (env.mailProvider === "smtp" && env.smtpReplyTo && !isPlausibleEmail(env.smtpReplyTo)) {
+  throw new Error("SMTP_REPLY_TO debe ser un correo valido cuando se usa SMTP.");
 }
 
 if (
