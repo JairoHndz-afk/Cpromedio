@@ -1,0 +1,28 @@
+{
+  "name": "periodico-backend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch src/server.js",
+    "start": "node src/server.js",
+    "bootstrap:users": "node src/scripts/bootstrap-users.js",
+    "test": "node --test",
+    "test:security": "node --test test/security/*.test.js",
+    "test:audit:flows": "node --test test/audit/editorial-flows.audit.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.1",
+    "express-rate-limit": "^8.6.0",
+    "helmet": "^8.3.0",
+    "jsonwebtoken": "^9.0.3",
+    "mongoose": "^8.7.1",
+    "morgan": "^1.10.0",
+    "nodemailer": "^9.0.3",
+    "zod": "^4.4.3"
+  }
+}
