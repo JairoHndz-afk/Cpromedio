@@ -70,6 +70,14 @@ export class PublicApiService {
     );
   }
 
+  reactivateSubscription(token: string): Promise<SubscriptionActionPayload> {
+    return firstValueFrom(
+      this.http.post<SubscriptionActionPayload>(`${API_BASE_URL}/public/subscriptions/reactivate`, {
+        token
+      })
+    );
+  }
+
   unsubscribeSubscription(token: string): Promise<SubscriptionActionPayload> {
     return firstValueFrom(
       this.http.post<SubscriptionActionPayload>(`${API_BASE_URL}/public/subscriptions/unsubscribe`, {

@@ -63,7 +63,10 @@ import { PublicArticle } from "../../../core/types/api.types";
           </a>
           <span class="tag" *ngIf="article.cover.type !== 'image'">{{ article.cover.type }}</span>
         </div>
-        <p class="news-card__author">{{ article.author?.name || "Redaccion" }}</p>
+        <p class="news-card__author">
+          <a *ngIf="article.author?.id; else plainAuthor" [routerLink]="['/autor', article.author?.id]">{{ article.author?.name || "Redacción" }}</a>
+          <ng-template #plainAuthor>{{ article.author?.name || "Redacción" }}</ng-template>
+        </p>
         <h3>
           <a class="news-card__title-link" [routerLink]="['/articulo', article.slug]">{{ article.title }}</a>
         </h3>

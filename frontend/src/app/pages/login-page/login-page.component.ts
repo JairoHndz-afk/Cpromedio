@@ -4,6 +4,7 @@ import { FormsModule } from "@angular/forms";
 import { Router } from "@angular/router";
 
 import { AuthService } from "../../core/services/auth.service";
+import { SeoService } from "../../core/services/seo.service";
 
 @Component({
   selector: "app-login-page",
@@ -35,7 +36,7 @@ import { AuthService } from "../../core/services/auth.service";
               class="password-toggle"
               [class.is-active]="showPassword"
               type="button"
-              [attr.aria-label]="showPassword ? 'Ocultar contrasena' : 'Mostrar contrasena'"
+              [attr.aria-label]="showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'"
               [attr.aria-pressed]="showPassword"
               (click)="togglePassword()"
             >
@@ -56,7 +57,7 @@ import { AuthService } from "../../core/services/auth.service";
         </label>
 
         <button class="button" type="submit" [disabled]="submitting">
-          {{ submitting ? "Ingresando…" : "Entrar" }}
+          {{ submitting ? "Ingresando..." : "Entrar" }}
         </button>
 
         <p class="error-text" *ngIf="errorMessage">{{ errorMessage }}</p>
@@ -68,6 +69,7 @@ import { AuthService } from "../../core/services/auth.service";
 export class LoginPageComponent {
   private readonly authService = inject(AuthService);
   private readonly router = inject(Router);
+  private readonly seo = inject(SeoService);
 
   submitting = false;
   showPassword = false;
@@ -76,6 +78,10 @@ export class LoginPageComponent {
     email: "",
     password: ""
   };
+
+  constructor() {
+    this.seo.setNoIndex("Acceso editorial | Colombiano Promedio", "Ingreso privado para administración y periodistas.");
+  }
 
   togglePassword(): void {
     this.showPassword = !this.showPassword;

@@ -5,6 +5,7 @@ import { FormsModule } from "@angular/forms";
 import { ActivatedRoute, Router, RouterLink } from "@angular/router";
 
 import { PublicApiService } from "../../core/services/public-api.service";
+import { SeoService } from "../../core/services/seo.service";
 import { ToastService } from "../../core/services/toast.service";
 import { PublicArticle, SitePayload } from "../../core/types/api.types";
 import { NewsCardComponent } from "../../shared/components/news-card/news-card.component";
@@ -50,12 +51,12 @@ import { NewsCardComponent } from "../../shared/components/news-card/news-card.c
       </article>
       <article class="feature-note">
         <p class="eyebrow">País en paz</p>
-        <h3 class="feature-note__quote">Creo que si uno vive en este país tiene una tarea fundamental: transformarlo</h3>
+        <h3 class="feature-note__quote">Creo que si uno vive en este país tiene una tarea fundamental: transformarlo.</h3>
         <p class="feature-note__author">Jaime Garzón</p>
       </article>
       <article class="feature-note">
         <p class="eyebrow">Ideas firmes</p>
-        <h3 class="feature-note__quote">El pueblo es superior a sus dirigentes</h3>
+        <h3 class="feature-note__quote">El pueblo es superior a sus dirigentes.</h3>
         <p class="feature-note__author">Jorge E. Gaitán</p>
       </article>
     </section>
@@ -152,6 +153,7 @@ export class HomePageComponent {
   private readonly router = inject(Router);
   private readonly publicApi = inject(PublicApiService);
   private readonly toast = inject(ToastService);
+  private readonly seo = inject(SeoService);
   private readonly cdr = inject(ChangeDetectorRef);
   private requestId = 0;
 
@@ -241,6 +243,7 @@ export class HomePageComponent {
         this.searchResults = response.items;
         this.activeResultsTitle = this.buildResultsTitle(search, tag, category);
         this.activeResultsDescription = this.buildResultsDescription(search, tag, category);
+        this.seo.setNoIndex(`${this.activeResultsTitle} | Colombiano Promedio`, this.activeResultsDescription);
         return;
       }
 
@@ -254,6 +257,10 @@ export class HomePageComponent {
       this.searchResults = [];
       this.activeResultsTitle = "Selecciones editoriales";
       this.activeResultsDescription = "Explora artículos relacionados con el tema actual.";
+      this.seo.setHome({
+        description: site.featured?.excerpt || "Lecturas, archivo editorial y nuevas publicaciones en Colombiano Promedio.",
+        imageUrl: site.featured?.cover.url
+      });
     } catch {
       if (requestId !== this.requestId) {
         return;
@@ -262,6 +269,7 @@ export class HomePageComponent {
       this.errorMessage = this.filterActive
         ? "No fue posible cargar esta selección editorial."
         : "No fue posible cargar la portada.";
+      this.seo.setNoIndex("Portada no disponible | Colombiano Promedio", this.errorMessage);
     } finally {
       if (requestId === this.requestId) {
         this.loading = false;

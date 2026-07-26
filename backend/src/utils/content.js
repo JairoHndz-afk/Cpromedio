@@ -80,6 +80,26 @@ export function sanitizeContentBlocks(input) {
       continue;
     }
 
+    if (item.type === "quote") {
+      const quoteText = sanitizeText(item.quote?.text ?? item.text ?? "", 1200);
+
+      if (!quoteText) {
+        continue;
+      }
+
+      const attribution = sanitizeText(item.quote?.attribution ?? "", 140);
+
+      blocks.push({
+        type: "quote",
+        quote: {
+          text: quoteText,
+          attribution
+        }
+      });
+      paragraphs.push(attribution ? `${quoteText} ${attribution}` : quoteText);
+      continue;
+    }
+
     if (item.type === "embed") {
       const embed = resolveVideoEmbedSource(sanitizeText(item.embed?.url ?? "", 1200));
 

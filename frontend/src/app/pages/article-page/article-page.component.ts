@@ -1,11 +1,13 @@
 import { DatePipe, NgFor, NgIf, NgSwitch, NgSwitchCase, NgSwitchDefault } from "@angular/common";
 import { ChangeDetectionStrategy, ChangeDetectorRef, Component, inject } from "@angular/core";
-import { DomSanitizer, SafeResourceUrl } from "@angular/platform-browser";
 import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
+import { DomSanitizer, SafeResourceUrl } from "@angular/platform-browser";
 import { ActivatedRoute, RouterLink } from "@angular/router";
 
 import { PublicApiService } from "../../core/services/public-api.service";
-import { PublicArticle, PublicArticlePreview } from "../../core/types/api.types";
+import { SeoService } from "../../core/services/seo.service";
+import { ArticleContentBlock, PublicArticle, PublicArticlePreview } from "../../core/types/api.types";
+import { renderEditorialText } from "../../core/utils/editorial-rich-text";
 import { resolveVideoEmbed } from "../../core/utils/video-embed";
 
 type ShareChannel = "whatsapp" | "telegram" | "x" | "facebook" | "copy";
@@ -25,8 +27,13 @@ type ShareChannel = "whatsapp" | "telegram" | "x" | "facebook" | "copy";
         <h1>{{ article.title }}</h1>
         <p class="hero-copy">{{ article.subtitle || article.excerpt }}</p>
         <div class="meta-row meta-row--featured">
-          <span class="meta-pill meta-pill--author">{{ article.author?.name || "Redaccion" }}</span>
-          <span class="meta-pill" *ngIf="article.publishedAt">{{ article.publishedAt | date: "mediumDate" }}</span>
+          <a class="meta-pill meta-pill--author" *ngIf="article.author?.id; else plainAuthorPill" [routerLink]="['/autor', article.author?.id]">
+            {{ article.author?.name || "Redacción" }}
+          </a>
+          <ng-template #plainAuthorPill>
+            <span class="meta-pill meta-pill--author">{{ article.author?.name || "Redacción" }}</span>
+          </ng-template>
+          <span class="meta-pill" *ngIf="article.publishedAt">{{ article.publishedAt | date: "d MMM y, h:mm a" }}</span>
           <span class="meta-pill meta-pill--warm">{{ article.readingTime }} min de lectura</span>
           <span class="meta-pill meta-pill--soft">{{ article.metrics.views }} vistas</span>
         </div>
@@ -59,13 +66,18 @@ type ShareChannel = "whatsapp" | "telegram" | "x" | "facebook" | "copy";
 
       <ng-template #textCover>
         <div class="article-cover article-cover--placeholder">
-          <span>{{ article.author?.name || "Redaccion" }}</span>
+          <span>{{ article.author?.name || "Redacción" }}</span>
         </div>
       </ng-template>
 
       <article class="article-body">
         <ng-container *ngFor="let block of article.contentBlocks">
-          <p *ngIf="block.type === 'paragraph'">{{ block.text }}</p>
+          <p *ngIf="block.type === 'paragraph'" [innerHTML]="renderBlockText(block)"></p>
+
+          <blockquote class="article-quote" *ngIf="block.type === 'quote'">
+            <p [innerHTML]="renderBlockText(block)"></p>
+            <footer class="article-quote__attribution" *ngIf="block.quote.attribution">{{ block.quote.attribution }}</footer>
+          </blockquote>
 
           <figure class="article-inline-media" *ngIf="block.type === 'image' && block.image.url">
             <img [src]="block.image.url" [alt]="block.image.alt || article.title" />
@@ -88,13 +100,18 @@ type ShareChannel = "whatsapp" | "telegram" | "x" | "facebook" | "copy";
       <section class="article-meta">
         <div>
           <p class="eyebrow">Firma</p>
-          <strong class="article-signature">{{ article.author?.name || "Redaccion" }}</strong>
+          <a class="article-signature article-signature__link" *ngIf="article.author?.id; else authorNameOnly" [routerLink]="['/autor', article.author?.id]">
+            {{ article.author?.name || "Redacción" }}
+          </a>
+          <ng-template #authorNameOnly>
+            <strong class="article-signature">{{ article.author?.name || "Redacción" }}</strong>
+          </ng-template>
           <p>{{ article.author?.role || "Equipo editorial" }}</p>
         </div>
         <div>
-          <p class="eyebrow">Lectura</p>
-          <strong>{{ article.readingTime }} minutos</strong>
-          <p>{{ article.metrics.views }} vistas acumuladas</p>
+          <p class="eyebrow">Publicación</p>
+          <strong>{{ article.publishedAt ? (article.publishedAt | date: "d MMM y, h:mm a") : "Edición sin fecha visible" }}</strong>
+          <p>Actualizado {{ article.updatedAt | date: "d MMM y, h:mm a" }}</p>
         </div>
       </section>
 
@@ -120,7 +137,7 @@ type ShareChannel = "whatsapp" | "telegram" | "x" | "facebook" | "copy";
             <strong>{{ next.title }}</strong>
             <p>{{ next.excerpt }}</p>
             <div class="meta-row">
-              <span class="meta-pill meta-pill--author">{{ next.author?.name || "Redaccion" }}</span>
+              <span class="meta-pill meta-pill--author">{{ next.author?.name || "Redacción" }}</span>
               <span class="meta-pill meta-pill--warm">{{ next.readingTime }} min</span>
               <span class="meta-pill meta-pill--soft">{{ next.metrics.views }} vistas</span>
             </div>
@@ -134,14 +151,14 @@ type ShareChannel = "whatsapp" | "telegram" | "x" | "facebook" | "copy";
 
           <ng-template #nextPlaceholder>
             <div class="article-next__media article-next__media--placeholder">
-              <span>{{ next.category?.name || "Siguiente articulo" }}</span>
+              <span>{{ next.category?.name || "Siguiente artículo" }}</span>
             </div>
           </ng-template>
         </a>
       </section>
     </section>
     <ng-template #loadingState>
-      <section class="empty-state">{{ errorMessage || "Cargando articulo..." }}</section>
+      <section class="empty-state">{{ errorMessage || "Cargando artículo..." }}</section>
     </ng-template>
   `,
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -149,6 +166,7 @@ type ShareChannel = "whatsapp" | "telegram" | "x" | "facebook" | "copy";
 export class ArticlePageComponent {
   private readonly route = inject(ActivatedRoute);
   private readonly publicApi = inject(PublicApiService);
+  private readonly seo = inject(SeoService);
   private readonly cdr = inject(ChangeDetectorRef);
   private readonly sanitizer = inject(DomSanitizer);
 
@@ -164,6 +182,18 @@ export class ArticlePageComponent {
     this.route.paramMap.pipe(takeUntilDestroyed()).subscribe((params) => {
       void this.loadArticle(params.get("slug") ?? "");
     });
+  }
+
+  renderBlockText(block: ArticleContentBlock): string {
+    if (block.type === "paragraph") {
+      return renderEditorialText(block.text);
+    }
+
+    if (block.type === "quote") {
+      return renderEditorialText(block.quote.text);
+    }
+
+    return "";
   }
 
   formatTopicLabel(value: string): string {
@@ -239,9 +269,20 @@ export class ArticlePageComponent {
       this.relatedTopicLabel = null;
     }
 
-    const label = this.relatedTopicLabel;
-    this.nextActionLabel = label ? `Leer siguiente de ${label}` : "Leer siguiente";
+    this.nextActionLabel = this.relatedTopicLabel ? `Leer siguiente de ${this.relatedTopicLabel}` : "Leer siguiente";
     this.nextSectionLabel = "Quizás te puede interesar";
+  }
+
+  private applySeo(article: PublicArticle): void {
+    this.seo.setArticle({
+      title: article.title,
+      description: article.subtitle || article.excerpt,
+      slug: article.slug,
+      imageUrl: article.cover.url,
+      publishedAt: article.publishedAt,
+      updatedAt: article.updatedAt,
+      authorName: article.author?.name || "Colombiano Promedio"
+    });
   }
 
   async loadArticle(currentSlug: string): Promise<void> {
@@ -259,9 +300,11 @@ export class ArticlePageComponent {
       this.article = response.article;
       this.nextArticle = response.nextArticle;
       this.syncTopicState();
+      this.applySeo(response.article);
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch {
-      this.errorMessage = "No fue posible cargar el articulo.";
+      this.errorMessage = "No fue posible cargar el artículo.";
+      this.seo.setNoIndex("Artículo no disponible | Colombiano Promedio", this.errorMessage);
     } finally {
       this.cdr.markForCheck();
     }

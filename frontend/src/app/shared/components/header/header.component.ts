@@ -39,6 +39,7 @@ import { BrandMarkComponent } from "../brand-mark/brand-mark.component";
           <div class="site-nav__panel" id="site-nav-panel" *ngIf="!isCompactViewport || menuOpen">
             <div class="site-nav__links">
               <a routerLink="/" routerLinkActive="is-active" [routerLinkActiveOptions]="{ exact: true }" (click)="closeMenu()">Inicio</a>
+              <a routerLink="/privacidad" routerLinkActive="is-active" (click)="closeMenu()">Privacidad</a>
               <a routerLink="/login" routerLinkActive="is-active" *ngIf="!authService.isAuthenticated()" (click)="closeMenu()">Acceso</a>
               <a routerLink="/dashboard" routerLinkActive="is-active" *ngIf="authService.isAuthenticated()" (click)="closeMenu()">Panel</a>
             </div>

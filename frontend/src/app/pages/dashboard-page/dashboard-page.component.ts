@@ -5,6 +5,7 @@ import { DomSanitizer, SafeResourceUrl } from "@angular/platform-browser";
 
 import { AuthService } from "../../core/services/auth.service";
 import { DashboardApiService } from "../../core/services/dashboard-api.service";
+import { SeoService } from "../../core/services/seo.service";
 import { ToastService } from "../../core/services/toast.service";
 import {
   ArticleContentBlock,
@@ -55,6 +56,8 @@ interface ArticleFormState {
 interface EditorContentBlock {
   type: ArticleContentBlock["type"];
   text: string;
+  quoteText: string;
+  quoteAttribution: string;
   imageUrl: string;
   imageAlt: string;
   imageCaption: string;
@@ -309,6 +312,7 @@ interface ConfirmDialogState {
                 </div>
                 <div class="button-row">
                   <button class="button button--ghost" type="button" (click)="addParagraphBlock()">Agregar parrafo</button>
+                  <button class="button button--ghost" type="button" (click)="addQuoteBlock()">Agregar cita</button>
                   <button class="button button--secondary" type="button" (click)="addImageBlock()">Agregar foto</button>
                   <button class="button button--ghost" type="button" (click)="addEmbedBlock()">Agregar video</button>
                 </div>
@@ -326,6 +330,7 @@ interface ConfirmDialogState {
                 </div>
                 <div class="button-row">
                   <button class="button button--ghost" type="button" (click)="addParagraphBlock()">Agregar parrafo</button>
+                  <button class="button button--ghost" type="button" (click)="addQuoteBlock()">Agregar cita</button>
                   <button class="button button--secondary" type="button" (click)="addImageBlock()">Agregar foto</button>
                   <button class="button button--ghost" type="button" (click)="addEmbedBlock()">Agregar video</button>
                 </div>
@@ -343,10 +348,36 @@ interface ConfirmDialogState {
                   </div>
 
                   <ng-container *ngIf="block.type === 'paragraph'">
+                    <div class="button-row">
+                      <button class="button button--ghost" type="button" (click)="insertSmartQuotes(blockIndex)">Insertar comillas</button>
+                      <button class="button button--ghost" type="button" (click)="insertLinkTemplate(blockIndex)">Insertar enlace</button>
+                    </div>
                     <label>
                       <span>Texto del parrafo</span>
-                      <textarea [(ngModel)]="block.text" [name]="'blockText' + blockIndex" rows="6"></textarea>
+                      <textarea
+                        [(ngModel)]="block.text"
+                        [name]="'blockText' + blockIndex"
+                        [attr.id]="'editorBlockText' + blockIndex"
+                        rows="6"
+                      ></textarea>
                     </label>
+                    <p class="helper-text">Acepta enlaces directos como https://... y formato [texto](https://...).</p>
+                  </ng-container>
+
+                  <ng-container *ngIf="block.type === 'quote'">
+                    <div class="stack-form">
+                      <label>
+                        <span>Texto de la cita</span>
+                        <textarea [(ngModel)]="block.quoteText" [name]="'blockQuoteText' + blockIndex" rows="4"></textarea>
+                      </label>
+
+                      <label>
+                        <span>Fuente o atribucion</span>
+                        <input type="text" [(ngModel)]="block.quoteAttribution" [name]="'blockQuoteAttribution' + blockIndex" placeholder="Autor, medio o contexto" />
+                      </label>
+
+                      <p class="helper-text">Usa este bloque para destacar frases dentro de la lectura sin mezclarlas con los parrafos normales.</p>
+                    </div>
                   </ng-container>
 
                   <ng-container *ngIf="block.type === 'image'">
@@ -427,6 +458,7 @@ interface ConfirmDialogState {
                     <span class="helper-text">Agregar debajo de este bloque</span>
                     <div class="button-row">
                       <button class="button button--ghost" type="button" (click)="insertParagraphBlock(blockIndex)">Texto debajo</button>
+                      <button class="button button--ghost" type="button" (click)="insertQuoteBlock(blockIndex)">Cita debajo</button>
                       <button class="button button--secondary" type="button" (click)="insertImageBlock(blockIndex)">Foto debajo</button>
                       <button class="button button--ghost" type="button" (click)="insertEmbedBlock(blockIndex)">Video debajo</button>
                     </div>
@@ -678,7 +710,7 @@ interface ConfirmDialogState {
 
                 <section class="editor-stage-card">
                   <p class="eyebrow">Cuerpo</p>
-                  <strong>{{ contentBlockCount('paragraph') }} parrafos</strong>
+                  <strong>{{ contentBlockCount('paragraph') }} parrafos y {{ contentBlockCount('quote') }} citas</strong>
                   <p>{{ contentBlockCount('image') }} fotos y {{ contentBlockCount('embed') }} videos embebidos</p>
                 </section>
 
@@ -1338,6 +1370,7 @@ interface ConfirmDialogState {
 export class DashboardPageComponent {
   readonly authService = inject(AuthService);
   private readonly dashboardApi = inject(DashboardApiService);
+  private readonly seo = inject(SeoService);
   private readonly toast = inject(ToastService);
   private readonly cdr = inject(ChangeDetectorRef);
   private readonly sanitizer = inject(DomSanitizer);
@@ -1410,6 +1443,7 @@ export class DashboardPageComponent {
     "subscription.confirmation_requested": "Correo de confirmacion enviado",
     "subscription.activated": "Suscripcion activada",
     "subscription.confirmed": "Suscripcion confirmada",
+    "subscription.reactivated": "Suscripcion reactivada",
     "subscription.cancelled": "Suscripcion cancelada",
     "subscription.deleted": "Suscripcion eliminada"
   };
@@ -1512,6 +1546,7 @@ export class DashboardPageComponent {
   private confirmDialogResolver: ((confirmed: boolean) => void) | null = null;
 
   constructor() {
+    this.seo.setNoIndex("Panel editorial | Colombiano Promedio", "Área privada para redacción, moderación y administración del periódico.");
     this.syncProfileForm();
     void this.loadDashboard();
   }
@@ -1621,6 +1656,10 @@ export class DashboardPageComponent {
   }
 
   contentBlockLabel(type: EditorContentBlock["type"]): string {
+    if (type === "quote") {
+      return "Cita";
+    }
+
     if (type === "image") {
       return "Foto";
     }
@@ -1713,6 +1752,10 @@ export class DashboardPageComponent {
         return block.text.trim().length > 0;
       }
 
+      if (type === "quote") {
+        return block.quoteText.trim().length > 0;
+      }
+
       if (type === "image") {
         return block.imageUrl.trim().length > 0;
       }
@@ -1757,6 +1800,10 @@ export class DashboardPageComponent {
     this.appendContentBlock("paragraph");
   }
 
+  addQuoteBlock(): void {
+    this.appendContentBlock("quote");
+  }
+
   addImageBlock(): void {
     this.appendContentBlock("image");
   }
@@ -1767,6 +1814,10 @@ export class DashboardPageComponent {
 
   insertParagraphBlock(afterIndex: number): void {
     this.insertContentBlock(afterIndex, "paragraph");
+  }
+
+  insertQuoteBlock(afterIndex: number): void {
+    this.insertContentBlock(afterIndex, "quote");
   }
 
   insertImageBlock(afterIndex: number): void {
@@ -1898,6 +1949,23 @@ export class DashboardPageComponent {
     return {
       type: "paragraph",
       text,
+      quoteText: "",
+      quoteAttribution: "",
+      imageUrl: "",
+      imageAlt: "",
+      imageCaption: "",
+      embedUrl: "",
+      embedTitle: "",
+      uploading: false
+    };
+  }
+
+  private createQuoteBlock(quote?: { text?: string; attribution?: string }): EditorContentBlock {
+    return {
+      type: "quote",
+      text: "",
+      quoteText: quote?.text ?? "",
+      quoteAttribution: quote?.attribution ?? "",
       imageUrl: "",
       imageAlt: "",
       imageCaption: "",
@@ -1911,6 +1979,8 @@ export class DashboardPageComponent {
     return {
       type: "image",
       text: "",
+      quoteText: "",
+      quoteAttribution: "",
       imageUrl: image?.url ?? "",
       imageAlt: image?.alt ?? "",
       imageCaption: image?.caption ?? "",
@@ -1924,6 +1994,8 @@ export class DashboardPageComponent {
     return {
       type: "embed",
       text: "",
+      quoteText: "",
+      quoteAttribution: "",
       imageUrl: "",
       imageAlt: "",
       imageCaption: "",
@@ -1934,6 +2006,10 @@ export class DashboardPageComponent {
   }
 
   private buildContentBlock(type: EditorContentBlock["type"]): EditorContentBlock {
+    if (type === "quote") {
+      return this.createQuoteBlock();
+    }
+
     if (type === "image") {
       return this.createImageBlock();
     }
@@ -1951,7 +2027,9 @@ export class DashboardPageComponent {
       : article.body.map((text) => ({ type: "paragraph", text } as ArticleContentBlock));
 
     const blocks = source.map((block) =>
-      block.type === "image"
+      block.type === "quote"
+        ? this.createQuoteBlock(block.quote)
+        : block.type === "image"
         ? this.createImageBlock(block.image)
         : block.type === "embed"
           ? this.createEmbedBlock(block.embed)
@@ -1965,6 +2043,23 @@ export class DashboardPageComponent {
     const payload: ArticleContentBlock[] = [];
 
     for (const block of this.articleForm.contentBlocks) {
+      if (block.type === "quote") {
+        const text = block.quoteText.trim();
+
+        if (!text) {
+          continue;
+        }
+
+        payload.push({
+          type: "quote",
+          quote: {
+            text,
+            attribution: block.quoteAttribution.trim() || undefined
+          }
+        });
+        continue;
+      }
+
       if (block.type === "image") {
         const imageUrl = block.imageUrl.trim();
 
@@ -2032,6 +2127,15 @@ export class DashboardPageComponent {
     for (const block of contentBlocks) {
       if (block.type === "paragraph" && "text" in block) {
         const text = block.text.trim().replace(/\s+/g, " ");
+
+        if (text) {
+          firstParagraph = text;
+          break;
+        }
+      }
+
+      if (block.type === "quote" && "quote" in block) {
+        const text = block.quote.text.trim().replace(/\s+/g, " ");
 
         if (text) {
           firstParagraph = text;
@@ -2117,7 +2221,7 @@ export class DashboardPageComponent {
     }
 
     if (payload.contentBlocks.length === 0) {
-      return "Agrega al menos un parrafo, una foto o un video embebido al cuerpo del articulo.";
+      return "Agrega al menos un parrafo, una cita, una foto o un video embebido al cuerpo del articulo.";
     }
 
     if (payload.excerpt.trim().length < 20) {
@@ -2212,7 +2316,7 @@ export class DashboardPageComponent {
       }
 
       if (this.buildContentPayload().length === 0) {
-        return "Agrega al menos un parrafo, una foto o un video embebido para empezar la noticia.";
+        return "Agrega al menos un parrafo, una cita, una foto o un video embebido para empezar la noticia.";
       }
 
       return null;
@@ -2252,6 +2356,46 @@ export class DashboardPageComponent {
     }
 
     this.articleForm.excerpt = this.articlePreviewText();
+  }
+
+  insertSmartQuotes(index: number): void {
+    this.insertTextIntoParagraph(index, "“Texto citado”", "“", "”");
+  }
+
+  insertLinkTemplate(index: number): void {
+    this.insertTextIntoParagraph(index, "[texto del enlace](https://ejemplo.com)", "[", "](https://ejemplo.com)");
+  }
+
+  private insertTextIntoParagraph(index: number, placeholder: string, prefix = "", suffix = ""): void {
+    const block = this.articleForm.contentBlocks[index];
+
+    if (!block || block.type !== "paragraph") {
+      return;
+    }
+
+    const elementId = `editorBlockText${index}`;
+    const textarea = document.getElementById(elementId) as HTMLTextAreaElement | null;
+    const currentValue = block.text ?? "";
+
+    if (!textarea) {
+      block.text = currentValue ? `${currentValue}\n${placeholder}` : placeholder;
+      this.cdr.markForCheck();
+      return;
+    }
+
+    const selectionStart = textarea.selectionStart ?? currentValue.length;
+    const selectionEnd = textarea.selectionEnd ?? currentValue.length;
+    const selectedText = currentValue.slice(selectionStart, selectionEnd);
+    const insertion = selectedText ? `${prefix}${selectedText}${suffix}` : placeholder;
+
+    block.text = `${currentValue.slice(0, selectionStart)}${insertion}${currentValue.slice(selectionEnd)}`;
+    this.cdr.markForCheck();
+
+    requestAnimationFrame(() => {
+      textarea.focus();
+      const cursorPosition = selectionStart + insertion.length;
+      textarea.setSelectionRange(cursorPosition, cursorPosition);
+    });
   }
 
   private validateImageFile(file: File): void {

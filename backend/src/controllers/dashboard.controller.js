@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 
 import { buildCookieOptions, signAuthToken } from "../lib/auth.js";
 import { writeAuditLog } from "../lib/audit.js";
+import { dispatchPublishedArticleBulletin } from "./public.controller.js";
 import { clearFeaturedArticleSelection, setFeaturedArticleSelection } from "../lib/site-settings.js";
 import { Article } from "../models/Article.js";
 import { AuditLog } from "../models/AuditLog.js";
@@ -226,6 +227,15 @@ function escapeRegexLiteral(value) {
   return String(value ?? "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+async function sendPublishedArticleBulletinSafely(article) {
+  try {
+    await dispatchPublishedArticleBulletin(article);
+  } catch (error) {
+    console.error("No fue posible despachar el boletin de nueva publicacion.");
+    console.error(error);
+  }
+}
+
 export async function getDashboardOverview(req, res, next) {
   try {
     const baseArticleFilter = req.user.role === "admin" ? {} : { author: req.user._id };
@@ -376,6 +386,10 @@ export async function createDashboardArticle(req, res, next) {
       { path: "category", select: "name slug" }
     ]);
 
+    if (article.status === "published") {
+      void sendPublishedArticleBulletinSafely(populated);
+    }
+
     res.status(201).json(serializeArticle(populated));
   } catch (error) {
     next(error);
@@ -401,6 +415,7 @@ export async function updateDashboardArticle(req, res, next) {
       return res.status(409).json({ message: "El artículo ya no puede ser editado por el periodista." });
     }
 
+    const wasPublished = article.status === "published";
     const normalized = applyEditorialRestrictions(req.user, await normalizeArticlePayload(req.body, article), article);
 
     Object.assign(article, normalized);
@@ -436,6 +451,10 @@ export async function updateDashboardArticle(req, res, next) {
       { path: "author", select: "name email role" },
       { path: "category", select: "name slug" }
     ]);
+
+    if (!wasPublished && article.status === "published") {
+      void sendPublishedArticleBulletinSafely(populated);
+    }
 
     res.json(serializeArticle(populated));
   } catch (error) {
@@ -566,6 +585,7 @@ export async function moderateArticle(req, res, next) {
     }
 
     const note = sanitizeText(payload.note, 400);
+    const wasPublished = article.status === "published";
 
     switch (payload.action) {
       case "approve":
@@ -627,6 +647,10 @@ export async function moderateArticle(req, res, next) {
         note
       }
     });
+
+    if (!wasPublished && article.status === "published") {
+      void sendPublishedArticleBulletinSafely(article);
+    }
 
     res.json(serializeArticle(article));
   } catch (error) {

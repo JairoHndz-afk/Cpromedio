@@ -1,18 +1,14 @@
 import crypto from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
 
 import nodemailer from "nodemailer";
 
 import { env } from "../config/env.js";
 
 let transporter;
-const MAIL_BRAND_NAME = env.smtpFromName || "Colombiano Promedio";
+let transporterCacheKey = "";
+const MAIL_BRAND_NAME = "Colombiano Promedio";
 const MAIL_BRAND_TAGLINE = "Hasta que la dignidad se haga costumbre";
-const NEWSLETTER_LOGO_CID = "colombiano-promedio-logo-dark@newsletter";
-const NEWSLETTER_LOGO_PATH = fileURLToPath(
-  new URL("../../../frontend/src/assets/branding/logo-user-dark-email.png", import.meta.url)
-);
+const NEWSLETTER_LOGO_ASSET_PATH = "/assets/branding/logo-c-dark.png";
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -24,11 +20,20 @@ function escapeHtml(value) {
 }
 
 function getTransporter() {
-  if (transporter) {
+  const nextCacheKey = getMailMode() === "smtp"
+    ? JSON.stringify({
+        host: env.smtpHost,
+        port: env.smtpPort,
+        secure: env.smtpSecure,
+        user: env.smtpUser
+      })
+    : "preview";
+
+  if (transporter && transporterCacheKey === nextCacheKey) {
     return transporter;
   }
 
-  if (env.mailConfigured) {
+  if (getMailMode() === "smtp") {
     transporter = nodemailer.createTransport({
       host: env.smtpHost,
       port: env.smtpPort,
@@ -43,6 +48,7 @@ function getTransporter() {
           }
         : undefined
     });
+    transporterCacheKey = nextCacheKey;
 
     return transporter;
   }
@@ -52,8 +58,21 @@ function getTransporter() {
     buffer: true,
     newline: "unix"
   });
+  transporterCacheKey = nextCacheKey;
 
   return transporter;
+}
+
+function getMailMode() {
+  if (env.resendApiKey && env.resendFromEmail) {
+    return "resend";
+  }
+
+  if (env.mailConfigured && env.smtpHost && env.smtpUser && env.smtpPass) {
+    return "smtp";
+  }
+
+  return "preview";
 }
 
 function buildAppUrl(pathname, token) {
@@ -66,27 +85,16 @@ function buildAppUrl(pathname, token) {
   return url.toString();
 }
 
+function buildPublicArticleUrl(slug) {
+  return new URL(`/articulo/${slug}`, `${env.publicSiteUrl}/`).toString();
+}
+
 function buildPublicAssetUrl(pathname) {
   return new URL(pathname, `${env.publicSiteUrl}/`).toString();
 }
 
-function buildBrandAttachments() {
-  if (!existsSync(NEWSLETTER_LOGO_PATH)) {
-    return [];
-  }
-
-  return [
-    {
-      filename: "colombiano-promedio-logo-dark.png",
-      content: readFileSync(NEWSLETTER_LOGO_PATH),
-      cid: NEWSLETTER_LOGO_CID,
-      contentType: "image/png",
-      contentDisposition: "inline",
-      headers: {
-        "X-Attachment-Id": NEWSLETTER_LOGO_CID
-      }
-    }
-  ];
+function buildBrandLogoUrl() {
+  return buildPublicAssetUrl(NEWSLETTER_LOGO_ASSET_PATH);
 }
 
 function renderHighlightCards(highlights) {
@@ -108,21 +116,11 @@ function renderHighlightCards(highlights) {
     .join("");
 }
 
-function buildLogoBackgroundStyle({ size = "300px", position = "right -36px top -32px", opacity = 1 } = {}) {
-  if (existsSync(NEWSLETTER_LOGO_PATH)) {
-    return [
-      "background-color:#081223;",
-      `background-image:url('cid:${NEWSLETTER_LOGO_CID}');`,
-      "background-repeat:no-repeat;",
-      `background-position:${position};`,
-      `background-size:${size};`,
-      opacity < 1 ? `opacity:${opacity};` : ""
-    ]
-      .filter(Boolean)
-      .join("");
-  }
-
-  return "background-color:#081223;";
+function buildLogoBackgroundStyle() {
+  return [
+    "background-color:#081223;",
+    "background-image:radial-gradient(circle at top right, rgba(21,72,167,0.34), transparent 34%), radial-gradient(circle at bottom left, rgba(201,53,53,0.18), transparent 26%);"
+  ].join("");
 }
 
 function renderShell({
@@ -142,6 +140,7 @@ function renderShell({
   const content = bodyLines
     .map((line) => `<p style="margin:0 0 14px;color:#5c687d;font-size:16px;line-height:1.72;">${escapeHtml(line)}</p>`)
     .join("");
+  const brandLogoUrl = buildBrandLogoUrl();
 
   const secondaryLink = secondaryLabel && secondaryUrl
     ? `
@@ -172,15 +171,24 @@ function renderShell({
                   <table role="presentation" style="width:100%;border-collapse:collapse;">
                     <tr>
                       <td valign="top" style="padding:0 0 24px;">
-                        <div style="display:inline-block;margin:0 0 14px;padding:8px 14px;border-radius:999px;background:rgba(255,255,255,0.08);color:#f8cf44;font-size:11px;font-weight:800;letter-spacing:0.22em;text-transform:uppercase;">
-                          Colombiano Promedio
-                        </div>
-                        <div style="margin:0 0 8px;color:#ffffff;font-size:30px;font-weight:800;line-height:1.02;letter-spacing:0.08em;text-transform:uppercase;">
-                          ${escapeHtml(MAIL_BRAND_NAME)}
-                        </div>
-                        <div style="color:#d6e2f5;font-size:13px;line-height:1.55;">
-                          ${escapeHtml(MAIL_BRAND_TAGLINE)}
-                        </div>
+                        <table role="presentation" style="border-collapse:collapse;">
+                          <tr>
+                            <td valign="middle" style="padding:0 16px 0 0;">
+                              <img src="${escapeHtml(brandLogoUrl)}" alt="${escapeHtml(MAIL_BRAND_NAME)}" width="64" height="64" style="display:block;width:64px;height:64px;border:0;border-radius:18px;" />
+                            </td>
+                            <td valign="middle">
+                              <div style="display:inline-block;margin:0 0 10px;padding:8px 14px;border-radius:999px;background:rgba(255,255,255,0.08);color:#f8cf44;font-size:11px;font-weight:800;letter-spacing:0.22em;text-transform:uppercase;">
+                                Bolet&iacute;n editorial
+                              </div>
+                              <div style="margin:0 0 8px;color:#ffffff;font-size:30px;font-weight:800;line-height:1.02;letter-spacing:0.08em;text-transform:uppercase;">
+                                ${escapeHtml(MAIL_BRAND_NAME)}
+                              </div>
+                              <div style="color:#d6e2f5;font-size:13px;line-height:1.55;">
+                                ${escapeHtml(MAIL_BRAND_TAGLINE)}
+                              </div>
+                            </td>
+                          </tr>
+                        </table>
                       </td>
                       <td align="right" valign="top" style="padding:0 0 24px 18px;">
                         <div style="display:inline-block;padding:12px 16px;border-radius:999px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.08);color:#f6f8ff;font-size:12px;font-weight:800;letter-spacing:0.16em;text-transform:uppercase;">
@@ -260,30 +268,87 @@ function buildMailHeaders({ unsubscribeUrl, feedbackKey }) {
 
   if (unsubscribeUrl) {
     headers["List-Unsubscribe"] = `<${unsubscribeUrl}>`;
-    headers["List-Unsubscribe-Post"] = "List-Unsubscribe=One-Click";
   }
 
   return headers;
 }
 
-async function deliverMail({ to, subject, html, text, unsubscribeUrl, feedbackKey, attachments = [] }) {
-  const senderDomain = env.smtpFromEmail.split("@")[1] || "localhost";
+function buildProviderErrorMessage(payload, fallbackStatus) {
+  if (typeof payload?.message === "string" && payload.message.trim()) {
+    return payload.message.trim();
+  }
+
+  if (typeof payload?.name === "string" && payload.name.trim()) {
+    return payload.name.trim();
+  }
+
+  if (typeof payload?.error?.message === "string" && payload.error.message.trim()) {
+    return payload.error.message.trim();
+  }
+
+  return `El proveedor de correo rechazo el envio (${fallbackStatus}).`;
+}
+
+async function deliverMailThroughResend({ to, subject, html, text, unsubscribeUrl, feedbackKey }) {
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${env.resendApiKey}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      from: `${MAIL_BRAND_NAME} <${env.mailFromEmail}>`,
+      to: [to],
+      subject,
+      html,
+      text,
+      reply_to: env.mailReplyTo || undefined,
+      headers: buildMailHeaders({
+        unsubscribeUrl,
+        feedbackKey
+      })
+    })
+  });
+
+  const payload = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    const error = new Error(buildProviderErrorMessage(payload, response.status));
+    error.status = 502;
+    throw error;
+  }
+
+  return payload;
+}
+
+async function deliverMail({ to, subject, html, text, unsubscribeUrl, feedbackKey }) {
+  if (getMailMode() === "resend") {
+    return deliverMailThroughResend({
+      to,
+      subject,
+      html,
+      text,
+      unsubscribeUrl,
+      feedbackKey
+    });
+  }
+
+  const senderDomain = env.mailFromEmail.split("@")[1] || "localhost";
 
   const info = await getTransporter().sendMail({
     from: {
       name: MAIL_BRAND_NAME,
-      address: env.smtpFromEmail
+      address: env.mailFromEmail
     },
     sender: {
       name: MAIL_BRAND_NAME,
-      address: env.smtpFromEmail
+      address: env.mailFromEmail
     },
     to,
-    replyTo: env.smtpReplyTo || undefined,
+    replyTo: env.mailReplyTo || undefined,
     subject,
     html,
     text,
-    attachments: attachments.length ? attachments : undefined,
     date: new Date(),
     messageId: `<${crypto.randomUUID()}@${senderDomain}>`,
     headers: buildMailHeaders({
@@ -304,7 +369,8 @@ export function buildNewsletterLinks({ confirmationToken, unsubscribeToken }) {
   return {
     homeUrl: env.publicSiteUrl,
     confirmUrl: buildAppUrl("/boletin/confirmar", confirmationToken),
-    unsubscribeUrl: buildAppUrl("/boletin/salir", unsubscribeToken)
+    unsubscribeUrl: buildAppUrl("/boletin/salir", unsubscribeToken),
+    reactivateUrl: buildAppUrl("/boletin/reactivar", confirmationToken)
   };
 }
 
@@ -352,7 +418,6 @@ export async function sendNewsletterConfirmationEmail(subscription, { confirmati
     subject: `${MAIL_BRAND_NAME} | Confirma tu suscripci\u00f3n`,
     html,
     text,
-    attachments: buildBrandAttachments(),
     unsubscribeUrl: links.unsubscribeUrl,
     feedbackKey: "confirmacion"
   });
@@ -401,8 +466,102 @@ export async function sendNewsletterWelcomeEmail(subscription, { unsubscribeToke
     subject: `${MAIL_BRAND_NAME} | Suscripci\u00f3n activa`,
     html,
     text,
-    attachments: buildBrandAttachments(),
     unsubscribeUrl: links.unsubscribeUrl,
     feedbackKey: "bienvenida"
+  });
+}
+
+export async function sendNewsletterGoodbyeEmail(subscription, { reactivationToken }) {
+  const links = buildNewsletterLinks({
+    confirmationToken: reactivationToken
+  });
+
+  const { html, text } = renderShell({
+    eyebrow: "Bolet\u00edn en pausa",
+    title: "Lamentamos verte partir",
+    intro: `${subscription.name}, tu salida del bolet\u00edn ya fue confirmada.`,
+    bodyLines: [
+      "Desde este momento dejar\u00e1s de recibir nuevas publicaciones editoriales en este correo.",
+      "Si cambias de idea, puedes reactivar tu suscripci\u00f3n con el bot\u00f3n principal o volver a registrarte desde la portada del sitio."
+    ],
+    ctaLabel: "Reactivar suscripci\u00f3n",
+    ctaUrl: links.reactivateUrl,
+    secondaryLabel: "Volver a la portada",
+    secondaryUrl: links.homeUrl,
+    footnote: "Este enlace de reactivaci\u00f3n se entrega para que puedas regresar sin repetir todo el proceso.",
+    preheader: "Tu salida del bolet\u00edn fue procesada y puedes volver cuando quieras.",
+    statusLabel: "Salida confirmada",
+    highlights: [
+      {
+        eyebrow: "Control",
+        text: "Tu correo ya no seguir\u00e1 dentro de la lista activa del bolet\u00edn.",
+        accentColor: "#c93535"
+      },
+      {
+        eyebrow: "Regreso",
+        text: "Puedes volver desde este mismo mensaje o desde el formulario p\u00fablico.",
+        accentColor: "#1548a7"
+      }
+    ]
+  });
+
+  if (!env.mailConfigured) {
+    console.info(`[newsletter-links] reactivate=${links.reactivateUrl} home=${links.homeUrl}`);
+  }
+
+  await deliverMail({
+    to: subscription.email,
+    subject: `${MAIL_BRAND_NAME} | Tu suscripci\u00f3n fue cancelada`,
+    html,
+    text,
+    feedbackKey: "despedida"
+  });
+}
+
+export async function sendNewsletterArticlePublishedEmail(subscription, { article }) {
+  const articleUrl = buildPublicArticleUrl(article.slug);
+  const articleCategory = article.category?.name || article.tags?.[0] || "Nueva lectura";
+  const articleAuthor = article.author?.name || "Equipo editorial";
+  const articleExcerpt = article.excerpt || article.subtitle || "Ya hay una nueva pieza disponible en la portada editorial.";
+
+  const { html, text } = renderShell({
+    eyebrow: "Nueva publicaci\u00f3n",
+    title: article.title,
+    intro: articleExcerpt,
+    bodyLines: [
+      `Acabamos de publicar una nueva nota firmada por ${articleAuthor}.`,
+      "Puedes abrirla desde el bot\u00f3n principal y continuar la lectura directamente en el sitio."
+    ],
+    ctaLabel: "Leer publicaci\u00f3n",
+    ctaUrl: articleUrl,
+    secondaryLabel: "Abrir portada",
+    secondaryUrl: env.publicSiteUrl,
+    footnote: "Recibes este aviso porque mantienes activa tu suscripci\u00f3n al bolet\u00edn editorial de Colombiano Promedio.",
+    preheader: `Nueva publicaci\u00f3n disponible: ${article.title}.`,
+    statusLabel: "Edici\u00f3n nueva",
+    highlights: [
+      {
+        eyebrow: "Autor",
+        text: articleAuthor,
+        accentColor: "#1548a7"
+      },
+      {
+        eyebrow: "Tema",
+        text: articleCategory,
+        accentColor: "#af7f00"
+      }
+    ]
+  });
+
+  if (!env.mailConfigured) {
+    console.info(`[newsletter-links] article=${articleUrl}`);
+  }
+
+  await deliverMail({
+    to: subscription.email,
+    subject: `${MAIL_BRAND_NAME} | Nueva publicaci\u00f3n: ${article.title}`,
+    html,
+    text,
+    feedbackKey: "publicacion"
   });
 }

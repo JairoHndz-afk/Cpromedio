@@ -1,0 +1,22 @@
+{
+  "name": "Colombiano Promedio",
+  "short_name": "ColPromedio",
+  "description": "Periodismo digital con archivo editorial, autores y lecturas recientes con identidad colombiana.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f3f5f8",
+  "theme_color": "#1548a7",
+  "lang": "es-CO",
+  "icons": [
+    {
+      "src": "assets/branding/logo-c-light.png",
+      "sizes": "1128x1128",
+      "type": "image/png"
+    },
+    {
+      "src": "assets/branding/logo-c-dark.png",
+      "sizes": "1128x1128",
+      "type": "image/png"
+    }
+  ]
+}

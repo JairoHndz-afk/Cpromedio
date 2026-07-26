@@ -1,0 +1,67 @@
+services:
+  - type: web
+    name: colombiano-promedio-backend
+    runtime: node
+    rootDir: backend
+    plan: starter
+    buildCommand: npm ci --omit=dev
+    startCommand: npm start
+    autoDeploy: true
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: TRUST_PROXY
+        value: "true"
+      - key: BOOTSTRAP_ON_START
+        value: "false"
+      - key: NEWSLETTER_REQUIRE_CONFIRM
+        value: "true"
+      - key: COOKIE_NAME
+        value: colombiano_promedio_session
+      - key: SMTP_FROM_NAME
+        value: Colombiano Promedio
+      - key: RESEND_API_KEY
+        sync: false
+      - key: RESEND_FROM_EMAIL
+        sync: false
+      - key: RESEND_REPLY_TO
+        sync: false
+      - key: MONGODB_URI
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: PUBLIC_SERVER_URL
+        sync: false
+      - key: PUBLIC_SITE_URL
+        sync: false
+      - key: FRONTEND_ORIGINS
+        sync: false
+      - key: ALLOWED_HOSTS
+        sync: false
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: JOURNALIST_EMAIL
+        sync: false
+      - key: JOURNALIST_PASSWORD
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_SECURE
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: SMTP_FROM_EMAIL
+        sync: false
+      - key: SMTP_REPLY_TO
+        sync: false
+    disk:
+      name: uploads
+      mountPath: /opt/render/project/src/uploads
+      sizeGB: 5

@@ -4,4 +4,6 @@ dist/
 coverage/
 .env
 *.log
-
+backend/uploads/
+design-previews/edge-share-preview-profile/
+.vercel/

@@ -1,0 +1,94 @@
+<svg width="1400" height="820" viewBox="0 0 1400 820" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="120" y1="90" x2="1280" y2="740" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0A1528"/>
+      <stop offset="1" stop-color="#141018"/>
+    </linearGradient>
+    <radialGradient id="goldGlow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(1120 180) rotate(135) scale(320 320)">
+      <stop stop-color="#F8C400" stop-opacity="0.26"/>
+      <stop offset="1" stop-color="#F8C400" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="redGlow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(1180 620) rotate(180) scale(340 230)">
+      <stop stop-color="#D53032" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#D53032" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="panelBorder" x1="86" y1="96" x2="1312" y2="732" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F8C400" stop-opacity="0.28"/>
+      <stop offset="0.5" stop-color="#235CC7" stop-opacity="0.20"/>
+      <stop offset="1" stop-color="#D53032" stop-opacity="0.24"/>
+    </linearGradient>
+    <linearGradient id="mediaGradient" x1="932" y1="170" x2="1240" y2="648" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F0BC44"/>
+      <stop offset="0.48" stop-color="#8D5C1E"/>
+      <stop offset="1" stop-color="#2B1C1D"/>
+    </linearGradient>
+    <linearGradient id="pill" x1="0" y1="0" x2="232" y2="0" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1C4FAE"/>
+      <stop offset="1" stop-color="#D53032"/>
+    </linearGradient>
+    <filter id="shadow" x="44" y="52" width="1312" height="716" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+      <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+      <feOffset dy="18"/>
+      <feGaussianBlur stdDeviation="20"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 0.02 0 0 0 0 0.04 0 0 0 0 0.08 0 0 0 0.42 0"/>
+      <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_0_1"/>
+      <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_0_1" result="shape"/>
+    </filter>
+  </defs>
+
+  <rect width="1400" height="820" fill="#ECEFF4"/>
+  <g filter="url(#shadow)">
+    <rect x="84" y="92" width="1232" height="636" rx="34" fill="url(#bg)"/>
+    <rect x="84.75" y="92.75" width="1230.5" height="634.5" rx="33.25" stroke="url(#panelBorder)" stroke-width="1.5"/>
+  </g>
+
+  <rect x="84" y="92" width="560" height="8" fill="#F8C400"/>
+  <rect x="644" y="92" width="338" height="8" fill="#235CC7"/>
+  <rect x="982" y="92" width="334" height="8" fill="#D53032"/>
+
+  <circle cx="1140" cy="208" r="250" fill="url(#goldGlow)"/>
+  <ellipse cx="1128" cy="620" rx="290" ry="185" fill="url(#redGlow)"/>
+
+  <image href="../frontend/src/assets/branding/logo-c-light.png" x="114" y="118" width="108" height="108" preserveAspectRatio="xMidYMid slice"/>
+
+  <text x="238" y="152" fill="#F7F8FB" font-family="Arial, Helvetica, sans-serif" font-size="34" font-weight="800" letter-spacing="0.04em">COLOMBIANO PROMEDIO</text>
+  <text x="238" y="190" fill="#B9C5D7" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="500">Hasta que la dignidad se haga costumbre</text>
+
+  <rect x="132" y="254" width="162" height="42" rx="21" fill="rgba(255,255,255,0.06)" stroke="rgba(248,196,0,0.45)"/>
+  <text x="165" y="281" fill="#F7D760" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700" letter-spacing="0.12em">LO ULTIMO</text>
+
+  <text x="132" y="352" fill="#F7F6F2" font-family="Georgia, 'Times New Roman', serif" font-size="64" font-weight="700">
+    <tspan x="132" dy="0">La comunidad de</tspan>
+    <tspan x="132" dy="76">jugadores impulsa</tspan>
+    <tspan x="132" dy="76">una nueva etapa</tspan>
+    <tspan x="132" dy="76">para los servidores</tspan>
+    <tspan x="132" dy="76">independientes</tspan>
+  </text>
+
+  <text x="136" y="642" fill="#C2CCDA" font-family="Arial, Helvetica, sans-serif" font-size="24" font-weight="500">
+    <tspan x="136" dy="0">Esto podria cambiar las cosas para la comunidad y abrir</tspan>
+    <tspan x="136" dy="32">una nueva etapa editorial dentro de Colombiano Promedio.</tspan>
+  </text>
+
+  <rect x="132" y="690" width="232" height="62" rx="31" fill="url(#pill)"/>
+  <text x="178" y="729" fill="#F8FBFF" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="700">Leer articulo</text>
+
+  <text x="132" y="786" fill="#8FA0B8" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="600" letter-spacing="0.08em">VISTA PREVIA PROPUESTA PARA WHATSAPP, X, FACEBOOK Y TELEGRAM</text>
+
+  <g>
+    <rect x="904" y="150" width="324" height="488" rx="28" fill="url(#mediaGradient)"/>
+    <rect x="932" y="180" width="268" height="432" rx="22" fill="rgba(255,255,255,0.12)" stroke="rgba(255,255,255,0.18)"/>
+    <rect x="978" y="228" width="178" height="144" rx="18" fill="rgba(255,255,255,0.10)" stroke="rgba(255,255,255,0.24)"/>
+    <rect x="978" y="392" width="178" height="184" rx="18" fill="rgba(255,255,255,0.10)" stroke="rgba(255,255,255,0.24)"/>
+    <text x="999" y="548" fill="#F7F6F2" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="700" letter-spacing="0.08em">IMAGEN DE</text>
+    <text x="999" y="576" fill="#F7F6F2" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="700" letter-spacing="0.08em">PORTADA</text>
+    <text x="999" y="612" fill="#E6D7B8" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="500">Aqui entraria la foto real</text>
+    <text x="999" y="638" fill="#E6D7B8" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="500">del articulo compartido.</text>
+  </g>
+
+  <rect x="864" y="660" width="404" height="52" rx="26" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.10)"/>
+  <text x="894" y="692" fill="#F3F6FC" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700">colombianopromedio.com</text>
+  <circle cx="1174" cy="686" r="4" fill="#F8C400"/>
+  <text x="1190" y="692" fill="#F3F6FC" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="600">Lectura editorial</text>
+</svg>

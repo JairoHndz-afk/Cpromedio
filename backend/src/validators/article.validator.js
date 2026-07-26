@@ -24,6 +24,13 @@ const articleContentBlockSchema = z.discriminatedUnion("type", [
     text: z.string().min(1, "Cada parrafo debe incluir contenido.").max(4000, "Cada parrafo no puede superar 4000 caracteres.")
   }),
   z.object({
+    type: z.literal("quote"),
+    quote: z.object({
+      text: z.string().min(1, "Cada cita debe incluir contenido.").max(1200, "Cada cita no puede superar 1200 caracteres."),
+      attribution: z.string().max(140, "La fuente de la cita no puede superar 140 caracteres.").optional().default("")
+    })
+  }),
+  z.object({
     type: z.literal("image"),
     image: articleImageSchema
   }),

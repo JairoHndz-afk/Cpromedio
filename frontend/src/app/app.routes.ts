@@ -3,9 +3,11 @@ import { CanActivateFn, Router, Routes } from "@angular/router";
 
 import { AuthService } from "./core/services/auth.service";
 import { ArticlePageComponent } from "./pages/article-page/article-page.component";
+import { AuthorPageComponent } from "./pages/author-page/author-page.component";
 import { DashboardPageComponent } from "./pages/dashboard-page/dashboard-page.component";
 import { HomePageComponent } from "./pages/home-page/home-page.component";
 import { LoginPageComponent } from "./pages/login-page/login-page.component";
+import { PrivacyPageComponent } from "./pages/privacy-page/privacy-page.component";
 import { SubscriptionStatusPageComponent } from "./pages/subscription-status-page/subscription-status-page.component";
 
 const authGuard: CanActivateFn = async () => {
@@ -35,6 +37,10 @@ export const routes: Routes = [
     component: LoginPageComponent
   },
   {
+    path: "privacidad",
+    component: PrivacyPageComponent
+  },
+  {
     path: "dashboard",
     canActivate: [authGuard],
     component: DashboardPageComponent
@@ -42,6 +48,10 @@ export const routes: Routes = [
   {
     path: "articulo/:slug",
     component: ArticlePageComponent
+  },
+  {
+    path: "autor/:authorId",
+    component: AuthorPageComponent
   },
   {
     path: "boletin/:action",

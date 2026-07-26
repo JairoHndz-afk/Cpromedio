@@ -7,7 +7,12 @@ import { Category } from "../models/Category.js";
 import { writeAuditLog } from "../lib/audit.js";
 import { env } from "../config/env.js";
 import { getMainSiteSetting } from "../lib/site-settings.js";
-import { sendNewsletterConfirmationEmail, sendNewsletterWelcomeEmail } from "../lib/newsletter-mailer.js";
+import {
+  sendNewsletterArticlePublishedEmail,
+  sendNewsletterConfirmationEmail,
+  sendNewsletterGoodbyeEmail,
+  sendNewsletterWelcomeEmail
+} from "../lib/newsletter-mailer.js";
 import { createExpiringToken, createOpaqueToken, hashOpaqueToken } from "../lib/newsletter-tokens.js";
 import { Subscription } from "../models/Subscription.js";
 import { User } from "../models/User.js";
@@ -16,6 +21,7 @@ import { readBoundedPositiveInt } from "../utils/request.js";
 import { subscriptionInputSchema, subscriptionTokenSchema } from "../validators/subscription.validator.js";
 
 const recentArticleViewsCookieName = "cp_recent_views";
+const publicConsentCookieName = "cp_cookie_preferences";
 const recentArticleViewWindowMs = 1000 * 60 * 45;
 const recentArticleViewLimit = 24;
 const publicSubscriptionAcceptedMessage = "Si el correo es valido, revisa tu bandeja para continuar con el boletin.";
@@ -92,6 +98,34 @@ function parseRecentArticleViews(rawValue) {
   } catch {
     return {};
   }
+}
+
+function parsePublicConsentPreferences(rawValue) {
+  if (typeof rawValue !== "string" || !rawValue.trim()) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(decodeURIComponent(rawValue));
+
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return null;
+    }
+
+    return {
+      essential: parsed.essential === true,
+      preferences: parsed.preferences === true,
+      measurement: parsed.measurement === true,
+      version: Number(parsed.version ?? 0)
+    };
+  } catch {
+    return null;
+  }
+}
+
+function hasMeasurementConsent(req) {
+  const preferences = parsePublicConsentPreferences(req.cookies?.[publicConsentCookieName]);
+  return preferences?.essential === true && preferences?.version === 1 && preferences?.measurement === true;
 }
 
 function pruneRecentArticleViews(entries, now = Date.now()) {
@@ -175,6 +209,10 @@ async function registerArticleView(req, articleId, now = Date.now()) {
 }
 
 async function shouldCountArticleView(req, res, articleId) {
+  if (!hasMeasurementConsent(req)) {
+    return false;
+  }
+
   const now = Date.now();
   const articleKey = articleId.toString();
   const recentViews = pruneRecentArticleViews(parseRecentArticleViews(req.cookies?.[recentArticleViewsCookieName]), now);
@@ -270,6 +308,28 @@ function createHttpError(status, message) {
   const error = new Error(message);
   error.status = status;
   return error;
+}
+
+function escapeXml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
+
+function formatSeoDate(value) {
+  const date = value ? new Date(value) : null;
+  return date && !Number.isNaN(date.getTime()) ? date.toISOString() : "";
+}
+
+function buildPublicArticleUrl(slug) {
+  return new URL(`/articulo/${slug}`, `${env.publicSiteUrl}/`).toString();
+}
+
+function buildPublicAuthorUrl(authorId) {
+  return new URL(`/autor/${authorId}`, `${env.publicSiteUrl}/`).toString();
 }
 
 function serializeSubscriptionMessage(message) {
@@ -387,6 +447,28 @@ async function sendWelcomeOrThrow(subscription, tokens) {
   }
 }
 
+async function sendGoodbyeBestEffort(subscription, tokens) {
+  try {
+    await sendNewsletterGoodbyeEmail(subscription, tokens);
+  } catch (error) {
+    console.error("No fue posible enviar el correo de despedida del boletin.");
+    console.error(error);
+  }
+}
+
+async function dispatchPublishedArticleBulletin(article) {
+  const activeSubscriptions = await Subscription.find({ status: "active" }).select("name email status plan");
+
+  for (const subscription of activeSubscriptions) {
+    try {
+      await sendNewsletterArticlePublishedEmail(subscription, { article });
+    } catch (error) {
+      console.error(`No fue posible enviar el aviso editorial a ${subscription.email}.`);
+      console.error(error);
+    }
+  }
+}
+
 function hasLockedPublicSubscriptionStatus(subscription) {
   return subscription?.status === "paused";
 }
@@ -500,6 +582,8 @@ export async function getPublicSite(_req, res, next) {
     next(error);
   }
 }
+
+export { dispatchPublishedArticleBulletin };
 
 export async function listPublicArticles(req, res, next) {
   try {
@@ -633,6 +717,76 @@ export async function getPublicAuthor(req, res, next) {
   }
 }
 
+export async function getRobotsTxt(_req, res, next) {
+  try {
+    const sitemapUrl = new URL("/sitemap.xml", `${env.publicSiteUrl}/`).toString();
+    const body = [
+      "User-agent: *",
+      "Allow: /",
+      "Disallow: /dashboard",
+      "Disallow: /login",
+      "Disallow: /boletin",
+      "Disallow: /api/",
+      `Sitemap: ${sitemapUrl}`
+    ].join("\n");
+
+    res.type("text/plain; charset=utf-8").send(body);
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function getSitemapXml(_req, res, next) {
+  try {
+    const [articles, authorIds] = await Promise.all([
+      Article.find(publishedVisibleArticleFilter())
+        .select("slug author publishedAt updatedAt featured")
+        .sort({ publishedAt: -1, updatedAt: -1, _id: -1 }),
+      Article.distinct("author", publishedVisibleArticleFilter())
+    ]);
+
+    const uniqueAuthorIds = [...new Set(authorIds.map((item) => item?.toString?.() ?? "").filter(Boolean))];
+    const urls = [
+      {
+        loc: env.publicSiteUrl,
+        lastmod: new Date().toISOString(),
+        changefreq: "hourly",
+        priority: "1.0"
+      },
+      ...uniqueAuthorIds.map((authorId) => ({
+        loc: buildPublicAuthorUrl(authorId),
+        lastmod: new Date().toISOString(),
+        changefreq: "daily",
+        priority: "0.6"
+      })),
+      ...articles.map((article) => ({
+        loc: buildPublicArticleUrl(article.slug),
+        lastmod: formatSeoDate(article.updatedAt ?? article.publishedAt) || new Date().toISOString(),
+        changefreq: "daily",
+        priority: article.featured ? "0.9" : "0.8"
+      }))
+    ];
+
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${urls
+  .map(
+    (entry) => `  <url>
+    <loc>${escapeXml(entry.loc)}</loc>
+    <lastmod>${escapeXml(entry.lastmod)}</lastmod>
+    <changefreq>${escapeXml(entry.changefreq)}</changefreq>
+    <priority>${escapeXml(entry.priority)}</priority>
+  </url>`
+  )
+  .join("\n")}
+</urlset>`;
+
+    res.type("application/xml; charset=utf-8").send(xml);
+  } catch (error) {
+    next(error);
+  }
+}
+
 export async function createPublicSubscription(req, res, next) {
   try {
     const payload = subscriptionInputSchema.parse(req.body);
@@ -760,6 +914,53 @@ export async function confirmPublicSubscription(req, res, next) {
   }
 }
 
+export async function reactivatePublicSubscription(req, res, next) {
+  try {
+    const payload = subscriptionTokenSchema.parse(req.body);
+    const tokenHash = hashOpaqueToken(payload.token);
+    const subscription = await Subscription.findOne({ confirmationTokenHash: tokenHash });
+
+    if (!subscription) {
+      throw createHttpError(404, "El enlace de reactivacion no es valido.");
+    }
+
+    if (subscription.confirmationTokenExpiresAt && subscription.confirmationTokenExpiresAt < new Date()) {
+      throw createHttpError(410, "El enlace de reactivacion ya vencio. Puedes volver a suscribirte desde la portada.");
+    }
+
+    if (subscription.status !== "cancelled") {
+      throw createHttpError(409, "La suscripcion ya no necesita reactivacion.");
+    }
+
+    const reactivatedAt = new Date();
+    let unsubscribeToken = "";
+
+    await persistThenSendSubscriptionMail({
+      subscription,
+      wasExisting: true,
+      mutate() {
+        unsubscribeToken = rotateUnsubscribeToken(subscription);
+        subscription.status = "active";
+        subscription.confirmedAt = subscription.confirmedAt ?? reactivatedAt;
+        subscription.welcomeSentAt = reactivatedAt;
+        subscription.confirmationTokenHash = "";
+        subscription.confirmationTokenExpiresAt = null;
+      },
+      deliver() {
+        return sendWelcomeOrThrow(subscription, { unsubscribeToken });
+      }
+    });
+
+    await logSubscriptionEvent(req, subscription, "subscription.reactivated", {
+      reactivatedAt
+    });
+
+    res.json(serializeSubscriptionMessage("Suscripcion reactivada. Volveras a recibir nuevas publicaciones del boletin."));
+  } catch (error) {
+    next(error);
+  }
+}
+
 export async function unsubscribePublicSubscription(req, res, next) {
   try {
     const payload = subscriptionTokenSchema.parse(req.body);
@@ -770,16 +971,25 @@ export async function unsubscribePublicSubscription(req, res, next) {
       throw createHttpError(404, "El enlace de salida no es valido.");
     }
 
+    const reactivation = createExpiringToken(24 * 30);
     subscription.status = "cancelled";
-    subscription.confirmationTokenHash = "";
-    subscription.confirmationTokenExpiresAt = null;
+    subscription.confirmationTokenHash = reactivation.hash;
+    subscription.confirmationTokenExpiresAt = reactivation.expiresAt;
     await subscription.save();
+
+    void sendGoodbyeBestEffort(subscription, {
+      reactivationToken: reactivation.token
+    });
 
     await logSubscriptionEvent(req, subscription, "subscription.cancelled", {
       cancelledAt: new Date()
     });
 
-    res.json(serializeSubscriptionMessage("Tu suscripcion fue cancelada correctamente."));
+    res.json(
+      serializeSubscriptionMessage(
+        "Tu suscripcion fue cancelada correctamente. Si cambias de idea, puedes volver desde el correo de despedida o desde la portada."
+      )
+    );
   } catch (error) {
     next(error);
   }

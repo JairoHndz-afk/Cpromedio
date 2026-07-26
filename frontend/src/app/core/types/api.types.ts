@@ -28,10 +28,19 @@ export interface ArticleEmbedAsset {
   title?: string;
 }
 
+export interface ArticleQuoteAsset {
+  text: string;
+  attribution?: string;
+}
+
 export type ArticleContentBlock =
   | {
       type: "paragraph";
       text: string;
+    }
+  | {
+      type: "quote";
+      quote: ArticleQuoteAsset;
     }
   | {
       type: "image";

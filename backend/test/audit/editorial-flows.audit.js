@@ -3,7 +3,14 @@ import test from "node:test";
 
 import { env } from "../../src/config/env.js";
 import { deleteDashboardArticle, deleteUser, moderateArticle, submitArticleForReview, updateSubscription } from "../../src/controllers/dashboard.controller.js";
-import { confirmPublicSubscription, createPublicSubscription, getPublicArticle } from "../../src/controllers/public.controller.js";
+import {
+  confirmPublicSubscription,
+  createPublicSubscription,
+  dispatchPublishedArticleBulletin,
+  getPublicArticle,
+  reactivatePublicSubscription,
+  unsubscribePublicSubscription
+} from "../../src/controllers/public.controller.js";
 import { clearFeaturedArticleSelection } from "../../src/lib/site-settings.js";
 import { AuditLog } from "../../src/models/AuditLog.js";
 import { Article } from "../../src/models/Article.js";
@@ -381,6 +388,190 @@ test("audita que un token de confirmacion no reactive suscripciones fuera del es
   assert.equal(pausedSubscription.status, "paused");
 });
 
+test("audita que cancelar una suscripcion deje listo un enlace de reactivacion", async (t) => {
+  const originalFindOne = Subscription.findOne;
+  const originalMailConfigured = env.mailConfigured;
+  const originalAuditCreate = AuditLog.create;
+  const originalConsoleInfo = console.info;
+
+  let saveCalls = 0;
+  const subscription = {
+    _id: createMockObjectId("subscription-cancelled"),
+    name: "Lector cancelado",
+    email: "cancelado@example.com",
+    plan: "newsletter",
+    status: "active",
+    interests: ["actualidad"],
+    source: "site",
+    confirmationTokenHash: "",
+    confirmationTokenExpiresAt: null,
+    unsubscribeTokenHash: "hash-anterior",
+    confirmedAt: new Date("2026-07-24T00:00:00.000Z"),
+    welcomeSentAt: new Date("2026-07-24T00:00:00.000Z"),
+    async save() {
+      saveCalls += 1;
+      return this;
+    }
+  };
+
+  Subscription.findOne = async () => subscription;
+  env.mailConfigured = false;
+  AuditLog.create = async () => ({});
+  console.info = () => {};
+
+  t.after(() => {
+    Subscription.findOne = originalFindOne;
+    env.mailConfigured = originalMailConfigured;
+    AuditLog.create = originalAuditCreate;
+    console.info = originalConsoleInfo;
+  });
+
+  const request = createMockRequest({
+    body: {
+      token: "token-de-salida-publico-1234567890"
+    }
+  });
+  const response = createMockResponse();
+
+  await unsubscribePublicSubscription(request, response, (error) => {
+    throw error;
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(saveCalls, 1);
+  assert.equal(subscription.status, "cancelled");
+  assert.notEqual(subscription.confirmationTokenHash, "");
+  assert.ok(subscription.confirmationTokenExpiresAt instanceof Date);
+  assert.match(response.payload?.message ?? "", /correo de despedida|portada/i);
+});
+
+test("audita que un enlace de reactivacion devuelva la suscripcion al estado activo", async (t) => {
+  const originalFindOne = Subscription.findOne;
+  const originalMailConfigured = env.mailConfigured;
+  const originalAuditCreate = AuditLog.create;
+  const originalConsoleInfo = console.info;
+
+  let saveCalls = 0;
+  const previousUnsubscribeHash = "hash-previo";
+  const subscription = {
+    _id: createMockObjectId("subscription-reactivate"),
+    name: "Lector de regreso",
+    email: "regreso@example.com",
+    plan: "newsletter",
+    status: "cancelled",
+    interests: [],
+    source: "site",
+    confirmationTokenHash: "hash-reactivacion",
+    confirmationTokenExpiresAt: new Date("2026-08-25T00:00:00.000Z"),
+    unsubscribeTokenHash: previousUnsubscribeHash,
+    confirmedAt: new Date("2026-07-20T00:00:00.000Z"),
+    welcomeSentAt: new Date("2026-07-20T00:00:00.000Z"),
+    async save() {
+      saveCalls += 1;
+      return this;
+    }
+  };
+
+  Subscription.findOne = async () => subscription;
+  env.mailConfigured = false;
+  AuditLog.create = async () => ({});
+  console.info = () => {};
+
+  t.after(() => {
+    Subscription.findOne = originalFindOne;
+    env.mailConfigured = originalMailConfigured;
+    AuditLog.create = originalAuditCreate;
+    console.info = originalConsoleInfo;
+  });
+
+  const request = createMockRequest({
+    body: {
+      token: "token-reactivacion-publico-1234567890"
+    }
+  });
+  const response = createMockResponse();
+
+  await reactivatePublicSubscription(request, response, (error) => {
+    throw error;
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(saveCalls, 1);
+  assert.equal(subscription.status, "active");
+  assert.equal(subscription.confirmationTokenHash, "");
+  assert.equal(subscription.confirmationTokenExpiresAt, null);
+  assert.notEqual(subscription.unsubscribeTokenHash, previousUnsubscribeHash);
+  assert.match(response.payload?.message ?? "", /reactivada/i);
+});
+
+test("audita que publicar una nota despache el boletin a suscriptores activos", async (t) => {
+  const originalSubscriptionFind = Subscription.find;
+  const originalConsoleInfo = console.info;
+  const originalMailConfigured = env.mailConfigured;
+
+  const capturedLogs = [];
+  let receivedFilter = null;
+  const article = {
+    _id: createMockObjectId("article-newsletter"),
+    slug: "nota-para-boletin",
+    title: "Nota para boletin",
+    subtitle: "Subtitulo editorial",
+    excerpt: "Resumen breve para activar el boletin.",
+    body: ["Resumen breve para activar el boletin."],
+    contentBlocks: [{ type: "paragraph", text: "Resumen breve para activar el boletin." }],
+    cover: { url: "", alt: "", type: "image", positionX: 50, positionY: 50 },
+    author: {
+      _id: createMockObjectId("admin-1"),
+      name: "Administrador",
+      email: "admin@periodico.local",
+      role: "admin"
+    },
+    category: null,
+    tags: ["actualidad"],
+    metrics: { views: 0, shares: 0, reactions: 0 },
+    status: "published",
+    featured: false,
+    isPremium: false,
+    readingTime: 1,
+    publishedAt: new Date("2026-07-26T00:00:00.000Z"),
+    updatedAt: new Date("2026-07-26T00:00:00.000Z"),
+    moderationNote: "",
+    moderationHistory: []
+  };
+
+  Subscription.find = (filter) => ({
+    async select() {
+      receivedFilter = filter;
+      return [
+        {
+          name: "Lector activo",
+          email: "activo@example.com",
+          status: "active",
+          plan: "newsletter"
+        }
+      ];
+    }
+  });
+  console.info = (...args) => {
+    capturedLogs.push(args.join(" "));
+  };
+  env.mailConfigured = false;
+
+  t.after(() => {
+    Subscription.find = originalSubscriptionFind;
+    console.info = originalConsoleInfo;
+    env.mailConfigured = originalMailConfigured;
+  });
+
+  await dispatchPublishedArticleBulletin(article);
+
+  assert.equal(receivedFilter?.status, "active");
+  assert.ok(
+    capturedLogs.some((entry) => entry.includes("Nueva publicaci")),
+    "Publicar una nota deberia generar al menos una previsualizacion del correo editorial."
+  );
+});
+
 test("audita que destacar un articulo retire el destacado previo para mantener una unica portada activa", async (t) => {
   const originalFindOne = Article.findOne;
   const originalUpdateMany = Article.updateMany;
@@ -741,9 +932,21 @@ test("audita que las vistas publicas no sumen varias veces dentro de la misma ve
     ArticleView.create = originalArticleViewCreate;
   });
 
+  const measurementConsentCookie = encodeURIComponent(
+    JSON.stringify({
+      essential: true,
+      preferences: false,
+      measurement: true,
+      version: 1,
+      updatedAt: "2026-07-26T00:00:00.000Z"
+    })
+  );
+
   const firstRequest = createMockRequest({
     params: { slug: "nota-vistas" },
-    cookies: {}
+    cookies: {
+      cp_cookie_preferences: measurementConsentCookie
+    }
   });
   const firstResponse = createMockResponse();
 
@@ -757,6 +960,7 @@ test("audita que las vistas publicas no sumen varias veces dentro de la misma ve
   const secondRequest = createMockRequest({
     params: { slug: "nota-vistas" },
     cookies: {
+      cp_cookie_preferences: measurementConsentCookie,
       [firstResponse.cookies[0].name]: firstResponse.cookies[0].value
     }
   });
@@ -839,10 +1043,21 @@ test("audita que las vistas publicas no puedan inflarse repitiendo la carga sin 
     "sec-ch-ua-platform": "\"Windows\"",
     "sec-ch-ua-mobile": "?0"
   };
+  const measurementConsentCookie = encodeURIComponent(
+    JSON.stringify({
+      essential: true,
+      preferences: false,
+      measurement: true,
+      version: 1,
+      updatedAt: "2026-07-26T00:00:00.000Z"
+    })
+  );
 
   const firstRequest = createMockRequest({
     params: { slug: "nota-vistas-fingerprint" },
-    cookies: {},
+    cookies: {
+      cp_cookie_preferences: measurementConsentCookie
+    },
     headers,
     ip: "10.0.0.7"
   });
@@ -854,7 +1069,9 @@ test("audita que las vistas publicas no puedan inflarse repitiendo la carga sin 
 
   const secondRequest = createMockRequest({
     params: { slug: "nota-vistas-fingerprint" },
-    cookies: {},
+    cookies: {
+      cp_cookie_preferences: measurementConsentCookie
+    },
     headers,
     ip: "10.0.0.7"
   });

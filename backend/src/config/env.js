@@ -105,6 +105,14 @@ const smtpFromEmail = (process.env.SMTP_FROM_EMAIL ?? smtpUser ?? adminEmail).tr
 const smtpFromName = process.env.SMTP_FROM_NAME?.trim() ?? "Colombiano Promedio";
 const smtpReplyTo = process.env.SMTP_REPLY_TO?.trim().toLowerCase() ?? "";
 const smtpSecure = toBoolean(process.env.SMTP_SECURE, false);
+const resendApiKey = process.env.RESEND_API_KEY?.trim() ?? "";
+const resendFromEmail = (process.env.RESEND_FROM_EMAIL ?? process.env.SMTP_FROM_EMAIL ?? "").trim().toLowerCase();
+const resendReplyTo = process.env.RESEND_REPLY_TO?.trim().toLowerCase() ?? "";
+const smtpConfigured = Boolean(smtpHost && smtpUser && smtpPass);
+const resendConfigured = Boolean(resendApiKey && resendFromEmail);
+const mailProvider = resendConfigured ? "resend" : smtpConfigured ? "smtp" : "preview";
+const mailFromEmail = (resendConfigured ? resendFromEmail : smtpFromEmail).trim().toLowerCase();
+const mailReplyTo = (resendConfigured ? resendReplyTo || smtpReplyTo : smtpReplyTo).trim().toLowerCase();
 const newsletterRequireConfirm = toBoolean(process.env.NEWSLETTER_REQUIRE_CONFIRM, true);
 const bootstrapOnStart = toBoolean(process.env.BOOTSTRAP_ON_START, isLocal);
 const allowedOrigins = uniqueList(
@@ -144,7 +152,15 @@ export const env = {
   smtpFromEmail,
   smtpFromName,
   smtpReplyTo,
-  mailConfigured: Boolean(smtpHost && smtpUser && smtpPass),
+  smtpConfigured,
+  resendApiKey,
+  resendFromEmail,
+  resendReplyTo,
+  resendConfigured,
+  mailProvider,
+  mailConfigured: resendConfigured || smtpConfigured,
+  mailFromEmail,
+  mailReplyTo,
   newsletterRequireConfirm,
   bootstrapOnStart,
   bootstrapAdmin: {

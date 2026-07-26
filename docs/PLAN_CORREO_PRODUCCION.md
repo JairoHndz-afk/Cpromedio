@@ -23,16 +23,16 @@ salgan desde el dominio del medio, con buena reputacion, enlaces reales y la min
 
 ### Opcion recomendada
 
-Usar un proveedor transaccional compatible con SMTP para no cambiar el flujo actual del backend.
+Usar un proveedor transaccional real. Desde el 26 de julio de 2026 el proyecto ya puede trabajar tanto con `Resend API` como con `SMTP`.
 
 Opciones recomendadas:
 
-- Postmark
 - Resend
+- Postmark
 - Mailgun
 - SendGrid
 
-La app ya usa `nodemailer`, asi que la migracion mas simple es configurar el SMTP del proveedor.
+La salida mas limpia para este proyecto hoy es `Resend`, porque evita pelear con SMTP y deja una integracion mas directa.
 
 ## Pasos obligatorios
 
@@ -77,14 +77,28 @@ Politica sugerida para arrancar:
 
 En produccion, el `.env` debe dejar de usar `localhost` y Gmail personal.
 
-Valores esperados:
+Valores esperados si usas Resend:
 
 ```env
 NODE_ENV=production
 PUBLIC_SITE_URL=https://tudominio.com
-PUBLIC_SERVER_URL=https://tudominio.com
+PUBLIC_SERVER_URL=https://api.tudominio.com
 FRONTEND_ORIGINS=https://tudominio.com
-ALLOWED_HOSTS=tudominio.com
+ALLOWED_HOSTS=tudominio.com,api.tudominio.com
+
+RESEND_API_KEY=TU_API_KEY_REAL
+RESEND_FROM_EMAIL=no-reply@tudominio.com
+RESEND_REPLY_TO=redaccion@tudominio.com
+```
+
+Valores esperados si usas SMTP:
+
+```env
+NODE_ENV=production
+PUBLIC_SITE_URL=https://tudominio.com
+PUBLIC_SERVER_URL=https://api.tudominio.com
+FRONTEND_ORIGINS=https://tudominio.com
+ALLOWED_HOSTS=tudominio.com,api.tudominio.com
 
 SMTP_HOST=smtp.tu-proveedor.com
 SMTP_PORT=587
@@ -101,7 +115,7 @@ SMTP_REPLY_TO=redaccion@tudominio.com
 Debes regenerar:
 
 - `JWT_SECRET`
-- `SMTP_PASS`
+- `RESEND_API_KEY` o `SMTP_PASS`
 - `ADMIN_PASSWORD`
 - `JOURNALIST_PASSWORD`
 
@@ -173,7 +187,7 @@ Eso ayuda, pero no compensa una configuracion pobre de dominio o remitente.
 La salida mas limpia para este proyecto es:
 
 1. montar el dominio real
-2. migrar SMTP a Postmark, Resend, Mailgun o SendGrid
+2. configurar Resend con dominio propio y DNS correcto
 3. corregir el `.env` productivo
 4. rotar secretos
 5. hacer pruebas reales en Gmail y Outlook antes del lanzamiento

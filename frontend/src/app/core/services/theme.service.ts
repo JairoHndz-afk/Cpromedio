@@ -1,6 +1,8 @@
 import { DOCUMENT } from "@angular/common";
 import { Injectable, inject, signal } from "@angular/core";
 
+import { CookieConsentService } from "./cookie-consent.service";
+
 type ThemeMode = "light" | "dark";
 
 const STORAGE_KEY = "periodico-theme";
@@ -8,6 +10,7 @@ const STORAGE_KEY = "periodico-theme";
 @Injectable({ providedIn: "root" })
 export class ThemeService {
   private readonly document = inject(DOCUMENT);
+  private readonly consent = inject(CookieConsentService);
 
   readonly mode = signal<ThemeMode>("light");
 
@@ -16,8 +19,8 @@ export class ThemeService {
       return;
     }
 
-    const storedMode = window.localStorage.getItem(STORAGE_KEY);
     const preferredMode: ThemeMode = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    const storedMode = this.consent.allowsPreferenceStorage() ? window.localStorage.getItem(STORAGE_KEY) : null;
     const mode = storedMode === "dark" || storedMode === "light" ? storedMode : preferredMode;
 
     this.apply(mode);
@@ -27,12 +30,20 @@ export class ThemeService {
     this.apply(this.mode() === "dark" ? "light" : "dark");
   }
 
+  syncPersistence(): void {
+    this.apply(this.mode());
+  }
+
   private apply(mode: ThemeMode): void {
     this.mode.set(mode);
     this.document.documentElement.dataset["theme"] = mode;
 
     if (typeof window !== "undefined") {
-      window.localStorage.setItem(STORAGE_KEY, mode);
+      if (this.consent.allowsPreferenceStorage()) {
+        window.localStorage.setItem(STORAGE_KEY, mode);
+      } else {
+        window.localStorage.removeItem(STORAGE_KEY);
+      }
     }
   }
 }
