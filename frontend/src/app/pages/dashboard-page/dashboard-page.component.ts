@@ -409,7 +409,7 @@ interface ConfirmDialogState {
                         </label>
                       </div>
 
-                      <p class="helper-text">Por seguridad, solo se aceptan imagenes subidas al propio servidor del medio.</p>
+                      <p class="helper-text">Por seguridad, solo se aceptan imagenes subidas a infraestructura controlada por el medio.</p>
                       <p class="helper-text" *ngIf="block.uploading">Subiendo imagen...</p>
 
                       <figure class="editor-image-preview" *ngIf="block.imageUrl">
@@ -528,7 +528,7 @@ interface ConfirmDialogState {
                     />
                   </label>
 
-                  <p class="helper-text">Por seguridad, la portada debe provenir de archivos subidos al servidor del medio.</p>
+                  <p class="helper-text">Por seguridad, la portada debe provenir de archivos subidos a infraestructura controlada por el medio.</p>
                   <p class="helper-text" *ngIf="uploadingCover">Subiendo portada...</p>
 
                   <div class="form-grid" *ngIf="articleForm.coverUrl && isVisualCoverType(articleForm.coverType)">

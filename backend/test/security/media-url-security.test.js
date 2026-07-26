@@ -25,7 +25,7 @@ test("rechaza URLs externas arbitrarias para portadas e imagenes editoriales", (
           }
         ]
       }),
-    /subidos al servidor/i
+    /infraestructura controlada/i
   );
 
   assert.throws(
@@ -48,7 +48,7 @@ test("rechaza URLs externas arbitrarias para portadas e imagenes editoriales", (
           }
         ]
       }),
-    /subidos al servidor/i
+    /infraestructura controlada/i
   );
 });
 
@@ -83,6 +83,27 @@ test("acepta uploads propios y sanea medios remotos ya almacenados", () => {
     ["paragraph", "image"]
   );
   assert.equal(blocks[1].image.url, allowedUploadUrl);
+});
+
+test("acepta assets de Cloudinary del cloud configurado y rechaza clouds ajenos", (t) => {
+  const originalCloudinaryCloudName = env.cloudinaryCloudName;
+  const originalCloudinaryConfigured = env.cloudinaryConfigured;
+  const allowedCloudinaryUrl =
+    "https://res.cloudinary.com/wbvvnw52/image/upload/f_auto,q_auto/v1785003138/colombiano-promedio/news/2026/07/portada-segura.webp";
+  const rejectedCloudinaryUrl =
+    "https://res.cloudinary.com/otro-cloud/image/upload/v1785003138/colombiano-promedio/news/2026/07/portada-segura.webp";
+
+  env.cloudinaryCloudName = "wbvvnw52";
+  env.cloudinaryConfigured = true;
+
+  t.after(() => {
+    env.cloudinaryCloudName = originalCloudinaryCloudName;
+    env.cloudinaryConfigured = originalCloudinaryConfigured;
+  });
+
+  assert.equal(isOwnedMediaUrl(allowedCloudinaryUrl), true);
+  assert.equal(sanitizeOwnedMediaUrl(allowedCloudinaryUrl), allowedCloudinaryUrl);
+  assert.equal(sanitizeOwnedMediaUrl(rejectedCloudinaryUrl), "");
 });
 
 test("rechaza rutas relativas con traversal aunque aparenten salir de /uploads/news", () => {

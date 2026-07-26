@@ -21,6 +21,14 @@ services:
         value: colombiano_promedio_session
       - key: SMTP_FROM_NAME
         value: Colombiano Promedio
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      - key: CLOUDINARY_UPLOAD_FOLDER
+        value: colombiano-promedio
       - key: RESEND_API_KEY
         sync: false
       - key: RESEND_FROM_EMAIL
@@ -61,7 +69,3 @@ services:
         sync: false
       - key: SMTP_REPLY_TO
         sync: false
-    disk:
-      name: uploads
-      mountPath: /opt/render/project/src/uploads
-      sizeGB: 5

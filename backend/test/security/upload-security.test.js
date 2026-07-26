@@ -78,3 +78,53 @@ test("rechaza archivos cuya firma no coincide con el MIME declarado", async () =
   assert.match(capturedError.message, /formato declarado|formato seguro permitido/i);
   assert.equal(response.payload, null);
 });
+
+test("usa Cloudinary cuando la integracion esta configurada", async (t) => {
+  const originalCloudinaryConfigured = env.cloudinaryConfigured;
+  const originalCloudinaryCloudName = env.cloudinaryCloudName;
+  const originalCloudinaryApiKey = env.cloudinaryApiKey;
+  const originalCloudinaryApiSecret = env.cloudinaryApiSecret;
+  const originalCloudinaryFolder = env.cloudinaryFolder;
+  const originalFetch = globalThis.fetch;
+  const request = createMockRequest(validPngDataUrl);
+  const response = createMockResponse();
+
+  env.cloudinaryConfigured = true;
+  env.cloudinaryCloudName = "wbvvnw52";
+  env.cloudinaryApiKey = "fake-key";
+  env.cloudinaryApiSecret = "fake-secret";
+  env.cloudinaryFolder = "colombiano-promedio";
+  globalThis.fetch = async (url) => {
+    assert.match(String(url), /api\.cloudinary\.com\/v1_1\/wbvvnw52\/image\/upload/i);
+
+    return {
+      ok: true,
+      async json() {
+        return {
+          secure_url:
+            "https://res.cloudinary.com/wbvvnw52/image/upload/v1785003138/colombiano-promedio/news/2026/07/portada-segura.webp",
+          public_id: "colombiano-promedio/news/2026/07/portada-segura"
+        };
+      }
+    };
+  };
+
+  t.after(() => {
+    env.cloudinaryConfigured = originalCloudinaryConfigured;
+    env.cloudinaryCloudName = originalCloudinaryCloudName;
+    env.cloudinaryApiKey = originalCloudinaryApiKey;
+    env.cloudinaryApiSecret = originalCloudinaryApiSecret;
+    env.cloudinaryFolder = originalCloudinaryFolder;
+    globalThis.fetch = originalFetch;
+  });
+
+  await uploadArticleImage(request, response, (error) => {
+    throw error;
+  });
+
+  assert.equal(response.statusCode, 201);
+  assert.equal(
+    response.payload?.url,
+    "https://res.cloudinary.com/wbvvnw52/image/upload/v1785003138/colombiano-promedio/news/2026/07/portada-segura.webp"
+  );
+});

@@ -4,18 +4,21 @@ import { env } from "../config/env.js";
 
 const uploadsNewsPathPattern = /^\/uploads\/news\/[a-zA-Z0-9/_\-.]+$/;
 const uploadsNewsRootPath = "/uploads/news/";
-const allowedOwnedMediaOrigins = new Set(
-  [env.publicServerUrl, env.publicSiteUrl]
-    .filter(Boolean)
-    .map((value) => {
-      try {
-        return new URL(value).origin;
-      } catch {
-        return "";
-      }
-    })
-    .filter(Boolean)
-);
+
+function getAllowedOwnedMediaOrigins() {
+  return new Set(
+    [env.publicServerUrl, env.publicSiteUrl]
+      .filter(Boolean)
+      .map((value) => {
+        try {
+          return new URL(value).origin;
+        } catch {
+          return "";
+        }
+      })
+      .filter(Boolean)
+  );
+}
 
 export function sanitizeText(value, maxLength = 5000) {
   if (typeof value !== "string") {
@@ -181,6 +184,39 @@ function normalizeOwnedUploadsPath(value) {
   return normalizedPath;
 }
 
+function normalizeCloudinaryPath(pathname) {
+  if (!env.cloudinaryCloudName) {
+    return "";
+  }
+
+  const normalizedPath = path.posix.normalize(pathname.startsWith("/") ? pathname : `/${pathname}`);
+  const segments = normalizedPath.split("/").filter(Boolean);
+
+  if (segments.length < 5) {
+    return "";
+  }
+
+  const [cloudName, resourceType, deliveryType, ...rest] = segments;
+
+  if (cloudName !== env.cloudinaryCloudName) {
+    return "";
+  }
+
+  if (!["image", "video", "raw"].includes(resourceType)) {
+    return "";
+  }
+
+  if (deliveryType !== "upload") {
+    return "";
+  }
+
+  if (rest.some((segment) => !segment || segment === "." || segment === "..")) {
+    return "";
+  }
+
+  return normalizedPath;
+}
+
 function buildYouTubeEmbed(url) {
   const host = url.hostname.replace(/^www\./, "").toLowerCase();
   let videoId = "";
@@ -257,9 +293,19 @@ export function sanitizeOwnedMediaUrl(value) {
     return "";
   }
 
+  if (url.hostname === "res.cloudinary.com") {
+    const normalizedCloudinaryPath = normalizeCloudinaryPath(url.pathname);
+
+    if (!normalizedCloudinaryPath) {
+      return "";
+    }
+
+    return new URL(normalizedCloudinaryPath, `${url.origin}/`).toString();
+  }
+
   const normalizedPath = normalizeOwnedUploadsPath(url.pathname);
 
-  if (!normalizedPath || !allowedOwnedMediaOrigins.has(url.origin)) {
+  if (!normalizedPath || !getAllowedOwnedMediaOrigins().has(url.origin)) {
     return "";
   }
 

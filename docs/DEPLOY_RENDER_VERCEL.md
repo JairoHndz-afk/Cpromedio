@@ -26,6 +26,13 @@ Usa el archivo `render.yaml` desde la raíz del repositorio.
 - `JOURNALIST_EMAIL`
 - `JOURNALIST_PASSWORD`
 
+### Variables de imagenes con Cloudinary
+
+- `CLOUDINARY_CLOUD_NAME`
+- `CLOUDINARY_API_KEY`
+- `CLOUDINARY_API_SECRET`
+- `CLOUDINARY_UPLOAD_FOLDER`
+
 ### Variables de correo con Resend
 
 - `RESEND_API_KEY`
@@ -51,13 +58,11 @@ Usa el archivo `render.yaml` desde la raíz del repositorio.
 - `NEWSLETTER_REQUIRE_CONFIRM=true`
 - `COOKIE_NAME=colombiano_promedio_session`
 
-### Disco persistente
+### Almacenamiento de imagenes
 
-El backend guarda imágenes en `backend/uploads`. En Render debes montar el disco en:
+Si configuras Cloudinary, no necesitas disco persistente en Render para portadas e imagenes del cuerpo.
 
-- `/opt/render/project/src/uploads`
-
-Sin ese disco, cada redeploy eliminará las imágenes subidas.
+Eso permite desplegar el backend incluso en un plan sin disco, siempre que las subidas queden yendo a Cloudinary.
 
 ## Frontend en Vercel
 
@@ -98,9 +103,10 @@ Quedó listo lo siguiente:
 ## Checklist antes de publicar
 
 - Confirma que `PUBLIC_SITE_URL` y `BACKEND_PUBLIC_URL` ya usan dominios finales.
+- Confirma que `CLOUDINARY_*` ya tiene valores reales antes de probar subidas desde dashboard.
 - Verifica que el SMTP use un dominio propio con SPF, DKIM y DMARC.
 - Si usas Resend, verifica el dominio remitente y no dejes `onboarding@resend.dev` en produccion.
-- Sube una imagen desde dashboard y comprueba que siga viva tras un redeploy.
+- Sube una imagen desde dashboard y comprueba que la URL resultante apunte a `res.cloudinary.com`.
 - Abre `https://TU-FRONTEND/robots.txt`.
 - Abre `https://TU-FRONTEND/sitemap.xml`.
 - Publica un artículo y revisa el HTML renderizado, metatags y enlaces del autor.

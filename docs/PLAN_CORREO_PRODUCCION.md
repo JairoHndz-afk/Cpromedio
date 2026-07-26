@@ -9,6 +9,10 @@ Hoy los correos de suscripcion tienen alta probabilidad de caer en spam por esta
 3. No hay evidencia de configuracion de entregabilidad del dominio del medio: `SPF`, `DKIM` y `DMARC`.
 4. Las credenciales SMTP y otros secretos ya expuestos deben rotarse antes de cualquier salida real.
 
+## Nota de infraestructura de imagenes
+
+Desde julio de 2026 el proyecto puede usar `Cloudinary` para portadas e imagenes del cuerpo. Eso evita depender del disco local de Render y permite mantener las URLs publicas de media fuera del servidor de la API.
+
 ## Objetivo
 
 Lograr que los correos de:

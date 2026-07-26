@@ -28,6 +28,28 @@ function buildPublicUrl(relativePath) {
   return env.buildPublicUrl(relativePath);
 }
 
+function buildCloudinaryFolder(year, month) {
+  return [env.cloudinaryFolder, "news", year, month]
+    .map((item) => sanitizeText(item ?? "", 80))
+    .filter(Boolean)
+    .map((item) => item.replace(/^\/+|\/+$/g, ""))
+    .filter(Boolean)
+    .join("/");
+}
+
+function createCloudinarySignature(params) {
+  const payload = Object.entries(params)
+    .filter(([, value]) => value !== undefined && value !== null && String(value).trim() !== "")
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([key, value]) => `${key}=${value}`)
+    .join("&");
+
+  return crypto
+    .createHash("sha1")
+    .update(`${payload}${env.cloudinaryApiSecret}`)
+    .digest("hex");
+}
+
 function detectImageMimeType(buffer) {
   if (buffer.length >= 8 && buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) {
     return "image/png";
@@ -117,28 +139,84 @@ function decodeDataUrl(dataUrl) {
   };
 }
 
+async function uploadToCloudinary({ buffer, mimeType, extension, fileStem, year, month }) {
+  const timestamp = Math.floor(Date.now() / 1000);
+  const folder = buildCloudinaryFolder(year, month);
+  const publicId = `${Date.now()}-${crypto.randomUUID()}-${fileStem}`;
+  const signature = createCloudinarySignature({
+    folder,
+    public_id: publicId,
+    timestamp
+  });
+  const formData = new FormData();
+
+  formData.append("file", new Blob([buffer], { type: mimeType }), `${fileStem}.${extension}`);
+  formData.append("api_key", env.cloudinaryApiKey);
+  formData.append("timestamp", String(timestamp));
+  formData.append("folder", folder);
+  formData.append("public_id", publicId);
+  formData.append("signature", signature);
+
+  const response = await fetch(`https://api.cloudinary.com/v1_1/${env.cloudinaryCloudName}/image/upload`, {
+    method: "POST",
+    body: formData
+  });
+  const payload = await response.json().catch(() => null);
+
+  if (!response.ok || !payload?.secure_url) {
+    const message =
+      payload?.error?.message
+      || payload?.message
+      || "Cloudinary rechazo la carga de la imagen.";
+
+    throw createHttpError(502, message);
+  }
+
+  return {
+    url: payload.secure_url,
+    filename: payload.public_id ?? `${folder}/${publicId}`
+  };
+}
+
 export async function uploadArticleImage(req, res, next) {
   try {
     const payload = imageUploadSchema.parse(req.body);
-    const { extension, buffer } = decodeDataUrl(payload.dataUrl);
+    const { extension, buffer, mimeType } = decodeDataUrl(payload.dataUrl);
     const year = String(new Date().getFullYear());
     const month = String(new Date().getMonth() + 1).padStart(2, "0");
-    const folder = path.join(uploadsRoot, year, month);
     const fileStem = safeFileStem(payload.filename);
-    const filename = `${Date.now()}-${crypto.randomUUID()}-${fileStem}.${extension}`;
+    let uploaded;
 
-    await fs.mkdir(folder, { recursive: true });
-    await fs.writeFile(path.join(folder, filename), buffer, {
-      flag: "wx",
-      mode: 0o600
-    });
+    if (env.cloudinaryConfigured) {
+      uploaded = await uploadToCloudinary({
+        buffer,
+        mimeType,
+        extension,
+        fileStem,
+        year,
+        month
+      });
+    } else {
+      const folder = path.join(uploadsRoot, year, month);
+      const filename = `${Date.now()}-${crypto.randomUUID()}-${fileStem}.${extension}`;
 
-    const relativePath = `/uploads/news/${year}/${month}/${filename}`;
+      await fs.mkdir(folder, { recursive: true });
+      await fs.writeFile(path.join(folder, filename), buffer, {
+        flag: "wx",
+        mode: 0o600
+      });
+
+      const relativePath = `/uploads/news/${year}/${month}/${filename}`;
+      uploaded = {
+        url: buildPublicUrl(relativePath),
+        filename
+      };
+    }
 
     res.status(201).json({
-      url: buildPublicUrl(relativePath),
+      url: uploaded.url,
       alt: sanitizeText(payload.alt ?? "", 140),
-      filename
+      filename: uploaded.filename
     });
   } catch (error) {
     next(error);

@@ -4,7 +4,7 @@ import { isOwnedMediaUrl, resolveVideoEmbedSource } from "../utils/content.js";
 const articleStatusSchema = z.enum(["draft", "review", "changes_requested", "approved", "published", "archived", "rejected"]);
 const ownedMediaUrlSchema = z
   .string()
-  .refine((value) => isOwnedMediaUrl(value), "Solo se aceptan archivos del medio subidos al servidor.");
+  .refine((value) => isOwnedMediaUrl(value), "Solo se aceptan archivos del medio subidos a infraestructura controlada por la redaccion.");
 
 const articleImageSchema = z.object({
   url: ownedMediaUrlSchema,

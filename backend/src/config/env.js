@@ -113,6 +113,11 @@ const resendConfigured = Boolean(resendApiKey && resendFromEmail);
 const mailProvider = resendConfigured ? "resend" : smtpConfigured ? "smtp" : "preview";
 const mailFromEmail = (resendConfigured ? resendFromEmail : smtpFromEmail).trim().toLowerCase();
 const mailReplyTo = (resendConfigured ? resendReplyTo || smtpReplyTo : smtpReplyTo).trim().toLowerCase();
+const cloudinaryCloudName = process.env.CLOUDINARY_CLOUD_NAME?.trim() ?? "";
+const cloudinaryApiKey = process.env.CLOUDINARY_API_KEY?.trim() ?? "";
+const cloudinaryApiSecret = process.env.CLOUDINARY_API_SECRET?.trim() ?? "";
+const cloudinaryFolder = process.env.CLOUDINARY_UPLOAD_FOLDER?.trim() ?? "colombiano-promedio";
+const cloudinaryConfigured = Boolean(cloudinaryCloudName && cloudinaryApiKey && cloudinaryApiSecret);
 const newsletterRequireConfirm = toBoolean(process.env.NEWSLETTER_REQUIRE_CONFIRM, true);
 const bootstrapOnStart = toBoolean(process.env.BOOTSTRAP_ON_START, isLocal);
 const allowedOrigins = uniqueList(
@@ -161,6 +166,11 @@ export const env = {
   mailConfigured: resendConfigured || smtpConfigured,
   mailFromEmail,
   mailReplyTo,
+  cloudinaryCloudName,
+  cloudinaryApiKey,
+  cloudinaryApiSecret,
+  cloudinaryFolder,
+  cloudinaryConfigured,
   newsletterRequireConfirm,
   bootstrapOnStart,
   bootstrapAdmin: {
