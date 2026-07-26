@@ -12,7 +12,7 @@ services:
       - key: NODE_ENV
         value: production
       - key: TRUST_PROXY
-        value: "true"
+        value: "1"
       - key: BOOTSTRAP_ON_START
         value: "false"
       - key: NEWSLETTER_REQUIRE_CONFIRM

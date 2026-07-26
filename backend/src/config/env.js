@@ -48,6 +48,36 @@ function toBoolean(value, defaultValue = false) {
   return value === "true";
 }
 
+function parseTrustProxy(value, defaultValue = false) {
+  if (value === undefined) {
+    return defaultValue;
+  }
+
+  if (typeof value === "boolean" || typeof value === "number") {
+    return value;
+  }
+
+  const normalized = String(value).trim().toLowerCase();
+
+  if (!normalized) {
+    return defaultValue;
+  }
+
+  if (normalized === "true") {
+    return true;
+  }
+
+  if (normalized === "false") {
+    return false;
+  }
+
+  if (/^\d+$/.test(normalized)) {
+    return Number(normalized);
+  }
+
+  return String(value).trim();
+}
+
 function toList(value, fallback = "") {
   const source = value ?? fallback;
 
@@ -148,7 +178,7 @@ export const env = {
   jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? "8h",
   cookieName: process.env.COOKIE_NAME ?? "periodico_session",
   cookieMaxAgeMs: Math.max(Number(process.env.COOKIE_MAX_AGE_MS ?? 1000 * 60 * 60 * 8), 60_000),
-  trustProxy: toBoolean(process.env.TRUST_PROXY, false),
+  trustProxy: parseTrustProxy(process.env.TRUST_PROXY, false),
   smtpHost,
   smtpPort,
   smtpUser,

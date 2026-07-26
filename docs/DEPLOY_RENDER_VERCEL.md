@@ -53,7 +53,7 @@ Usa el archivo `render.yaml` desde la raíz del repositorio.
 ### Valores recomendados
 
 - `NODE_ENV=production`
-- `TRUST_PROXY=true`
+- `TRUST_PROXY=1`
 - `BOOTSTRAP_ON_START=false`
 - `NEWSLETTER_REQUIRE_CONFIRM=true`
 - `COOKIE_NAME=colombiano_promedio_session`
