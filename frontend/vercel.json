@@ -11,9 +11,7 @@
         {
           "type": "header",
           "key": "user-agent",
-          "value": {
-            "re": "(facebookexternalhit|meta-externalagent|[Ww]hats[Aa]pp|Twitterbot|TelegramBot|Slackbot|Discordbot|LinkedInBot|SkypeUriPreview|[Bb]ot|crawler|spider)"
-          }
+          "value": ".*(facebookexternalhit|meta-externalagent|WhatsApp|whatsapp|Twitterbot|twitterbot|TelegramBot|telegrambot|Slackbot|Discordbot|LinkedInBot|linkedinbot|SkypeUriPreview|bot|crawler|spider).*"
         }
       ],
       "destination": "/api/articulo/:slug"

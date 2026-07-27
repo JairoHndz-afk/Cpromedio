@@ -251,9 +251,9 @@ export class ArticlePageComponent {
 
     if (channel === "copy") {
       void navigator.clipboard
-        .writeText(articleUrl)
+        .writeText(shareUrl)
         .then(() => {
-          this.shareMessage = "Enlace del articulo copiado.";
+          this.shareMessage = "Enlace de compartido copiado.";
           this.cdr.markForCheck();
         })
         .catch(() => {

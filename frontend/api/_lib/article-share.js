@@ -48,24 +48,44 @@ function resolveCoverImage(article, origin) {
 
 function resolveSocialImage(imageUrl) {
   if (!imageUrl) {
-    return imageUrl;
+    return {
+      url: imageUrl,
+      width: null,
+      height: null,
+      mimeType: null
+    };
   }
 
   try {
     const url = new URL(imageUrl);
 
     if (url.hostname !== "res.cloudinary.com" || !url.pathname.includes("/image/upload/")) {
-      return imageUrl;
+      return {
+        url: imageUrl,
+        width: null,
+        height: null,
+        mimeType: null
+      };
     }
 
     url.pathname = url.pathname.replace(
       "/image/upload/",
-      "/image/upload/f_jpg,q_auto,c_limit,w_1200/"
+      "/image/upload/f_jpg,q_auto:eco,c_fill,g_auto,w_1200,h_630/"
     );
 
-    return url.toString();
+    return {
+      url: url.toString(),
+      width: 1200,
+      height: 630,
+      mimeType: "image/jpeg"
+    };
   } catch {
-    return imageUrl;
+    return {
+      url: imageUrl,
+      width: null,
+      height: null,
+      mimeType: null
+    };
   }
 }
 
@@ -104,7 +124,8 @@ function renderShareDocument({
   const publishedTime = article.publishedAt ? new Date(article.publishedAt).toISOString() : "";
   const updatedTime = article.updatedAt ? new Date(article.updatedAt).toISOString() : publishedTime;
   const authorName = String(article.author?.name ?? "Colombiano Promedio").trim();
-  const socialImageUrl = resolveSocialImage(imageUrl);
+  const socialImage = resolveSocialImage(imageUrl);
+  const socialImageUrl = socialImage.url;
   const redirectMarkup = redirectToCanonical
     ? `
     <meta http-equiv="refresh" content="0; url=${escapeHtml(canonicalUrl)}" />
@@ -133,6 +154,9 @@ function renderShareDocument({
     <meta property="og:url" content="${escapeHtml(canonicalUrl)}" />
     <meta property="og:image" content="${escapeHtml(socialImageUrl)}" />
     <meta property="og:image:secure_url" content="${escapeHtml(socialImageUrl)}" />
+    ${socialImage.width ? `<meta property="og:image:width" content="${socialImage.width}" />` : ""}
+    ${socialImage.height ? `<meta property="og:image:height" content="${socialImage.height}" />` : ""}
+    ${socialImage.mimeType ? `<meta property="og:image:type" content="${escapeHtml(socialImage.mimeType)}" />` : ""}
     <meta property="og:image:alt" content="${escapeHtml(article.cover?.alt || article.title)}" />
     <meta property="article:author" content="${escapeHtml(authorName)}" />
     ${publishedTime ? `<meta property="article:published_time" content="${escapeHtml(publishedTime)}" />` : ""}
@@ -141,6 +165,8 @@ function renderShareDocument({
     <meta name="twitter:title" content="${escapeHtml(title)}" />
     <meta name="twitter:description" content="${escapeHtml(description)}" />
     <meta name="twitter:image" content="${escapeHtml(socialImageUrl)}" />
+    ${socialImage.width ? `<meta name="twitter:image:width" content="${socialImage.width}" />` : ""}
+    ${socialImage.height ? `<meta name="twitter:image:height" content="${socialImage.height}" />` : ""}
     <meta name="twitter:image:alt" content="${escapeHtml(article.cover?.alt || article.title)}" />${redirectMarkup}
     <style>
       :root {
