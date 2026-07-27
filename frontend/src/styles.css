@@ -558,6 +558,9 @@ a:focus-visible {
 }
 
 .site-nav-toggle {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
   place-items: center;
   grid-template-rows: repeat(3, 3px);
   gap: 5px;
@@ -572,13 +575,57 @@ a:focus-visible {
   box-shadow: var(--shadow-soft);
 }
 
+.site-nav-toggle::after {
+  content: "";
+  position: absolute;
+  left: 0.65rem;
+  right: 0.65rem;
+  bottom: 0.45rem;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--brand-ribbon);
+  opacity: 0.92;
+}
+
 .site-nav-toggle span {
+  position: relative;
+  z-index: 1;
   display: block;
   width: 18px;
   height: 2px;
   border-radius: 999px;
   background: var(--text);
   transition: transform 160ms ease, opacity 160ms ease;
+}
+
+:root[data-theme="dark"] .site-nav-toggle {
+  border-color: rgba(255, 208, 77, 0.22);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02)),
+    rgba(8, 16, 29, 0.96);
+  box-shadow:
+    0 16px 34px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+:root[data-theme="dark"] .site-nav-toggle span {
+  background: #f8fbff;
+}
+
+.site-nav-toggle:hover,
+.site-nav-toggle:focus-visible,
+.site-nav-toggle:active {
+  transform: translateY(-1px);
+  border-color: rgba(21, 72, 167, 0.28);
+}
+
+:root[data-theme="dark"] .site-nav-toggle:hover,
+:root[data-theme="dark"] .site-nav-toggle:focus-visible,
+:root[data-theme="dark"] .site-nav-toggle:active {
+  border-color: rgba(255, 208, 77, 0.34);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.03)),
+    rgba(10, 19, 34, 0.98);
 }
 
 .site-nav--open .site-nav-toggle span:nth-child(1) {
@@ -2918,6 +2965,17 @@ h3 {
     z-index: 36;
   }
 
+  :root[data-theme="dark"] .site-nav__panel {
+    border-color: rgba(255, 208, 77, 0.12);
+    background:
+      radial-gradient(circle at top, rgba(255, 208, 77, 0.1), transparent 34%),
+      linear-gradient(180deg, rgba(20, 29, 48, 0.96), rgba(9, 16, 28, 0.96)),
+      var(--surface-strong);
+    box-shadow:
+      0 28px 60px rgba(0, 0, 0, 0.36),
+      inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  }
+
   .site-nav--open .site-nav__panel {
     display: grid;
   }
@@ -2949,6 +3007,27 @@ h3 {
     width: 100%;
     justify-content: center;
     text-align: center;
+  }
+
+  :root[data-theme="dark"] .site-nav a,
+  :root[data-theme="dark"] .nav-button,
+  :root[data-theme="dark"] .theme-toggle {
+    background: rgba(6, 12, 23, 0.9);
+    border-color: rgba(171, 196, 255, 0.14);
+    color: #f3f7ff;
+  }
+
+  :root[data-theme="dark"] .site-nav .is-active,
+  :root[data-theme="dark"] .site-nav a:hover,
+  :root[data-theme="dark"] .site-nav a:focus-visible,
+  :root[data-theme="dark"] .site-nav a:active,
+  :root[data-theme="dark"] .nav-button:hover,
+  :root[data-theme="dark"] .nav-button:focus-visible,
+  :root[data-theme="dark"] .nav-button:active,
+  :root[data-theme="dark"] .theme-toggle:hover,
+  :root[data-theme="dark"] .theme-toggle:focus-visible,
+  :root[data-theme="dark"] .theme-toggle:active {
+    background: rgba(15, 27, 46, 0.96);
   }
 
   .hero,
@@ -3021,6 +3100,10 @@ h3 {
     gap: 0.85rem;
   }
 
+  .site-header {
+    overflow: visible;
+  }
+
   .brand {
     gap: 0.75rem;
     align-items: flex-start;
@@ -3050,6 +3133,19 @@ h3 {
     right: 0;
     left: 0;
     padding: 0.9rem;
+    top: calc(100% + 0.6rem);
+    border-radius: 22px;
+  }
+
+  .site-nav-toggle {
+    width: 52px;
+    height: 52px;
+    border-radius: 18px;
+  }
+
+  .site-nav-toggle span {
+    width: 20px;
+    height: 2.5px;
   }
 
   .site-nav__links,
