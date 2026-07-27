@@ -74,6 +74,9 @@ import { NewsCardComponent } from "../../shared/components/news-card/news-card.c
         <button class="button button--ghost" type="button" *ngIf="filterActive" (click)="clearSearch()">Limpiar</button>
       </form>
       <p class="helper-text">Busca por texto o explora por etiquetas y categorías creadas por administración.</p>
+      <p class="helper-text helper-text--cold-start" *ngIf="coldStartHintVisible">
+        Si es tu primera visita, la carga inicial puede tardar unos segundos mientras despertamos el servidor.
+      </p>
       <p class="error-text" *ngIf="errorMessage">{{ errorMessage }}</p>
     </section>
 
@@ -166,9 +169,13 @@ export class HomePageComponent {
   activeResultsTitle = "Selecciones editoriales";
   activeResultsDescription = "Explora artículos relacionados con el tema actual.";
   loading = false;
+  coldStartHintVisible = false;
   errorMessage = "";
   subscriptionMessage = "";
   submittingSubscription = false;
+  private coldStartShowTimer: ReturnType<typeof setTimeout> | null = null;
+  private coldStartHideTimer: ReturnType<typeof setTimeout> | null = null;
+  private coldStartHintDismissed = false;
   subscriptionForm = {
     name: "",
     email: "",
@@ -226,6 +233,7 @@ export class HomePageComponent {
     this.activeTag = tag;
     this.activeCategory = category;
     this.filterActive = Boolean(search || tag || category);
+    this.updateColdStartHintState(requestId);
     this.cdr.markForCheck();
 
     try {
@@ -269,13 +277,57 @@ export class HomePageComponent {
       this.errorMessage = this.filterActive
         ? "No fue posible cargar esta selección editorial."
         : "No fue posible cargar la portada.";
+      this.clearColdStartHint();
       this.seo.setNoIndex("Portada no disponible | Colombiano Promedio", this.errorMessage);
     } finally {
       if (requestId === this.requestId) {
         this.loading = false;
+        this.clearColdStartHint();
         this.cdr.markForCheck();
       }
     }
+  }
+
+  private updateColdStartHintState(requestId: number): void {
+    if (this.filterActive || this.site || this.coldStartHintDismissed) {
+      this.clearColdStartHint();
+      return;
+    }
+
+    this.clearColdStartHint();
+
+    this.coldStartShowTimer = setTimeout(() => {
+      if (requestId !== this.requestId || !this.loading || this.filterActive || this.site || this.coldStartHintDismissed) {
+        return;
+      }
+
+      this.coldStartHintVisible = true;
+      this.cdr.markForCheck();
+
+      this.coldStartHideTimer = setTimeout(() => {
+        if (requestId !== this.requestId) {
+          return;
+        }
+
+        this.coldStartHintVisible = false;
+        this.coldStartHintDismissed = true;
+        this.cdr.markForCheck();
+      }, 12000);
+    }, 1800);
+  }
+
+  private clearColdStartHint(): void {
+    if (this.coldStartShowTimer) {
+      clearTimeout(this.coldStartShowTimer);
+      this.coldStartShowTimer = null;
+    }
+
+    if (this.coldStartHideTimer) {
+      clearTimeout(this.coldStartHideTimer);
+      this.coldStartHideTimer = null;
+    }
+
+    this.coldStartHintVisible = false;
   }
 
   async runSearch(): Promise<void> {

@@ -1025,6 +1025,38 @@ h3 {
   line-height: 1.64;
 }
 
+.helper-text--cold-start {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  width: fit-content;
+  max-width: 100%;
+  margin-top: 0.15rem;
+  padding: 0.72rem 0.95rem;
+  border-radius: 14px;
+  border: 1px solid rgba(248, 196, 0, 0.18);
+  background: linear-gradient(135deg, rgba(248, 196, 0, 0.08), rgba(21, 72, 167, 0.05));
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.helper-text--cold-start::before {
+  content: "Aviso";
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  min-height: 28px;
+  padding: 0 0.65rem;
+  border-radius: 999px;
+  background: rgba(248, 196, 0, 0.14);
+  color: var(--accent-warm);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
 .meta-row {
   color: var(--muted);
   font-size: 0.88rem;
