@@ -1,6 +1,5 @@
 import { registerLocaleData } from "@angular/common";
 import localeEsCo from "@angular/common/locales/es-CO";
-import { isDevMode } from "@angular/core";
 import { bootstrapApplication } from "@angular/platform-browser";
 import { inject as injectVercelAnalytics } from "@vercel/analytics";
 import { injectSpeedInsights } from "@vercel/speed-insights";
@@ -25,11 +24,22 @@ function shouldTrackSpeedInsights(url: string): boolean {
   }
 }
 
+function shouldEnableVercelInsights(): boolean {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  return PRODUCTION_HOSTS.has(window.location.hostname);
+}
+
 registerLocaleData(localeEsCo);
-injectVercelAnalytics({ mode: isDevMode() ? "development" : "production" });
-injectSpeedInsights({
-  sampleRate: 0.5,
-  beforeSend: (payload) => (shouldTrackSpeedInsights(payload.url) ? payload : null)
-});
+
+if (shouldEnableVercelInsights()) {
+  injectVercelAnalytics({ mode: "production" });
+  injectSpeedInsights({
+    sampleRate: 0.5,
+    beforeSend: (payload) => (shouldTrackSpeedInsights(payload.url) ? payload : null)
+  });
+}
 
 bootstrapApplication(AppComponent, appConfig).catch((error) => console.error(error));

@@ -53,6 +53,11 @@ function renderAutoLinkedHtml(segment: string): string {
 
 export function renderEditorialText(value: string): string {
   const source = String(value ?? "");
+
+  if (/<([a-z][a-z0-9]*)\b[^>]*>/i.test(source)) {
+    return source;
+  }
+
   const markdownLinkPattern = /\[([^\]]+)\]\(((?:https?:\/\/|mailto:)[^\s)]+)\)/g;
   let html = "";
   let lastIndex = 0;

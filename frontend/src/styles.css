@@ -1,3 +1,5 @@
+@import "ckeditor5/ckeditor5.css";
+
 :root {
   --flag-yellow: #f8c400;
   --flag-blue: #1548a7;
@@ -1996,23 +1998,30 @@ h3 {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.dashboard-overview--focused {
+  grid-template-columns: minmax(280px, 0.92fr) minmax(0, 1.38fr);
+  align-items: start;
+}
+
 .dashboard-metrics {
   display: grid;
-  gap: 1rem;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.9rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .metric-tile {
   display: grid;
   gap: 0.35rem;
-  padding: 1rem;
+  min-height: 108px;
+  padding: 0.95rem 1rem;
   position: relative;
   overflow: hidden;
   border-radius: 20px;
 }
 
 .metric-tile strong {
-  font-size: 2rem;
+  font-size: clamp(1.55rem, 2.4vw, 2rem);
+  line-height: 1;
   font-family: var(--headline);
 }
 
@@ -2052,6 +2061,94 @@ h3 {
   background:
     linear-gradient(135deg, rgba(96, 132, 255, 0.12), rgba(255, 190, 105, 0.12)),
     var(--surface);
+}
+
+.dashboard-overview__hero,
+.dashboard-overview__hero-copy,
+.dashboard-overview__spotlight,
+.dashboard-overview__account,
+.dashboard-overview__account-cards {
+  display: grid;
+  gap: 1rem;
+}
+
+.dashboard-overview__hero h2 {
+  margin: 0;
+  font-family: var(--headline);
+  font-size: clamp(1.85rem, 3vw, 2.7rem);
+  line-height: 1.04;
+}
+
+.panel-heading--overview {
+  align-items: flex-start;
+}
+
+.dashboard-overview__chips,
+.dashboard-overview__switcher {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+}
+
+.dashboard-overview__switcher {
+  justify-content: flex-end;
+}
+
+.dashboard-overview__switch {
+  min-height: 42px;
+  padding: 0.72rem 1rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent), var(--surface-soft);
+  color: var(--muted);
+  font-weight: 700;
+  box-shadow: none;
+  transition: transform 160ms ease, border-color 160ms ease, color 160ms ease, background 160ms ease;
+}
+
+.dashboard-overview__switch:hover,
+.dashboard-overview__switch:focus-visible {
+  transform: translateY(-1px);
+  color: var(--text);
+  border-color: rgba(108, 140, 255, 0.28);
+}
+
+.dashboard-overview__switch.is-active {
+  color: var(--text);
+  border-color: rgba(255, 208, 77, 0.32);
+  background:
+    linear-gradient(135deg, rgba(255, 208, 77, 0.14), rgba(101, 138, 255, 0.12)),
+    var(--surface-soft);
+  box-shadow: var(--shadow-soft);
+}
+
+.dashboard-overview__list {
+  gap: 0.85rem;
+}
+
+.dashboard-overview__account-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(220px, 0.9fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.dashboard-overview__mini {
+  display: grid;
+  gap: 0.35rem;
+  padding: 1rem;
+  border-radius: 18px;
+  border: 1px solid var(--border);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent), var(--surface-soft);
+}
+
+.dashboard-overview__mini strong {
+  color: var(--text);
+}
+
+.dashboard-overview__mini span {
+  color: var(--muted);
+  line-height: 1.55;
 }
 
 .panel-subtitle {
@@ -3056,6 +3153,11 @@ h3 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .dashboard-overview--focused,
+  .dashboard-overview__account-grid {
+    grid-template-columns: 1fr;
+  }
+
   .dashboard-header,
   .panel-heading,
   .section-heading {
@@ -3171,6 +3273,7 @@ h3 {
   .feature-strip,
   .cards-grid,
   .dashboard-overview,
+  .dashboard-overview--focused,
   .dashboard-metrics,
   .dashboard-columns,
   .admin-grid,
@@ -3201,6 +3304,10 @@ h3 {
 
   .dashboard-tab small {
     font-size: 0.82rem;
+  }
+
+  .dashboard-overview__switcher {
+    justify-content: flex-start;
   }
 
   .content-block__header .button-row > * {

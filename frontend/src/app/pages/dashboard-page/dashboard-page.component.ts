@@ -16,10 +16,39 @@ import {
   SubscriptionEntry,
   UserSession
 } from "../../core/types/api.types";
+import { renderEditorialText } from "../../core/utils/editorial-rich-text";
 import { resolveVideoEmbed } from "../../core/utils/video-embed";
+import { CKEditorModule } from "@ckeditor/ckeditor5-angular";
+import {
+  AutoImage,
+  Autoformat,
+  BlockQuote,
+  Bold,
+  ClassicEditor,
+  Essentials,
+  Heading,
+  Image,
+  ImageCaption,
+  ImageInsert,
+  ImageToolbar,
+  ImageUpload,
+  Italic,
+  Link,
+  MediaEmbed,
+  Paragraph,
+  PasteFromOffice,
+  Strikethrough,
+  Underline
+} from "ckeditor5";
+import esTranslations from "ckeditor5/translations/es.js";
 
 type DashboardSection = "overview" | "articles" | "team" | "categories" | "audience" | "profile";
+type OverviewPanel = "recent" | "top" | "account";
+type ArticleWorkspaceTab = "redaction" | "format" | "media" | "preview" | "publish";
 type ArticleEditorStep = "body" | "preview" | "subtitle" | "title" | "settings" | "review";
+type EditorPreviewMode = "article" | "home" | "mobile" | "share";
+type EditorSidebarTab = "document" | "block";
+type BlockTextField = "headingText" | "text" | "quoteText";
 type PasswordFieldKey = "user" | "current" | "next" | "confirm";
 
 interface SectionConfig {
@@ -32,6 +61,12 @@ interface SectionConfig {
 interface ArticleEditorStepConfig {
   id: ArticleEditorStep;
   order: number;
+  label: string;
+  description: string;
+}
+
+interface ArticleWorkspaceTabConfig {
+  id: ArticleWorkspaceTab;
   label: string;
   description: string;
 }
@@ -77,10 +112,70 @@ interface ConfirmDialogState {
   tone: "danger" | "neutral";
 }
 
+interface BlockCursorState {
+  index: number;
+  field: BlockTextField;
+  start: number;
+  end: number;
+}
+
+interface CkeditorFileLoader {
+  file: Promise<File>;
+}
+
+interface CkeditorUploadAdapterConsumer {
+  plugins: {
+    get: (name: string) => {
+      createUploadAdapter?: (loader: CkeditorFileLoader) => EditorialImageUploadAdapter;
+    };
+  };
+}
+
+class EditorialImageUploadAdapter {
+  private aborted = false;
+
+  constructor(
+    private readonly loader: CkeditorFileLoader,
+    private readonly uploadFile: (file: File) => Promise<{ url: string }>
+  ) {}
+
+  async upload(): Promise<{ default: string }> {
+    const file = await this.loader.file;
+
+    if (this.aborted) {
+      throw new Error("La carga fue cancelada.");
+    }
+
+    const uploaded = await this.uploadFile(file);
+
+    if (this.aborted) {
+      throw new Error("La carga fue cancelada.");
+    }
+
+    return {
+      default: uploaded.url
+    };
+  }
+
+  abort(): void {
+    this.aborted = true;
+  }
+}
+
+function createEditorialUploadAdapterPlugin(
+  factory: (file: File) => Promise<{ url: string }>
+): (editor: CkeditorUploadAdapterConsumer) => void {
+  return function editorialUploadAdapterPlugin(editor: CkeditorUploadAdapterConsumer): void {
+    const repository = editor.plugins.get("FileRepository");
+    repository.createUploadAdapter = (loader: CkeditorFileLoader) =>
+      new EditorialImageUploadAdapter(loader, factory);
+  };
+}
+
 @Component({
   selector: "app-dashboard-page",
   standalone: true,
-  imports: [NgFor, NgIf, NgClass, FormsModule, DatePipe],
+  imports: [NgFor, NgIf, NgClass, FormsModule, DatePipe, CKEditorModule],
   template: `
     <section class="dashboard-shell" *ngIf="authService.user() as currentUser">
       <header class="dashboard-header">
@@ -109,14 +204,6 @@ interface ConfirmDialogState {
           <strong>{{ overview.metrics.publishedCount }}</strong>
           <span>Publicados</span>
         </div>
-        <div class="metric-tile" *ngIf="currentUser.role === 'admin'">
-          <strong>{{ overview.metrics.usersCount }}</strong>
-          <span>Usuarios</span>
-        </div>
-      <div class="metric-tile" *ngIf="currentUser.role === 'admin'">
-          <strong>{{ overview.metrics.subscriptionsCount }}</strong>
-          <span>Suscripciones</span>
-        </div>
       </div>
 
       <nav class="dashboard-nav" aria-label="Secciones internas">
@@ -132,76 +219,118 @@ interface ConfirmDialogState {
         </button>
       </nav>
 
-      <section class="dashboard-overview" *ngIf="activeSection === 'overview'">
-        <section class="dashboard-panel">
-          <div class="panel-heading">
-            <div>
-              <h2>Actividad reciente</h2>
-              <p class="panel-subtitle">Acceso rapido a las piezas que se estan moviendo hoy.</p>
-            </div>
-            <button class="button button--ghost" type="button" (click)="selectSection('articles')">Ir a articulos</button>
+      <section class="dashboard-overview dashboard-overview--focused" *ngIf="activeSection === 'overview'">
+        <section class="dashboard-panel dashboard-panel--accent dashboard-overview__hero">
+          <div class="dashboard-overview__hero-copy">
+            <p class="eyebrow">Vista rapida</p>
+            <h2>Menos ruido, mas foco editorial.</h2>
+            <p class="panel-subtitle">Consulta el pulso del medio y abre solo el bloque que necesitas en cada momento.</p>
           </div>
 
-          <div class="dashboard-list">
-            <button
-              type="button"
-              class="article-row"
-              *ngFor="let article of overview?.recentArticles || []"
-              (click)="openArticleEditor(article)"
-            >
-              <strong>{{ article.title }}</strong>
-              <span>{{ formatArticleStatus(article.status) }} | {{ article.author?.name || "Redaccion" }}</span>
-            </button>
-            <p class="empty-state" *ngIf="(overview?.recentArticles || []).length === 0">Todavia no hay actividad editorial.</p>
-          </div>
-        </section>
-
-        <section class="dashboard-panel">
-          <div class="panel-heading">
-            <div>
-              <h2>Mas vistos</h2>
-              <p class="panel-subtitle">Trafico y piezas con mejor lectura.</p>
-            </div>
-          </div>
-
-          <div class="dashboard-list">
-            <div class="history-row" *ngFor="let article of overview?.topViewedArticles || []">
-              <strong>{{ article.title }}</strong>
-              <span>{{ article.metrics.views }} vistas | {{ formatArticleStatus(article.status) }}</span>
-              <p>{{ article.author?.name || "Redaccion" }}</p>
-            </div>
-            <p class="empty-state" *ngIf="(overview?.topViewedArticles || []).length === 0">Aun no hay suficientes vistas para mostrar tendencia.</p>
-          </div>
-        </section>
-
-        <section class="dashboard-panel dashboard-panel--accent">
-          <div class="panel-heading">
-            <div>
-              <h2>Cuenta y atajos</h2>
-              <p class="panel-subtitle">Perfil, seguridad y acceso directo a tus tareas.</p>
-            </div>
-          </div>
-
-          <div class="profile-summary">
-            <div class="profile-summary__badge">{{ initials(currentUser.name) }}</div>
-            <div>
-              <strong>{{ currentUser.name }}</strong>
-              <p>{{ currentUser.email }}</p>
-              <span>{{ formatRole(currentUser.role) }} | {{ formatUserStatus(currentUser.status) }}</span>
-            </div>
+          <div class="dashboard-overview__chips" *ngIf="overview">
+            <span class="count-pill" *ngIf="currentUser.role === 'admin'">{{ overview.metrics.usersCount }} usuarios</span>
+            <span class="count-pill" *ngIf="currentUser.role === 'admin'">{{ overview.metrics.subscriptionsCount }} suscripciones</span>
+            <span class="count-pill">{{ overview.metrics.reviewCount }} pendientes</span>
           </div>
 
           <div class="button-row">
-            <button class="button" type="button" (click)="selectSection('profile')">Editar perfil</button>
-            <button class="button button--secondary" type="button" (click)="selectSection('articles')">Redactar</button>
+            <button class="button button--secondary" type="button" (click)="selectSection('articles')">Ir a articulos</button>
+            <button class="button button--ghost" type="button" (click)="selectSection('profile')">Abrir perfil</button>
             <button class="button button--ghost" type="button" *ngIf="currentUser.role === 'admin'" (click)="selectSection('team')">
               Gestionar equipo
             </button>
           </div>
         </section>
+
+        <section class="dashboard-panel dashboard-overview__spotlight">
+          <div class="panel-heading panel-heading--overview">
+            <div>
+              <h2>{{ overviewPanelTitle() }}</h2>
+              <p class="panel-subtitle">{{ overviewPanelSubtitle() }}</p>
+            </div>
+
+            <div class="dashboard-overview__switcher" aria-label="Cambiar vista rapida">
+              <button
+                type="button"
+                class="dashboard-overview__switch"
+                [ngClass]="{ 'is-active': activeOverviewPanel === 'recent' }"
+                (click)="setActiveOverviewPanel('recent')"
+              >
+                Actividad
+              </button>
+              <button
+                type="button"
+                class="dashboard-overview__switch"
+                [ngClass]="{ 'is-active': activeOverviewPanel === 'top' }"
+                (click)="setActiveOverviewPanel('top')"
+              >
+                Mas vistos
+              </button>
+              <button
+                type="button"
+                class="dashboard-overview__switch"
+                [ngClass]="{ 'is-active': activeOverviewPanel === 'account' }"
+                (click)="setActiveOverviewPanel('account')"
+              >
+                Cuenta
+              </button>
+            </div>
+          </div>
+
+          <div class="dashboard-list dashboard-overview__list" *ngIf="activeOverviewPanel === 'recent'">
+            <button
+              type="button"
+              class="article-row"
+              *ngFor="let article of overviewRecentArticles()"
+              (click)="openArticleEditor(article)"
+            >
+              <strong>{{ article.title }}</strong>
+              <span>{{ formatArticleStatus(article.status) }} | {{ article.author?.name || "Redaccion" }}</span>
+            </button>
+            <p class="empty-state" *ngIf="overviewRecentArticles().length === 0">Todavia no hay actividad editorial.</p>
+          </div>
+
+          <div class="dashboard-list dashboard-overview__list" *ngIf="activeOverviewPanel === 'top'">
+            <div class="history-row" *ngFor="let article of overviewTopViewedArticles()">
+              <strong>{{ article.title }}</strong>
+              <span>{{ article.metrics.views }} vistas | {{ formatArticleStatus(article.status) }}</span>
+              <p>{{ article.author?.name || "Redaccion" }}</p>
+            </div>
+            <p class="empty-state" *ngIf="overviewTopViewedArticles().length === 0">Aun no hay suficientes vistas para mostrar tendencia.</p>
+          </div>
+
+          <div class="dashboard-overview__account" *ngIf="activeOverviewPanel === 'account'">
+            <div class="dashboard-overview__account-grid">
+              <div class="profile-summary">
+                <div class="profile-summary__badge">{{ initials(currentUser.name) }}</div>
+                <div>
+                  <strong>{{ currentUser.name }}</strong>
+                  <p>{{ currentUser.email }}</p>
+                  <span>{{ formatRole(currentUser.role) }} | {{ formatUserStatus(currentUser.status) }}</span>
+                </div>
+              </div>
+
+              <div class="dashboard-overview__account-cards">
+                <article class="dashboard-overview__mini">
+                  <strong>Ultimo acceso</strong>
+                  <span>{{ currentUser.lastLoginAt ? (currentUser.lastLoginAt | date: "short") : "Sin registros" }}</span>
+                </article>
+                <article class="dashboard-overview__mini">
+                  <strong>Publicaciones activas</strong>
+                  <span>{{ overview?.metrics?.publishedCount ?? 0 }} piezas visibles para lectores.</span>
+                </article>
+              </div>
+            </div>
+
+            <div class="button-row">
+              <button class="button" type="button" (click)="selectSection('profile')">Editar perfil</button>
+              <button class="button button--secondary" type="button" (click)="selectSection('articles')">Redactar</button>
+            </div>
+          </div>
+        </section>
       </section>
 
-      <section class="dashboard-grid" *ngIf="activeSection === 'articles'">
+      <section class="dashboard-grid dashboard-grid--editor" *ngIf="activeSection === 'articles'">
         <aside class="dashboard-panel">
           <div class="panel-heading">
             <div>
@@ -287,547 +416,327 @@ interface ConfirmDialogState {
             </div>
           </div>
 
-          <nav class="editor-stepper" aria-label="Flujo de redaccion">
-            <button
-              type="button"
-              class="editor-step"
-              *ngFor="let step of articleSteps"
-              [ngClass]="{
-                'is-active': activeArticleStep === step.id,
-                'is-unlocked': canOpenArticleStep(step.id),
-                'is-complete': isArticleStepComplete(step.id)
-              }"
-              [disabled]="!canOpenArticleStep(step.id)"
-              (click)="openArticleStep(step.id)"
-            >
-              <span class="editor-step__count">{{ step.order }}</span>
-              <strong>{{ step.label }}</strong>
-              <small>{{ step.description }}</small>
-            </button>
-          </nav>
+          <div class="doc-editor">
+            <div class="doc-editor__menu">
+              <button
+                type="button"
+                class="doc-editor__menu-tab"
+                *ngFor="let tab of articleWorkspaceTabs"
+                [ngClass]="{ 'is-active': activeArticleWorkspaceTab === tab.id }"
+                (click)="setActiveArticleWorkspaceTab(tab.id)"
+              >
+                <span>{{ tab.label }}</span>
+                <small>{{ tab.description }}</small>
+              </button>
+            </div>
 
-          <form class="editor-form editor-form--guided" novalidate>
-            <section class="editor-stage" *ngIf="activeArticleStep === 'body'">
-              <div class="panel-heading">
-                <div>
-                  <h3>Cuerpo de la noticia</h3>
-                  <p class="panel-subtitle">Empieza por el contenido real: parrafos, fotos y videos embebidos entre bloques.</p>
-                </div>
-                <div class="button-row">
-                  <button class="button button--secondary" type="button" (click)="addHeadingBlock()">Agregar titulo</button>
-                  <button class="button button--ghost" type="button" (click)="addParagraphBlock()">Agregar parrafo</button>
-                  <button class="button button--ghost" type="button" (click)="addQuoteBlock()">Agregar cita</button>
-                  <button class="button button--ghost" type="button" (click)="addImageBlock()">Agregar foto</button>
-                  <button class="button button--ghost" type="button" (click)="addEmbedBlock()">Agregar video</button>
-                </div>
+            <div class="doc-editor__toolbar" role="toolbar" aria-label="Estado del editor">
+              <div class="doc-editor__toolbar-group">
+                <span class="helper-text">
+                  Escribe el cuerpo en un solo flujo. El editor admite encabezados, negritas, cursivas, enlaces, citas, imagenes y videos embebidos.
+                </span>
               </div>
 
-              <div class="editor-note">
-                <strong>Importante</strong>
-                <p>Todo lo que agregues aqui vive dentro del cuerpo de la noticia. La portada principal se configura en el siguiente paso.</p>
+              <div class="doc-editor__toolbar-meta">
+                <span class="count-pill">{{ formatArticleStatus(articleForm.status) }}</span>
+                <span class="count-pill">{{ articleBodyPreviewBlocks.length }} bloques</span>
+                <span class="count-pill">{{ articleWordCount() }} palabras</span>
+                <span class="count-pill">{{ articleReadingTimeEstimate() }} min</span>
               </div>
+            </div>
 
-              <div class="content-builder-toolbar" role="toolbar" aria-label="Accesos rapidos para agregar bloques">
-                <div class="content-builder-toolbar__label">
-                  <strong>Inserta contenido sin volver al inicio</strong>
-                  <span>Esta barra se queda visible mientras redactas y cada bloque tambien te deja agregar contenido justo debajo.</span>
-                </div>
-                <div class="button-row">
-                  <button class="button button--secondary" type="button" (click)="addHeadingBlock()">Agregar titulo</button>
-                  <button class="button button--ghost" type="button" (click)="addParagraphBlock()">Agregar parrafo</button>
-                  <button class="button button--ghost" type="button" (click)="addQuoteBlock()">Agregar cita</button>
-                  <button class="button button--ghost" type="button" (click)="addImageBlock()">Agregar foto</button>
-                  <button class="button button--ghost" type="button" (click)="addEmbedBlock()">Agregar video</button>
-                </div>
-              </div>
-
-              <div class="content-builder">
-                <section class="content-block" *ngFor="let block of articleForm.contentBlocks; let blockIndex = index" [attr.data-content-block-index]="blockIndex">
-                  <div class="content-block__header">
-                    <span class="count-pill">{{ contentBlockLabel(block.type) }}</span>
-                    <div class="button-row">
-                      <button class="button button--ghost" type="button" (click)="moveContentBlock(blockIndex, -1)">Subir</button>
-                      <button class="button button--ghost" type="button" (click)="moveContentBlock(blockIndex, 1)">Bajar</button>
-                      <button class="button button--ghost" type="button" (click)="removeContentBlock(blockIndex)">Quitar</button>
+            <form class="doc-editor__form" novalidate>
+              <div class="doc-editor__canvas">
+                <section class="doc-editor__panel" *ngIf="activeArticleWorkspaceTab === 'format'">
+                  <div class="panel-heading panel-heading--compact">
+                    <div>
+                      <p class="eyebrow">Jerarquia editorial</p>
+                      <h3>Titular y bajada</h3>
+                      <p class="panel-subtitle">Define el encabezado principal de la nota antes de entrar al contenido.</p>
                     </div>
                   </div>
 
-                  <ng-container *ngIf="block.type === 'heading'">
-                    <div class="stack-form">
-                      <label>
-                        <span>Titulo interno</span>
-                        <textarea
-                          [(ngModel)]="block.headingText"
-                          [name]="'blockHeadingText' + blockIndex"
-                          rows="2"
-                          placeholder="EL PASADO"
-                        ></textarea>
-                      </label>
+                  <input
+                    class="doc-editor__title-input"
+                    type="text"
+                    [(ngModel)]="articleForm.title"
+                    name="title"
+                    placeholder="Titulo del articulo"
+                    required
+                  />
 
-                      <div class="form-grid">
-                        <label>
-                          <span>Alineacion</span>
-                          <select [(ngModel)]="block.headingAlign" [name]="'blockHeadingAlign' + blockIndex">
-                            <option value="left">Izquierda</option>
-                            <option value="center">Centro</option>
-                            <option value="right">Derecha</option>
-                          </select>
-                        </label>
+                  <textarea
+                    class="doc-editor__subtitle-input"
+                    [(ngModel)]="articleForm.subtitle"
+                    name="subtitle"
+                    rows="3"
+                    placeholder="Bajada o subtitulo"
+                  ></textarea>
+                </section>
 
-                        <label>
-                          <span>Jerarquia</span>
-                          <select [(ngModel)]="block.headingLevel" [name]="'blockHeadingLevel' + blockIndex">
-                            <option value="h2">Titulo principal del bloque</option>
-                            <option value="h3">Subtitulo del bloque</option>
-                          </select>
-                        </label>
+                <section class="doc-editor__panel" *ngIf="activeArticleWorkspaceTab === 'media'">
+                  <section class="doc-cover">
+                    <div class="doc-cover__header">
+                      <div>
+                        <p class="eyebrow">Portada principal</p>
+                        <strong>{{ articleForm.coverUrl ? "Portada cargada" : "Carga la imagen principal del articulo" }}</strong>
                       </div>
-
-                      <div class="editor-heading-preview" [attr.data-align]="block.headingAlign">
-                        <p class="eyebrow">Vista previa</p>
-                        <h3 [class.editor-heading-preview__title--compact]="block.headingLevel === 'h3'">
-                          {{ block.headingText.trim() || "Tu titulo interno aparecera aqui" }}
-                        </h3>
-                      </div>
-
-                      <p class="helper-text">Usa este bloque para entradas como "EL PASADO" o separadores editoriales dentro de la nota.</p>
+                      <span class="count-pill" *ngIf="articleForm.coverUrl">{{ articleCoverToneLabel() }}</span>
                     </div>
-                  </ng-container>
 
-                  <ng-container *ngIf="block.type === 'paragraph'">
-                    <div class="button-row">
-                      <button class="button button--ghost" type="button" (click)="insertSmartQuotes(blockIndex)">Insertar comillas</button>
-                      <button class="button button--ghost" type="button" (click)="insertLinkTemplate(blockIndex)">Insertar enlace</button>
-                    </div>
-                    <label>
-                      <span>Texto del parrafo</span>
-                      <textarea
-                        [(ngModel)]="block.text"
-                        [name]="'blockText' + blockIndex"
-                        [attr.id]="'editorBlockText' + blockIndex"
-                        rows="6"
-                      ></textarea>
-                    </label>
-                    <p class="helper-text">Acepta enlaces directos como https://... y formato [texto](https://...).</p>
-                  </ng-container>
-
-                  <ng-container *ngIf="block.type === 'quote'">
-                    <div class="stack-form">
+                    <div class="doc-cover__fields">
                       <label>
-                        <span>Texto de la cita</span>
-                        <textarea [(ngModel)]="block.quoteText" [name]="'blockQuoteText' + blockIndex" rows="4"></textarea>
+                        <span>Tipo de portada</span>
+                        <select [(ngModel)]="articleForm.coverType" name="coverType">
+                          <option value="image">Imagen</option>
+                          <option value="video">Video</option>
+                          <option value="audio">Audio</option>
+                          <option value="infographic">Infografia</option>
+                        </select>
                       </label>
 
                       <label>
-                        <span>Fuente o atribucion</span>
-                        <input type="text" [(ngModel)]="block.quoteAttribution" [name]="'blockQuoteAttribution' + blockIndex" placeholder="Autor, medio o contexto" />
+                        <span>URL o ruta de portada</span>
+                        <input type="url" [(ngModel)]="articleForm.coverUrl" name="coverUrl" placeholder="/uploads/news/2026/07/portada.webp" />
                       </label>
 
-                      <p class="helper-text">Usa este bloque para destacar frases dentro de la lectura sin mezclarlas con los parrafos normales.</p>
-                    </div>
-                  </ng-container>
-
-                  <ng-container *ngIf="block.type === 'image'">
-                    <div class="stack-form">
-                      <label>
-                        <span>Ruta o URL interna de la foto</span>
-                        <input type="url" [(ngModel)]="block.imageUrl" [name]="'blockImageUrl' + blockIndex" placeholder="/uploads/news/2026/07/mi-foto.webp" />
-                      </label>
-
-                      <label>
-                        <span>Subir foto desde tu computador</span>
+                      <label *ngIf="isVisualCoverType(articleForm.coverType)">
+                        <span>Subir portada desde el computador</span>
                         <input
                           type="file"
                           accept="image/png,image/jpeg,image/webp,image/gif,image/avif"
-                          (change)="onContentImageSelected($event, blockIndex)"
-                          [disabled]="block.uploading"
+                          (change)="onCoverImageSelected($event)"
+                          [disabled]="uploadingCover"
                         />
                       </label>
 
-                      <div class="form-grid">
-                        <label>
-                          <span>Texto alternativo</span>
-                          <input type="text" [(ngModel)]="block.imageAlt" [name]="'blockImageAlt' + blockIndex" />
-                        </label>
-
-                        <label>
-                          <span>Leyenda</span>
-                          <input type="text" [(ngModel)]="block.imageCaption" [name]="'blockImageCaption' + blockIndex" />
-                        </label>
-                      </div>
-
-                      <p class="helper-text">Por seguridad, solo se aceptan imagenes subidas a infraestructura controlada por el medio.</p>
-                      <p class="helper-text" *ngIf="block.uploading">Subiendo imagen...</p>
-
-                      <figure class="editor-image-preview" *ngIf="block.imageUrl">
-                        <img [src]="block.imageUrl" [alt]="block.imageAlt || 'Vista previa de imagen'" />
-                        <figcaption *ngIf="block.imageCaption">{{ block.imageCaption }}</figcaption>
-                      </figure>
+                      <label>
+                        <span>Texto alternativo</span>
+                        <input type="text" [(ngModel)]="articleForm.coverAlt" name="coverAlt" placeholder="Describe la imagen de portada" />
+                      </label>
                     </div>
-                  </ng-container>
 
-                  <ng-container *ngIf="block.type === 'embed'">
-                    <div class="stack-form">
+                    <div class="form-grid" *ngIf="articleForm.coverUrl && isVisualCoverType(articleForm.coverType)">
                       <label>
-                        <span>Enlace del video embebido</span>
-                        <input
-                          type="url"
-                          [(ngModel)]="block.embedUrl"
-                          [name]="'blockEmbedUrl' + blockIndex"
-                          placeholder="https://www.youtube.com/watch?v=..."
-                        />
+                        <span>Enfoque X: {{ articleForm.coverPositionX }}%</span>
+                        <input type="range" min="0" max="100" step="0.1" [(ngModel)]="articleForm.coverPositionX" name="coverPositionX" />
                       </label>
 
                       <label>
-                        <span>Titulo opcional del video</span>
-                        <input type="text" [(ngModel)]="block.embedTitle" [name]="'blockEmbedTitle' + blockIndex" />
+                        <span>Enfoque Y: {{ articleForm.coverPositionY }}%</span>
+                        <input type="range" min="0" max="100" step="0.1" [(ngModel)]="articleForm.coverPositionY" name="coverPositionY" />
                       </label>
+                    </div>
 
-                      <p class="helper-text">Acepta enlaces de YouTube o Vimeo para insertarlos dentro del cuerpo.</p>
+                    <figure class="doc-cover__preview" *ngIf="articleDisplayCoverUrl() as coverPreview">
+                      <img
+                        [src]="coverPreview"
+                        [alt]="articleForm.coverAlt || articleDisplayTitle()"
+                        [style.object-position]="coverObjectPosition(articleForm.coverPositionX, articleForm.coverPositionY)"
+                      />
+                    </figure>
+                  </section>
+                </section>
 
-                      <div class="editor-embed-preview" *ngIf="safeBlockEmbedUrl(block) as embedUrl">
-                        <iframe
-                          [src]="embedUrl"
-                          [title]="block.embedTitle || 'Vista previa del video embebido'"
-                          loading="lazy"
-                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                          allowfullscreen
-                        ></iframe>
+                <section class="doc-editor__panel" *ngIf="activeArticleWorkspaceTab === 'redaction'">
+                  <section class="doc-body-editor">
+                    <div class="panel-heading panel-heading--compact">
+                      <div>
+                        <p class="eyebrow">Cuerpo de la noticia</p>
+                        <h3>Editor principal</h3>
+                        <p class="panel-subtitle">Redacta como en un procesador de texto y agrega multimedia desde la misma posicion del cursor.</p>
                       </div>
+                    </div>
 
-                      <p class="helper-text helper-text--danger" *ngIf="block.embedUrl && !safeBlockEmbedUrl(block)">
-                        El enlace aun no es compatible. Usa YouTube o Vimeo.
+                    <div class="doc-body-editor__surface">
+                      <ckeditor
+                        [editor]="Editor"
+                        [config]="ckeditorConfig"
+                        [(ngModel)]="articleBodyHtml"
+                        (ngModelChange)="onArticleBodyChange($event)"
+                        name="articleBodyHtml"
+                      ></ckeditor>
+                    </div>
+
+                    <div class="doc-body-editor__notes">
+                      <p class="helper-text">
+                        Usa “Encabezado 2” para intertitulos, “Encabezado 3” para subtitulos internos, “Cita” para destacar frases y “Insertar imagen” o
+                        “Insertar contenido multimedia” desde la barra del editor.
                       </p>
+                      <button class="button button--ghost" type="button" (click)="applySuggestedPreview()">Generar resumen sugerido</button>
                     </div>
-                  </ng-container>
-
-                  <div class="content-block__quick-add">
-                    <span class="helper-text">Agregar debajo de este bloque</span>
-                    <div class="button-row">
-                      <button class="button button--secondary" type="button" (click)="insertHeadingBlock(blockIndex)">Titulo debajo</button>
-                      <button class="button button--ghost" type="button" (click)="insertParagraphBlock(blockIndex)">Texto debajo</button>
-                      <button class="button button--ghost" type="button" (click)="insertQuoteBlock(blockIndex)">Cita debajo</button>
-                      <button class="button button--ghost" type="button" (click)="insertImageBlock(blockIndex)">Foto debajo</button>
-                      <button class="button button--ghost" type="button" (click)="insertEmbedBlock(blockIndex)">Video debajo</button>
-                    </div>
-                  </div>
-                </section>
-              </div>
-
-              <div class="editor-stage__actions">
-                <button class="button" type="button" (click)="continueArticleStep()">Continuar con previsualizacion</button>
-              </div>
-            </section>
-
-            <section class="editor-stage" *ngIf="activeArticleStep === 'preview'">
-              <div class="panel-heading">
-                <div>
-                  <h3>Previsualizacion y portada</h3>
-                  <p class="panel-subtitle">Aqui defines el resumen corto y la imagen principal de portada, separados del cuerpo.</p>
-                </div>
-              </div>
-
-              <div class="editor-stage__grid">
-                <section class="editor-stage-card">
-                  <h4>Previsualizacion corta</h4>
-                  <p class="helper-text">Este texto se usa en tarjetas, listados y espacios de resumen. Puedes editarlo o usar la sugerencia automatica.</p>
-                  <label>
-                    <span>Previsualizacion corta</span>
-                    <textarea [(ngModel)]="articleForm.excerpt" name="excerpt" rows="5"></textarea>
-                  </label>
-                  <div class="button-row">
-                    <button class="button button--ghost" type="button" (click)="applySuggestedPreview()">Usar sugerencia automatica</button>
-                  </div>
+                  </section>
                 </section>
 
-                <section class="editor-stage-card editor-stage-card--accent">
-                  <h4>Portada principal</h4>
-                  <p class="helper-text">Esta portada solo afecta home, tarjetas y cabecera del articulo. No cambia las fotos del cuerpo.</p>
+                <section class="doc-editor__panel" *ngIf="activeArticleWorkspaceTab === 'preview'">
+                  <div class="panel-heading panel-heading--compact">
+                    <div>
+                      <p class="eyebrow">Vista previa</p>
+                      <h3>Lectura editorial</h3>
+                      <p class="panel-subtitle">Aqui validas la portada, el titular y el ritmo de la lectura antes de publicar.</p>
+                    </div>
+                  </div>
 
-                  <div class="form-grid">
+                  <figure class="doc-cover__preview" *ngIf="articleDisplayCoverUrl() as coverPreview">
+                    <img
+                      [src]="coverPreview"
+                      [alt]="articleForm.coverAlt || articleDisplayTitle()"
+                      [style.object-position]="coverObjectPosition(articleForm.coverPositionX, articleForm.coverPositionY)"
+                    />
+                  </figure>
+
+                  <div class="doc-editor__preview-head">
+                    <h2>{{ articleDisplayTitle() }}</h2>
+                    <p *ngIf="articleForm.subtitle.trim()">{{ articleForm.subtitle }}</p>
+                  </div>
+
+                  <section class="doc-body-preview" *ngIf="articleBodyPreviewBlocks.length > 0; else emptyEditorialPreview">
+                    <div class="panel-heading panel-heading--compact">
+                      <div>
+                        <p class="eyebrow">Cuerpo renderizado</p>
+                        <h3>Asi se vera la lectura</h3>
+                        <p class="panel-subtitle">Previsualizacion editorial antes de guardar o enviar a revision.</p>
+                      </div>
+                    </div>
+
+                    <article class="article-body article-body--editor-preview">
+                      <ng-container *ngFor="let block of articleBodyPreviewBlocks">
+                        <ng-container *ngIf="block.type === 'heading'">
+                          <h2
+                            *ngIf="block.heading.level === 'h2'; else compactPreviewHeading"
+                            class="article-section-heading"
+                            [class.article-section-heading--center]="block.heading.align === 'center'"
+                            [class.article-section-heading--right]="block.heading.align === 'right'"
+                            [innerHTML]="renderPreviewBlockText(block)"
+                          ></h2>
+                          <ng-template #compactPreviewHeading>
+                            <h3
+                              class="article-section-heading article-section-heading--compact"
+                              [class.article-section-heading--center]="block.heading.align === 'center'"
+                              [class.article-section-heading--right]="block.heading.align === 'right'"
+                              [innerHTML]="renderPreviewBlockText(block)"
+                            ></h3>
+                          </ng-template>
+                        </ng-container>
+
+                        <p *ngIf="block.type === 'paragraph'" [innerHTML]="renderPreviewBlockText(block)"></p>
+
+                        <blockquote class="article-quote" *ngIf="block.type === 'quote'">
+                          <p [innerHTML]="renderPreviewBlockText(block)"></p>
+                          <footer class="article-quote__attribution" *ngIf="block.quote.attribution">{{ block.quote.attribution }}</footer>
+                        </blockquote>
+
+                        <figure class="article-inline-media" *ngIf="block.type === 'image' && block.image.url">
+                          <img [src]="block.image.url" [alt]="block.image.alt || articleDisplayTitle()" />
+                          <figcaption *ngIf="block.image.caption || block.image.alt">{{ block.image.caption || block.image.alt }}</figcaption>
+                        </figure>
+
+                        <figure class="article-inline-embed" *ngIf="block.type === 'embed' && safePreviewEmbedUrl(block.embed.url) as embedUrl">
+                          <iframe
+                            [src]="embedUrl"
+                            [title]="block.embed.title || articleDisplayTitle()"
+                            loading="lazy"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                            allowfullscreen
+                          ></iframe>
+                          <figcaption *ngIf="block.embed.title">{{ block.embed.title }}</figcaption>
+                        </figure>
+                      </ng-container>
+                    </article>
+                  </section>
+                  <ng-template #emptyEditorialPreview>
+                    <div class="editor-preview-placeholder">
+                      <strong>La vista previa aparecera cuando empieces a redactar.</strong>
+                      <p>Agrega texto, imagenes o videos en Redaccion para revisar aqui el resultado final.</p>
+                    </div>
+                  </ng-template>
+                </section>
+
+                <section class="doc-editor__settings" *ngIf="activeArticleWorkspaceTab === 'publish'">
+                  <div class="panel-heading panel-heading--compact">
+                    <div>
+                      <h3>Publicacion</h3>
+                      <p class="panel-subtitle">Resumen, etiquetas, categoria y salida editorial.</p>
+                    </div>
+                  </div>
+
+                  <div class="doc-editor__settings-grid">
                     <label>
-                      <span>Tipo de portada</span>
-                      <select [(ngModel)]="articleForm.coverType" name="coverType">
-                        <option value="image">Imagen</option>
-                        <option value="video">Video</option>
-                        <option value="audio">Audio</option>
-                        <option value="infographic">Infografia</option>
+                      <span>Previsualizacion corta</span>
+                      <textarea [(ngModel)]="articleForm.excerpt" name="excerpt" rows="4" placeholder="Resumen corto para portada, SEO y compartidos"></textarea>
+                    </label>
+
+                    <label>
+                      <span>Etiquetas</span>
+                      <input type="text" [(ngModel)]="articleForm.tags" name="tags" placeholder="memoria, politica, cultura" />
+                    </label>
+
+                    <label>
+                      <span>Categoria opcional</span>
+                      <select [(ngModel)]="articleForm.categoryId" name="categoryId">
+                        <option value="">Sin categoria</option>
+                        <option *ngFor="let category of categories" [value]="category.id">{{ category.name }}</option>
                       </select>
                     </label>
 
-                    <label>
-                      <span>Texto alternativo de portada</span>
-                      <input type="text" [(ngModel)]="articleForm.coverAlt" name="coverAlt" />
+                    <label *ngIf="currentUser.role === 'admin'">
+                      <span>Estado</span>
+                      <select [(ngModel)]="articleForm.status" name="status">
+                        <option value="draft">Borrador</option>
+                        <option value="review">En revision</option>
+                        <option value="changes_requested">Correcciones</option>
+                        <option value="approved">Aprobado</option>
+                        <option value="published">Publicado</option>
+                        <option value="archived">Archivado</option>
+                        <option value="rejected">Rechazado</option>
+                      </select>
+                    </label>
+
+                    <label class="editor-checkbox" *ngIf="currentUser.role === 'admin'">
+                      <input type="checkbox" [(ngModel)]="articleForm.featured" name="featured" />
+                      <span>Destacar en portada</span>
                     </label>
                   </div>
 
-                  <label>
-                    <span>Ruta o URL interna de portada</span>
-                    <input type="url" [(ngModel)]="articleForm.coverUrl" name="coverUrl" placeholder="/uploads/news/2026/07/portada.webp" />
-                  </label>
-
-                  <label *ngIf="isVisualCoverType(articleForm.coverType)">
-                    <span>Subir portada desde tu computador</span>
-                    <input
-                      type="file"
-                      accept="image/png,image/jpeg,image/webp,image/gif,image/avif"
-                      (change)="onCoverImageSelected($event)"
-                      [disabled]="uploadingCover"
-                    />
-                  </label>
-
-                  <p class="helper-text">Por seguridad, la portada debe provenir de archivos subidos a infraestructura controlada por el medio.</p>
-                  <p class="helper-text" *ngIf="uploadingCover">Subiendo portada...</p>
-
-                  <div class="form-grid" *ngIf="articleForm.coverUrl && isVisualCoverType(articleForm.coverType)">
-                    <label>
-                      <span>Enfoque horizontal: {{ articleForm.coverPositionX }}%</span>
-                      <input
-                        type="range"
-                        min="0"
-                        max="100"
-                        step="0.1"
-                        [(ngModel)]="articleForm.coverPositionX"
-                        name="coverPositionX"
-                      />
-                    </label>
-
-                    <label>
-                      <span>Enfoque vertical: {{ articleForm.coverPositionY }}%</span>
-                      <input
-                        type="range"
-                        min="0"
-                        max="100"
-                        step="0.1"
-                        [(ngModel)]="articleForm.coverPositionY"
-                        name="coverPositionY"
-                      />
-                    </label>
+                  <div class="button-row">
+                    <button class="button button--ghost" type="button" (click)="applySuggestedPreview()">Generar resumen sugerido</button>
+                    <span class="count-pill">{{ articleForm.contentBlocks.length }} bloques</span>
                   </div>
 
-                  <figure class="editor-image-preview editor-image-preview--cover" *ngIf="articleForm.coverUrl && isVisualCoverType(articleForm.coverType)">
-                    <img
-                      [src]="articleForm.coverUrl"
-                      [alt]="articleForm.coverAlt || 'Vista previa de portada'"
-                      [style.object-position]="coverObjectPosition(articleForm.coverPositionX, articleForm.coverPositionY)"
-                    />
-                    <figcaption *ngIf="articleForm.coverAlt">{{ articleForm.coverAlt }}</figcaption>
-                  </figure>
-
-                  <div class="editor-embed-preview" *ngIf="articleForm.coverType === 'video' && safeEmbedUrl(articleForm.coverUrl) as coverVideo">
-                    <iframe
-                      [src]="coverVideo"
-                      title="Vista previa del video de portada"
-                      loading="lazy"
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                      allowfullscreen
-                    ></iframe>
+                  <div class="editor-note editor-note--warm" *ngIf="currentUser.role !== 'admin' && reviewConfirmationOpen">
+                    <strong>Confirmacion editorial</strong>
+                    <p>La nota se guardara y se enviara a revision final.</p>
                   </div>
 
-                  <audio controls *ngIf="articleForm.coverType === 'audio' && articleForm.coverUrl">
-                    <source [src]="articleForm.coverUrl" />
-                  </audio>
-                </section>
-              </div>
-
-              <div class="editor-stage__actions">
-                <button class="button button--ghost" type="button" (click)="goToPreviousArticleStep()">Volver</button>
-                <button class="button" type="button" (click)="continueArticleStep()">Continuar con subtitulo</button>
-              </div>
-            </section>
-
-            <section class="editor-stage" *ngIf="activeArticleStep === 'subtitle'">
-              <div class="panel-heading">
-                <div>
-                  <h3>Subtitulo</h3>
-                  <p class="panel-subtitle">Dale contexto a la nota. Si no hace falta, puedes dejarlo vacio y continuar.</p>
-                </div>
-              </div>
-
-              <label>
-                <span>Subtitulo</span>
-                <input type="text" [(ngModel)]="articleForm.subtitle" name="subtitle" />
-              </label>
-
-              <div class="editor-stage__actions">
-                <button class="button button--ghost" type="button" (click)="goToPreviousArticleStep()">Volver</button>
-                <button class="button" type="button" (click)="continueArticleStep()">Continuar con titulo</button>
-              </div>
-            </section>
-
-            <section class="editor-stage" *ngIf="activeArticleStep === 'title'">
-              <div class="panel-heading">
-                <div>
-                  <h3>Titulo final</h3>
-                  <p class="panel-subtitle">Este es el titular principal que vera la audiencia en portada y en la lectura completa.</p>
-                </div>
-              </div>
-
-              <label>
-                <span>Titulo</span>
-                <input type="text" [(ngModel)]="articleForm.title" name="title" required />
-              </label>
-
-              <div class="editor-note editor-note--warm" *ngIf="articleForm.title.trim()">
-                <strong>Lectura del titular</strong>
-                <p>{{ articleForm.title }}</p>
-              </div>
-
-              <div class="editor-stage__actions">
-                <button class="button button--ghost" type="button" (click)="goToPreviousArticleStep()">Volver</button>
-                <button class="button" type="button" (click)="continueArticleStep()">Continuar con detalles editoriales</button>
-              </div>
-            </section>
-
-            <section class="editor-stage" *ngIf="activeArticleStep === 'settings'">
-              <div class="panel-heading">
-                <div>
-                  <h3>Detalles editoriales</h3>
-                  <p class="panel-subtitle">Ultimos ajustes de clasificacion y estado antes de la revision final.</p>
-                </div>
-              </div>
-
-              <div class="form-grid">
-                <label>
-                  <span>Etiquetas</span>
-                  <input type="text" [(ngModel)]="articleForm.tags" name="tags" placeholder="memoria, politica, cultura" />
-                </label>
-
-                <label>
-                  <span>Categoria opcional</span>
-                  <select [(ngModel)]="articleForm.categoryId" name="categoryId">
-                    <option value="">Sin categoria</option>
-                    <option *ngFor="let category of categories" [value]="category.id">{{ category.name }}</option>
-                  </select>
-                </label>
-              </div>
-
-              <div class="form-grid" *ngIf="currentUser.role === 'admin'; else journalistFlowNote">
-                <label>
-                  <span>Estado</span>
-                  <select [(ngModel)]="articleForm.status" name="status">
-                    <option value="draft">Borrador</option>
-                    <option value="review">En revision</option>
-                    <option value="changes_requested">Correcciones</option>
-                    <option value="approved">Aprobado</option>
-                    <option value="published">Publicado</option>
-                    <option value="archived">Archivado</option>
-                    <option value="rejected">Rechazado</option>
-                  </select>
-                </label>
-
-                <label class="editor-checkbox">
-                  <input type="checkbox" [(ngModel)]="articleForm.featured" name="featured" />
-                  <span>Destacar esta pieza en portada</span>
-                </label>
-              </div>
-
-              <ng-template #journalistFlowNote>
-                <div class="editor-note">
-                  <strong>Flujo del periodista</strong>
-                  <p>Tu nota se mantendra en borrador mientras la editas. En el ultimo paso podras enviarla a revision final.</p>
-                </div>
-              </ng-template>
-
-              <div class="editor-stage__actions">
-                <button class="button button--ghost" type="button" (click)="goToPreviousArticleStep()">Volver</button>
-                <button class="button" type="button" (click)="continueArticleStep()">Ir a revision final</button>
-              </div>
-            </section>
-
-            <section class="editor-stage" *ngIf="activeArticleStep === 'review'">
-              <div class="panel-heading">
-                <div>
-                  <h3>Revision final</h3>
-                  <p class="panel-subtitle">Haz un ultimo chequeo antes de guardar o enviar la nota.</p>
-                </div>
-              </div>
-
-              <div class="editor-review-grid">
-                <section class="editor-stage-card">
-                  <p class="eyebrow">Titular</p>
-                  <strong>{{ articleForm.title.trim() || "Aun sin titulo final" }}</strong>
-                  <p>{{ articleForm.subtitle.trim() || "Sin subtitulo por ahora." }}</p>
-                </section>
-
-                <section class="editor-stage-card">
-                  <p class="eyebrow">Previsualizacion</p>
-                  <strong>Resumen corto</strong>
-                  <p>{{ articleForm.excerpt.trim() || articlePreviewText() }}</p>
-                </section>
-
-                <section class="editor-stage-card">
-                  <p class="eyebrow">Cuerpo</p>
-                  <strong>{{ contentBlockCount('heading') }} titulos internos, {{ contentBlockCount('paragraph') }} parrafos y {{ contentBlockCount('quote') }} citas</strong>
-                  <p>{{ contentBlockCount('image') }} fotos y {{ contentBlockCount('embed') }} videos embebidos</p>
-                </section>
-
-                <section class="editor-stage-card">
-                  <p class="eyebrow">Portada</p>
-                  <strong>{{ articleForm.coverUrl ? "Portada lista" : "Sin portada principal" }}</strong>
-                  <p>{{ articleForm.coverUrl ? articleForm.coverType : "Puedes dejarla vacia o volver para agregarla." }}</p>
-                </section>
-              </div>
-
-              <div class="editor-note editor-note--warm" *ngIf="currentUser.role !== 'admin' && !reviewConfirmationOpen">
-                <strong>Todo correcto hasta aqui</strong>
-                <p>Si quieres revisar una vez mas, vuelve a cualquier paso. Si ya esta lista, puedes enviarla a revision final.</p>
-              </div>
-
-              <div class="editor-confirmation" *ngIf="currentUser.role !== 'admin' && reviewConfirmationOpen">
-                <strong>Confirmacion editorial</strong>
-                <p>La noticia se guardara y se enviara al equipo de moderacion para la revision final. Aun podras verla en el dashboard.</p>
-              </div>
-
-              <div class="editor-stage__actions" *ngIf="currentUser.role === 'admin'; else journalistReviewActions">
-                <button class="button button--ghost" type="button" (click)="goToPreviousArticleStep()">Volver</button>
-                <button
-                  class="button"
-                  type="button"
-                  (click)="saveArticle()"
-                  [disabled]="savingArticle || uploadingCover || hasUploadingContentBlocks()"
-                >
-                  {{ savingArticle ? "Guardando..." : selectedArticleId ? "Guardar cambios" : "Crear articulo" }}
-                </button>
-              </div>
-
-              <ng-template #journalistReviewActions>
-                <div class="editor-stage__actions" *ngIf="!reviewConfirmationOpen; else journalistConfirmationButtons">
-                  <button class="button button--ghost" type="button" (click)="goToPreviousArticleStep()">Volver</button>
-                  <button
-                    class="button button--secondary"
-                    type="button"
-                    (click)="saveArticle()"
-                    [disabled]="savingArticle || uploadingCover || hasUploadingContentBlocks()"
-                  >
-                    {{ savingArticle ? "Guardando..." : selectedArticleId ? "Guardar borrador" : "Crear borrador" }}
-                  </button>
-                  <button
-                    class="button"
-                    type="button"
-                    (click)="openReviewConfirmation()"
-                    [disabled]="savingArticle || uploadingCover || hasUploadingContentBlocks()"
-                  >
-                    Todo esta correcto
-                  </button>
-                </div>
-
-                <ng-template #journalistConfirmationButtons>
-                  <div class="editor-stage__actions">
-                    <button class="button button--ghost" type="button" (click)="requestLastArticleReview()">Quiero revisar una vez mas</button>
-                    <button
-                      class="button"
-                      type="button"
-                      (click)="saveArticle({ submitForReview: true })"
-                      [disabled]="savingArticle || uploadingCover || hasUploadingContentBlocks()"
-                    >
-                      {{ savingArticle ? "Enviando..." : "Enviar a revision final" }}
+                  <div class="doc-editor__actions" *ngIf="currentUser.role === 'admin'; else journalistDocActions">
+                    <button class="button" type="button" (click)="saveArticle()" [disabled]="savingArticle || uploadingCover || hasUploadingContentBlocks()">
+                      {{ savingArticle ? "Guardando..." : selectedArticleId ? "Guardar cambios" : "Crear articulo" }}
                     </button>
                   </div>
-                </ng-template>
-              </ng-template>
-            </section>
-          </form>
+
+                  <ng-template #journalistDocActions>
+                    <div class="doc-editor__actions" *ngIf="!reviewConfirmationOpen; else journalistDocConfirm">
+                      <button class="button button--secondary" type="button" (click)="saveArticle()" [disabled]="savingArticle || uploadingCover || hasUploadingContentBlocks()">
+                        {{ savingArticle ? "Guardando..." : selectedArticleId ? "Guardar borrador" : "Crear borrador" }}
+                      </button>
+                      <button class="button" type="button" (click)="openReviewConfirmation()" [disabled]="savingArticle || uploadingCover || hasUploadingContentBlocks()">
+                        Enviar a revision
+                      </button>
+                    </div>
+
+                    <ng-template #journalistDocConfirm>
+                      <div class="doc-editor__actions">
+                        <button class="button button--ghost" type="button" (click)="requestLastArticleReview()">Seguir editando</button>
+                        <button class="button" type="button" (click)="saveArticle({ submitForReview: true })" [disabled]="savingArticle || uploadingCover || hasUploadingContentBlocks()">
+                          {{ savingArticle ? "Enviando..." : "Confirmar envio" }}
+                        </button>
+                      </div>
+                    </ng-template>
+                  </ng-template>
+                </section>
+              </div>
+            </form>
+          </div>
 
           <section class="moderation-panel" *ngIf="currentUser.role === 'admin' && selectedArticleId">
             <h3>Moderacion</h3>
@@ -1330,6 +1239,1276 @@ interface ConfirmDialogState {
     </section>
   `,
   styles: [`
+    .dashboard-grid--editor {
+      grid-template-columns: minmax(280px, 320px) minmax(0, 1fr);
+      align-items: start;
+    }
+
+    .editor-studio {
+      display: grid;
+      grid-template-columns: minmax(0, 1.55fr) minmax(320px, 0.92fr);
+      gap: 20px;
+      align-items: start;
+      margin-top: 20px;
+    }
+
+    .editor-studio__rail,
+    .editor-studio__workspace,
+    .editor-studio__inspector {
+      display: grid;
+      gap: 18px;
+      align-content: start;
+    }
+
+    .editor-studio-card {
+      display: grid;
+      gap: 16px;
+      padding: 18px;
+      border-radius: 26px;
+      border: 1px solid var(--border-strong);
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent),
+        var(--surface);
+      box-shadow: var(--shadow-soft);
+    }
+
+    .editor-studio-card--workspace {
+      padding: 20px;
+    }
+
+    .editor-studio-card--hero {
+      background:
+        linear-gradient(135deg, rgba(255, 208, 77, 0.08), rgba(44, 85, 177, 0.08)),
+        var(--surface);
+    }
+
+    .editor-studio-card--sticky {
+      position: sticky;
+      top: 18px;
+    }
+
+    .editor-studio-hero {
+      display: grid;
+      gap: 18px;
+    }
+
+    .editor-studio-hero__copy {
+      display: grid;
+      gap: 10px;
+    }
+
+    .panel-heading--compact {
+      gap: 12px;
+      margin-bottom: 0;
+    }
+
+    .editor-studio__title {
+      font-family: var(--headline);
+      font-size: clamp(1.35rem, 2vw, 1.75rem);
+      line-height: 1.1;
+      color: var(--text);
+    }
+
+    .editor-studio__metrics {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .editor-studio__metric {
+      display: grid;
+      gap: 6px;
+      padding: 12px;
+      border-radius: 18px;
+      border: 1px solid var(--border);
+      background: rgba(9, 14, 27, 0.32);
+    }
+
+    .editor-studio__metric span {
+      font-size: 0.78rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .editor-studio__metric strong {
+      color: var(--text);
+      font-size: 0.98rem;
+    }
+
+    .editor-stepper--stack {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+    }
+
+    .editor-outline-list {
+      display: grid;
+      gap: 8px;
+      max-height: 420px;
+      overflow: auto;
+      padding-right: 6px;
+    }
+
+    .editor-outline-item {
+      display: grid;
+      grid-template-columns: 36px minmax(0, 1fr);
+      gap: 12px;
+      align-items: start;
+      width: 100%;
+      padding: 12px;
+      border-radius: 18px;
+      border: 1px solid var(--border);
+      background: rgba(9, 14, 27, 0.18);
+      color: var(--text);
+      text-align: left;
+      transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+    }
+
+    .editor-outline-item:hover,
+    .editor-outline-item:focus-visible {
+      transform: translateY(-1px);
+      border-color: rgba(90, 125, 255, 0.35);
+      background: rgba(13, 22, 42, 0.34);
+    }
+
+    .editor-outline-item.is-active {
+      border-color: rgba(255, 208, 77, 0.34);
+      background: linear-gradient(135deg, rgba(255, 208, 77, 0.16), rgba(66, 102, 232, 0.16));
+      box-shadow: 0 0 0 1px rgba(255, 208, 77, 0.08);
+    }
+
+    .editor-outline-item__index {
+      display: inline-grid;
+      place-items: center;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.05);
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .editor-outline-item__body {
+      display: grid;
+      gap: 4px;
+      min-width: 0;
+    }
+
+    .editor-outline-item__body strong {
+      color: var(--text);
+      font-size: 0.95rem;
+    }
+
+    .editor-outline-item__body small {
+      color: var(--muted);
+      line-height: 1.45;
+      white-space: normal;
+      word-break: break-word;
+    }
+
+    .editor-studio-toolbar {
+      display: flex;
+      justify-content: space-between;
+      gap: 18px;
+      align-items: flex-start;
+      margin-bottom: 18px;
+    }
+
+    .editor-studio-toolbar strong {
+      color: var(--text);
+      font-size: 1.05rem;
+    }
+
+    .editor-studio-toolbar__meta {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+
+    .editor-form--studio {
+      display: grid;
+      gap: 18px;
+    }
+
+    .wordpress-editor {
+      display: grid;
+      gap: 18px;
+    }
+
+    .wordpress-editor__head {
+      display: grid;
+      gap: 16px;
+      padding: 20px;
+      border-radius: 24px;
+      border: 1px solid var(--border);
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent),
+        rgba(10, 16, 28, 0.42);
+    }
+
+    .wordpress-editor__title-field,
+    .wordpress-editor__subtitle-field,
+    .content-block label,
+    .editor-sidebar-panel label {
+      display: grid;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .wordpress-editor__title-field span,
+    .content-block label span,
+    .editor-sidebar-panel label span {
+      color: var(--muted);
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .wordpress-editor__title-input {
+      min-height: 84px;
+      padding: 0;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      box-shadow: none;
+      color: var(--text);
+      font-family: var(--headline);
+      font-size: clamp(2.1rem, 4vw, 3.6rem);
+      line-height: 1.02;
+    }
+
+    .wordpress-editor__title-input::placeholder {
+      color: rgba(176, 188, 214, 0.62);
+    }
+
+    .wordpress-editor__subtitle-field textarea {
+      min-height: 110px;
+      resize: vertical;
+      font-size: 1rem;
+      line-height: 1.7;
+    }
+
+    .content-builder-toolbar {
+      position: sticky;
+      top: 14px;
+      z-index: 4;
+      display: flex;
+      justify-content: space-between;
+      gap: 18px;
+      align-items: center;
+      padding: 16px 18px;
+      border-radius: 22px;
+      border: 1px solid var(--border);
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent),
+        rgba(12, 18, 31, 0.94);
+      backdrop-filter: blur(16px);
+      box-shadow: var(--shadow-soft);
+    }
+
+    .content-builder-toolbar__label {
+      display: grid;
+      gap: 4px;
+    }
+
+    .content-builder-toolbar__label strong {
+      color: var(--text);
+      font-size: 1rem;
+    }
+
+    .content-builder-toolbar__label span {
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    .content-builder {
+      display: grid;
+      gap: 18px;
+    }
+
+    .content-block {
+      display: grid;
+      gap: 16px;
+      padding: 20px;
+      border-radius: 24px;
+      border: 1px solid var(--border);
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent),
+        rgba(10, 16, 28, 0.58);
+      transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+    }
+
+    .content-block:hover {
+      border-color: rgba(132, 169, 255, 0.2);
+      transform: translateY(-1px);
+    }
+
+    .content-block__header,
+    .content-block__quick-add {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .content-block__quick-add {
+      padding-top: 14px;
+      border-top: 1px solid var(--border);
+    }
+
+    .content-block textarea {
+      resize: vertical;
+    }
+
+    .content-block textarea[name^="blockText"] {
+      min-height: 230px;
+      font-size: 1.04rem;
+      line-height: 1.85;
+    }
+
+    .content-block textarea[name^="blockHeadingText"] {
+      min-height: 120px;
+      font-family: var(--headline);
+      font-size: clamp(1.7rem, 2.4vw, 2.4rem);
+      line-height: 1.12;
+      font-weight: 700;
+    }
+
+    .content-block textarea[name^="blockQuoteText"] {
+      min-height: 160px;
+      font-family: var(--headline);
+      font-size: 1.2rem;
+      line-height: 1.7;
+    }
+
+    .editor-image-preview,
+    .editor-embed-preview {
+      overflow: hidden;
+      border-radius: 22px;
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .editor-image-preview {
+      margin: 0;
+    }
+
+    .editor-image-preview img {
+      width: 100%;
+      max-height: 420px;
+      object-fit: cover;
+    }
+
+    .editor-image-preview figcaption {
+      padding: 12px 14px;
+      color: var(--muted);
+      font-size: 0.92rem;
+      line-height: 1.55;
+    }
+
+    .editor-embed-preview iframe {
+      display: block;
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      border: 0;
+    }
+
+    .doc-editor {
+      display: grid;
+      gap: 18px;
+      margin-top: 20px;
+    }
+
+    .doc-editor__menu {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 10px;
+      padding: 0;
+    }
+
+    .doc-editor__menu-tab {
+      display: grid;
+      gap: 4px;
+      padding: 14px 16px;
+      text-align: left;
+      border-radius: 18px;
+      border: 1px solid var(--border);
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent),
+        rgba(10, 16, 28, 0.36);
+      color: var(--muted);
+      transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .doc-editor__menu-tab span {
+      color: var(--text);
+      font-size: 0.94rem;
+      font-weight: 700;
+    }
+
+    .doc-editor__menu-tab small {
+      color: var(--muted);
+      line-height: 1.45;
+      font-size: 0.78rem;
+    }
+
+    .doc-editor__menu-tab:hover,
+    .doc-editor__menu-tab:focus-visible {
+      transform: translateY(-1px);
+      border-color: rgba(132, 169, 255, 0.26);
+      box-shadow: var(--shadow-soft);
+    }
+
+    .doc-editor__menu-tab.is-active {
+      border-color: rgba(255, 208, 77, 0.34);
+      background:
+        linear-gradient(135deg, rgba(255, 208, 77, 0.14), rgba(66, 102, 232, 0.14)),
+        rgba(10, 16, 28, 0.46);
+      box-shadow: var(--shadow-soft);
+    }
+
+    .doc-editor__toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 16px;
+      border-radius: 22px;
+      border: 1px solid var(--border-strong);
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent),
+        var(--surface);
+      box-shadow: var(--shadow-soft);
+    }
+
+    .doc-editor__toolbar-group,
+    .doc-editor__toolbar-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .doc-editor__form,
+    .doc-editor__canvas {
+      display: grid;
+      gap: 18px;
+    }
+
+    .doc-editor__page,
+    .doc-editor__settings,
+    .doc-editor__panel {
+      width: min(100%, 920px);
+      margin: 0 auto;
+      padding: 28px 32px;
+      border-radius: 28px;
+      border: 1px solid rgba(18, 28, 46, 0.12);
+      background: rgba(255, 255, 255, 0.92);
+      box-shadow: 0 20px 50px rgba(9, 18, 33, 0.12);
+    }
+
+    .doc-editor__page,
+    .doc-editor__panel {
+      display: grid;
+      gap: 24px;
+    }
+
+    .doc-editor__panel {
+      min-height: 620px;
+    }
+
+    :host-context(:root[data-theme="dark"]) .doc-editor__page,
+    :host-context(:root[data-theme="dark"]) .doc-editor__settings,
+    :host-context(:root[data-theme="dark"]) .doc-editor__panel {
+      border-color: rgba(176, 188, 214, 0.12);
+      background: rgba(12, 16, 23, 0.96);
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.28);
+    }
+
+    .doc-editor__preview-head {
+      display: grid;
+      gap: 10px;
+    }
+
+    .doc-editor__preview-head h2 {
+      margin: 0;
+      font-family: var(--headline);
+      font-size: clamp(2rem, 3vw, 3rem);
+      line-height: 1.04;
+      color: var(--text);
+    }
+
+    .doc-editor__preview-head p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 1.02rem;
+      line-height: 1.75;
+    }
+
+    .doc-editor__title-input,
+    .doc-editor__subtitle-input,
+    .doc-block__heading-input,
+    .doc-block__paragraph-input,
+    .doc-block__quote-input {
+      width: 100%;
+      padding: 0;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      box-shadow: none;
+      color: #16233a;
+    }
+
+    .doc-editor__title-input {
+      min-height: 90px;
+      font-family: var(--headline);
+      font-size: clamp(2.4rem, 4vw, 3.8rem);
+      line-height: 1.02;
+      font-weight: 700;
+    }
+
+    .doc-editor__subtitle-input {
+      min-height: 80px;
+      resize: none;
+      font-size: 1.12rem;
+      line-height: 1.8;
+      color: #52637d;
+    }
+
+    .doc-editor__title-input::placeholder,
+    .doc-editor__subtitle-input::placeholder,
+    .doc-block__heading-input::placeholder,
+    .doc-block__paragraph-input::placeholder,
+    .doc-block__quote-input::placeholder {
+      color: rgba(82, 99, 125, 0.58);
+    }
+
+    .doc-cover {
+      display: grid;
+      gap: 16px;
+      padding: 20px;
+      border-radius: 22px;
+      border: 1px solid rgba(18, 28, 46, 0.1);
+      background: rgba(245, 247, 251, 0.9);
+    }
+
+    .doc-cover__header {
+      display: flex;
+      justify-content: space-between;
+      gap: 14px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .doc-cover__header strong {
+      color: #16233a;
+      font-size: 1rem;
+    }
+
+    .doc-cover__fields,
+    .doc-block__asset-fields,
+    .doc-block__options,
+    .doc-editor__settings-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .doc-cover label,
+    .doc-block label,
+    .doc-editor__settings label {
+      display: grid;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .doc-cover label span,
+    .doc-block label span,
+    .doc-editor__settings label span {
+      color: #52637d;
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .doc-cover__preview,
+    .doc-block__image-preview,
+    .doc-block__embed-preview {
+      margin: 0;
+      overflow: hidden;
+      border-radius: 20px;
+      border: 1px solid rgba(18, 28, 46, 0.1);
+      background: #f4f7fb;
+    }
+
+    .doc-cover__preview img,
+    .doc-block__image-preview img {
+      width: 100%;
+      display: block;
+      max-height: 460px;
+      object-fit: cover;
+    }
+
+    .doc-body-editor,
+    .doc-body-preview {
+      display: grid;
+      gap: 16px;
+      padding: 20px;
+      border-radius: 22px;
+      border: 1px solid rgba(18, 28, 46, 0.1);
+      background: rgba(245, 247, 251, 0.88);
+    }
+
+    .doc-body-editor__surface {
+      border: 1px solid rgba(18, 28, 46, 0.1);
+      border-radius: 20px;
+      overflow: hidden;
+      background: rgba(255, 255, 255, 0.98);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+    }
+
+    .doc-body-editor__notes {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .doc-body-preview .article-body {
+      padding: 0;
+      border: 0;
+      background: transparent;
+      box-shadow: none;
+    }
+
+    .doc-body-preview .article-body p:first-child,
+    .doc-body-preview .article-body h2:first-child,
+    .doc-body-preview .article-body h3:first-child,
+    .doc-body-preview .article-body blockquote:first-child,
+    .doc-body-preview .article-body figure:first-child {
+      margin-top: 0;
+    }
+
+    :host ::ng-deep .ck.ck-editor {
+      display: block;
+    }
+
+    :host ::ng-deep .ck.ck-toolbar {
+      border: 0;
+      border-bottom: 1px solid rgba(18, 28, 46, 0.08);
+      background: linear-gradient(180deg, rgba(245, 248, 252, 0.98), rgba(233, 239, 248, 0.94));
+      padding: 10px 12px;
+      gap: 4px;
+    }
+
+    :host ::ng-deep .ck.ck-button,
+    :host ::ng-deep .ck.ck-dropdown__button {
+      border-radius: 12px;
+    }
+
+    :host ::ng-deep .ck.ck-editor__main > .ck-editor__editable {
+      min-height: 420px;
+      padding: 28px 30px;
+      border: 0;
+      color: #142038;
+      background: rgba(255, 255, 255, 0.99);
+      box-shadow: none;
+      font-family: var(--body);
+      font-size: 1.05rem;
+      line-height: 1.9;
+    }
+
+    :host ::ng-deep .ck.ck-editor__main > .ck-editor__editable h2,
+    :host ::ng-deep .ck.ck-editor__main > .ck-editor__editable h3 {
+      font-family: var(--headline);
+      color: #13203a;
+      line-height: 1.12;
+    }
+
+    :host ::ng-deep .ck.ck-editor__main > .ck-editor__editable h2 {
+      font-size: clamp(1.9rem, 2.8vw, 2.5rem);
+      margin: 1.4rem 0 0.75rem;
+    }
+
+    :host ::ng-deep .ck.ck-editor__main > .ck-editor__editable h3 {
+      font-size: clamp(1.35rem, 2.2vw, 1.8rem);
+      margin: 1.1rem 0 0.65rem;
+    }
+
+    :host ::ng-deep .ck.ck-editor__main > .ck-editor__editable blockquote {
+      border-left: 4px solid rgba(21, 72, 167, 0.3);
+      margin: 1.5rem 0;
+      padding: 0.25rem 0 0.25rem 1rem;
+      color: #3d4d66;
+      font-family: var(--headline);
+      font-size: 1.18rem;
+    }
+
+    :host ::ng-deep .ck.ck-editor__main > .ck-editor__editable a {
+      color: #1548a7;
+      text-decoration-color: rgba(21, 72, 167, 0.38);
+      text-underline-offset: 0.16em;
+    }
+
+    :host-context(:root[data-theme="dark"]) .doc-body-editor,
+    :host-context(:root[data-theme="dark"]) .doc-body-preview {
+      border-color: rgba(176, 188, 214, 0.12);
+      background: rgba(16, 20, 28, 0.92);
+    }
+
+    :host-context(:root[data-theme="dark"]) .doc-body-editor__surface {
+      border-color: rgba(176, 188, 214, 0.14);
+      background: rgba(9, 12, 18, 0.98);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    }
+
+    :host-context(:root[data-theme="dark"]) :host ::ng-deep .ck.ck-toolbar,
+    :host-context(:root[data-theme="dark"]) ::ng-deep .ck.ck-toolbar {
+      border-bottom-color: rgba(176, 188, 214, 0.1);
+      background: linear-gradient(180deg, rgba(18, 23, 33, 0.98), rgba(11, 15, 23, 0.96));
+    }
+
+    :host-context(:root[data-theme="dark"]) ::ng-deep .ck.ck-editor__main > .ck-editor__editable {
+      color: #eef4ff;
+      background: rgba(9, 12, 18, 0.99);
+    }
+
+    :host-context(:root[data-theme="dark"]) ::ng-deep .ck.ck-editor__main > .ck-editor__editable h2,
+    :host-context(:root[data-theme="dark"]) ::ng-deep .ck.ck-editor__main > .ck-editor__editable h3 {
+      color: #f8fbff;
+    }
+
+    :host-context(:root[data-theme="dark"]) ::ng-deep .ck.ck-editor__main > .ck-editor__editable blockquote {
+      border-left-color: rgba(255, 208, 77, 0.34);
+      color: #d4dcec;
+    }
+
+    :host-context(:root[data-theme="dark"]) ::ng-deep .ck.ck-editor__main > .ck-editor__editable a {
+      color: #9abbff;
+      text-decoration-color: rgba(154, 187, 255, 0.42);
+    }
+
+    .doc-block__image-preview figcaption {
+      padding: 12px 14px;
+      color: #52637d;
+      line-height: 1.55;
+    }
+
+    .doc-block__embed-preview iframe {
+      display: block;
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      border: 0;
+    }
+
+    .doc-blocks {
+      display: grid;
+      gap: 18px;
+    }
+
+    .doc-block {
+      display: grid;
+      gap: 14px;
+      padding: 12px 0;
+      border-top: 1px solid rgba(18, 28, 46, 0.08);
+    }
+
+    .doc-block:first-child {
+      border-top: 0;
+    }
+
+    .doc-block.is-selected {
+      padding-inline: 12px;
+      margin-inline: -12px;
+      border-radius: 18px;
+      background: rgba(67, 97, 185, 0.07);
+      border-top-color: transparent;
+      box-shadow: inset 0 0 0 1px rgba(67, 97, 185, 0.12);
+    }
+
+    .doc-block__meta {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .doc-block__insert {
+      padding: 0;
+      border: 0;
+      background: transparent;
+      color: var(--flag-blue);
+      font-size: 0.92rem;
+      font-weight: 700;
+    }
+
+    .doc-block__insertbar {
+      display: grid;
+      gap: 10px;
+      padding-top: 14px;
+      border-top: 1px dashed rgba(18, 28, 46, 0.12);
+    }
+
+    .doc-block__insertbar-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .doc-block--heading .doc-block__heading-input {
+      min-height: 90px;
+      font-family: var(--headline);
+      font-size: clamp(1.8rem, 3vw, 2.6rem);
+      line-height: 1.15;
+      font-weight: 700;
+    }
+
+    .doc-block--paragraph .doc-block__paragraph-input {
+      min-height: 220px;
+      resize: vertical;
+      font-size: 1.08rem;
+      line-height: 1.92;
+    }
+
+    .doc-block--quote .doc-block__quote-input {
+      min-height: 140px;
+      resize: vertical;
+      font-family: var(--headline);
+      font-size: 1.28rem;
+      line-height: 1.7;
+    }
+
+    .doc-editor__add-row,
+    .doc-editor__actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .doc-editor__settings {
+      display: grid;
+      gap: 18px;
+    }
+
+    .doc-editor__settings .panel-heading h3,
+    .doc-editor__settings .panel-subtitle,
+    .doc-editor__settings .helper-text,
+    .doc-cover .helper-text {
+      color: #52637d;
+    }
+
+    .doc-editor__settings textarea,
+    .doc-editor__settings input,
+    .doc-editor__settings select,
+    .doc-cover input,
+    .doc-cover select,
+    .doc-block input,
+    .doc-block select {
+      color: #16233a;
+      background: rgba(255, 255, 255, 0.96);
+      border-color: rgba(18, 28, 46, 0.12);
+    }
+
+    .doc-editor__settings .count-pill,
+    .doc-cover .count-pill,
+    .doc-block .count-pill {
+      color: #28467a;
+      border-color: rgba(40, 70, 122, 0.14);
+      background: rgba(40, 70, 122, 0.08);
+    }
+
+    .doc-editor__settings .editor-note {
+      border-color: rgba(255, 208, 77, 0.26);
+      background: linear-gradient(135deg, rgba(255, 208, 77, 0.16), rgba(201, 53, 53, 0.08));
+    }
+
+    :host-context(:root[data-theme="dark"]) .doc-editor__settings .panel-heading h3 {
+      color: #f4f7ff;
+    }
+
+    :host-context(:root[data-theme="dark"]) .doc-cover label span,
+    :host-context(:root[data-theme="dark"]) .doc-block label span,
+    :host-context(:root[data-theme="dark"]) .doc-editor__settings label span,
+    :host-context(:root[data-theme="dark"]) .editor-checkbox span,
+    :host-context(:root[data-theme="dark"]) .doc-editor__settings .panel-subtitle,
+    :host-context(:root[data-theme="dark"]) .doc-editor__settings .helper-text,
+    :host-context(:root[data-theme="dark"]) .doc-cover .helper-text {
+      color: #9db2d8;
+    }
+
+    :host-context(:root[data-theme="dark"]) .doc-editor__settings textarea,
+    :host-context(:root[data-theme="dark"]) .doc-editor__settings input,
+    :host-context(:root[data-theme="dark"]) .doc-editor__settings select,
+    :host-context(:root[data-theme="dark"]) .doc-cover input,
+    :host-context(:root[data-theme="dark"]) .doc-cover select,
+    :host-context(:root[data-theme="dark"]) .doc-block input,
+    :host-context(:root[data-theme="dark"]) .doc-block select {
+      color: #eef4ff;
+      background: rgba(18, 24, 35, 0.96);
+      border-color: rgba(154, 187, 255, 0.18);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    }
+
+    :host-context(:root[data-theme="dark"]) .doc-editor__settings textarea::placeholder,
+    :host-context(:root[data-theme="dark"]) .doc-editor__settings input::placeholder,
+    :host-context(:root[data-theme="dark"]) .doc-cover input::placeholder,
+    :host-context(:root[data-theme="dark"]) .doc-block input::placeholder {
+      color: rgba(196, 210, 235, 0.7);
+    }
+
+    :host-context(:root[data-theme="dark"]) .doc-editor__settings textarea:focus,
+    :host-context(:root[data-theme="dark"]) .doc-editor__settings input:focus,
+    :host-context(:root[data-theme="dark"]) .doc-editor__settings select:focus,
+    :host-context(:root[data-theme="dark"]) .doc-cover input:focus,
+    :host-context(:root[data-theme="dark"]) .doc-cover select:focus,
+    :host-context(:root[data-theme="dark"]) .doc-block input:focus,
+    :host-context(:root[data-theme="dark"]) .doc-block select:focus {
+      border-color: rgba(255, 208, 77, 0.42);
+      box-shadow:
+        0 0 0 3px rgba(255, 208, 77, 0.12),
+        inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    }
+
+    .content-block.is-selected {
+      border-color: rgba(90, 125, 255, 0.34);
+      box-shadow:
+        0 0 0 1px rgba(90, 125, 255, 0.14),
+        var(--shadow-soft);
+      background:
+        linear-gradient(180deg, rgba(104, 132, 255, 0.08), transparent),
+        rgba(13, 20, 36, 0.9);
+    }
+
+    .editor-preview-modes {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .editor-preview-mode {
+      padding: 10px 14px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: rgba(9, 14, 27, 0.18);
+      color: var(--muted);
+      font-weight: 600;
+      transition: transform 0.2s ease, border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
+    }
+
+    .editor-preview-mode:hover,
+    .editor-preview-mode:focus-visible {
+      transform: translateY(-1px);
+      color: var(--text);
+      border-color: rgba(90, 125, 255, 0.3);
+    }
+
+    .editor-preview-mode.is-active {
+      color: var(--text);
+      border-color: rgba(255, 208, 77, 0.34);
+      background: linear-gradient(135deg, rgba(255, 208, 77, 0.16), rgba(66, 102, 232, 0.16));
+    }
+
+    .editor-preview-sheet,
+    .editor-preview-home,
+    .editor-preview-mobile,
+    .editor-preview-share {
+      display: grid;
+      gap: 14px;
+    }
+
+    .editor-preview-hero__media,
+    .editor-preview-home__media,
+    .editor-preview-share__media {
+      margin: 0;
+      overflow: hidden;
+      border-radius: 22px;
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .editor-preview-hero__media {
+      aspect-ratio: 16 / 10;
+    }
+
+    .editor-preview-home__media,
+    .editor-preview-share__media {
+      aspect-ratio: 16 / 9;
+    }
+
+    .editor-preview-hero__media img,
+    .editor-preview-home__media img,
+    .editor-preview-share__media img,
+    .editor-preview-block--image img,
+    .editor-mobile-frame__media img {
+      width: 100%;
+      height: 100%;
+      display: block;
+      object-fit: cover;
+    }
+
+    .editor-preview-hero {
+      display: grid;
+      gap: 10px;
+    }
+
+    .editor-preview-hero h3,
+    .editor-preview-home__body h3,
+    .editor-mobile-frame__body h3,
+    .editor-preview-share__body strong {
+      margin: 0;
+      font-family: var(--headline);
+      color: var(--text);
+      line-height: 1.06;
+    }
+
+    .editor-preview-hero h3 {
+      font-size: clamp(1.7rem, 2.3vw, 2.4rem);
+    }
+
+    .editor-preview-hero p,
+    .editor-preview-home__body p,
+    .editor-mobile-frame__body p,
+    .editor-preview-share__body p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.65;
+    }
+
+    .editor-preview-content {
+      display: grid;
+      gap: 14px;
+      max-height: 520px;
+      overflow: auto;
+      padding-right: 6px;
+    }
+
+    .editor-preview-block {
+      display: grid;
+      gap: 8px;
+    }
+
+    .editor-preview-block h4,
+    .editor-preview-block p,
+    .editor-preview-block blockquote,
+    .editor-preview-block strong {
+      margin: 0;
+      color: var(--text);
+    }
+
+    .editor-preview-block p {
+      line-height: 1.8;
+    }
+
+    .editor-preview-block--quote {
+      padding: 16px 18px;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .editor-preview-block--quote blockquote {
+      font-family: var(--headline);
+      font-size: 1.08rem;
+      line-height: 1.6;
+    }
+
+    .editor-preview-block--quote span {
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    .editor-preview-block--image {
+      margin: 0;
+      overflow: hidden;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+    }
+
+    .editor-preview-block--image figcaption {
+      padding: 12px 14px;
+      color: var(--muted);
+      font-size: 0.9rem;
+      line-height: 1.5;
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .editor-preview-home__card,
+    .editor-preview-share__card {
+      display: grid;
+      gap: 0;
+      overflow: hidden;
+      border-radius: 26px;
+      border: 1px solid var(--border-strong);
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent),
+        var(--surface-strong);
+      box-shadow: var(--shadow-soft);
+    }
+
+    .editor-preview-home__body,
+    .editor-preview-share__body {
+      display: grid;
+      gap: 10px;
+      padding: 18px;
+    }
+
+    .editor-preview-share__body span {
+      color: var(--flag-blue);
+      font-size: 0.88rem;
+      word-break: break-word;
+    }
+
+    .editor-mobile-frame {
+      width: min(100%, 330px);
+      margin: 0 auto;
+      padding: 14px;
+      border-radius: 30px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: linear-gradient(180deg, rgba(9, 16, 28, 0.98), rgba(6, 10, 18, 0.98));
+      box-shadow: var(--shadow);
+    }
+
+    .editor-mobile-frame__screen {
+      overflow: hidden;
+      border-radius: 22px;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      background: rgba(9, 14, 27, 0.9);
+    }
+
+    .editor-mobile-frame__media {
+      margin: 0;
+      aspect-ratio: 4 / 3;
+    }
+
+    .editor-mobile-frame__body {
+      display: grid;
+      gap: 10px;
+      padding: 16px;
+    }
+
+    .editor-mobile-frame__chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .editor-preview-placeholder {
+      display: grid;
+      gap: 8px;
+      place-items: center;
+      min-height: 180px;
+      padding: 20px;
+      text-align: center;
+      border-radius: 22px;
+      border: 1px dashed var(--border);
+      background: rgba(255, 255, 255, 0.03);
+      color: var(--muted);
+    }
+
+    .editor-preview-placeholder--compact {
+      min-height: 120px;
+    }
+
+    .editor-inspector-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .editor-inspector-list {
+      display: grid;
+      gap: 10px;
+      padding-top: 8px;
+      border-top: 1px solid var(--border);
+    }
+
+    .editor-inspector-list__item {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      color: var(--muted);
+      font-size: 0.94rem;
+    }
+
+    .editor-inspector-list__item strong {
+      color: var(--text);
+      text-align: right;
+    }
+
+    .editor-sidebar-tabs {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .editor-sidebar-tab {
+      padding: 11px 14px;
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      background: rgba(9, 14, 27, 0.2);
+      color: var(--muted);
+      font-weight: 700;
+      transition: transform 0.2s ease, border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
+    }
+
+    .editor-sidebar-tab:hover,
+    .editor-sidebar-tab:focus-visible {
+      transform: translateY(-1px);
+      color: var(--text);
+      border-color: rgba(132, 169, 255, 0.22);
+    }
+
+    .editor-sidebar-tab.is-active {
+      color: var(--text);
+      border-color: rgba(255, 208, 77, 0.36);
+      background: linear-gradient(135deg, rgba(255, 208, 77, 0.14), rgba(44, 85, 177, 0.14));
+    }
+
+    .editor-sidebar-panel {
+      display: grid;
+      gap: 16px;
+    }
+
+    .editor-sidebar-actions {
+      display: grid;
+      gap: 10px;
+    }
+
+    .editor-note {
+      display: grid;
+      gap: 8px;
+      padding: 14px 16px;
+      border-radius: 18px;
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .editor-note strong {
+      color: var(--text);
+    }
+
+    .editor-note p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    .editor-note--warm {
+      border-color: rgba(255, 208, 77, 0.22);
+      background: linear-gradient(135deg, rgba(255, 208, 77, 0.1), rgba(201, 53, 53, 0.08));
+    }
+
     .dashboard-confirm {
       position: fixed;
       inset: 0;
@@ -1391,7 +2570,115 @@ interface ConfirmDialogState {
       color: #120f0f;
     }
 
+    @media (max-width: 1380px) {
+      .editor-studio {
+        grid-template-columns: minmax(0, 1.3fr) minmax(300px, 0.92fr);
+      }
+
+      .editor-studio-card--sticky {
+        position: static;
+      }
+    }
+
+    @media (max-width: 1080px) {
+      .editor-studio {
+        grid-template-columns: 1fr;
+      }
+
+      .dashboard-grid--editor {
+        grid-template-columns: 1fr;
+      }
+
+      .doc-editor__menu {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .doc-editor__toolbar {
+        align-items: flex-start;
+      }
+
+      .doc-cover__fields,
+      .doc-block__asset-fields,
+      .doc-block__options,
+      .doc-editor__settings-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .editor-studio__metrics {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .content-builder-toolbar {
+        position: static;
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .editor-studio-toolbar {
+        flex-direction: column;
+      }
+
+      .editor-studio-toolbar__meta {
+        justify-content: flex-start;
+      }
+    }
+
     @media (max-width: 640px) {
+      .doc-editor__menu {
+        grid-template-columns: 1fr;
+        gap: 10px;
+      }
+
+      .doc-editor__page,
+      .doc-editor__settings,
+      .doc-editor__panel {
+        padding: 18px;
+        border-radius: 22px;
+      }
+
+      .doc-editor__title-input {
+        min-height: 70px;
+        font-size: clamp(2rem, 8vw, 2.7rem);
+      }
+
+      .doc-editor__subtitle-input {
+        font-size: 1rem;
+      }
+
+      .editor-studio {
+        gap: 16px;
+      }
+
+      .wordpress-editor__head,
+      .content-block {
+        padding: 16px;
+        border-radius: 22px;
+      }
+
+      .editor-studio-card,
+      .editor-studio-card--workspace {
+        padding: 16px;
+        border-radius: 22px;
+      }
+
+      .editor-studio__metrics {
+        grid-template-columns: 1fr;
+      }
+
+      .editor-preview-modes {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .editor-sidebar-tabs {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .editor-preview-mode {
+        width: 100%;
+        justify-content: center;
+      }
+
       .dashboard-confirm {
         padding: 16px;
         align-items: end;
@@ -1509,8 +2796,17 @@ export class DashboardPageComponent {
     { id: "settings", order: 5, label: "Detalle editorial", description: "Etiquetas, categoria y estado." },
     { id: "review", order: 6, label: "Revision final", description: "Confirmacion antes de publicar o enviar." }
   ];
+  readonly articleWorkspaceTabs: ArticleWorkspaceTabConfig[] = [
+    { id: "redaction", label: "Redaccion", description: "Cuerpo principal de la noticia." },
+    { id: "format", label: "Formato", description: "Titulo y bajada editorial." },
+    { id: "media", label: "Multimedia", description: "Portada, carga y enfoque." },
+    { id: "preview", label: "Vista previa", description: "Lectura antes de publicar." },
+    { id: "publish", label: "Publicacion", description: "Resumen, etiquetas y salida." }
+  ];
 
   activeSection: DashboardSection = "overview";
+  activeOverviewPanel: OverviewPanel = "recent";
+  activeArticleWorkspaceTab: ArticleWorkspaceTab = "redaction";
   activeArticleStep: ArticleEditorStep = "body";
   unlockedArticleStep: ArticleEditorStep = "body";
   loading = true;
@@ -1553,12 +2849,70 @@ export class DashboardPageComponent {
   uploadingCover = false;
   savingArticle = false;
   reviewConfirmationOpen = false;
+  editorPreviewMode: EditorPreviewMode = "article";
+  editorSidebarTab: EditorSidebarTab = "document";
+  selectedContentBlockIndex = 0;
+  activeBlockCursor: BlockCursorState | null = null;
   passwordVisibility: Record<PasswordFieldKey, boolean> = {
     user: false,
     current: false,
     next: false,
     confirm: false
   };
+  readonly Editor = ClassicEditor;
+  readonly ckeditorConfig: Record<string, unknown> = {
+    licenseKey: "GPL",
+    language: "es",
+    translations: [esTranslations],
+    plugins: [
+      Essentials,
+      Paragraph,
+      Heading,
+      Autoformat,
+      PasteFromOffice,
+      Bold,
+      Italic,
+      Underline,
+      Strikethrough,
+      Link,
+      BlockQuote,
+      Image,
+      ImageCaption,
+      ImageToolbar,
+      ImageInsert,
+      ImageUpload,
+      AutoImage,
+      MediaEmbed
+    ],
+    toolbar: {
+      items: ["undo", "redo", "|", "heading", "|", "bold", "italic", "underline", "strikethrough", "link", "blockQuote", "|", "insertImage", "mediaEmbed"],
+      shouldNotGroupWhenFull: true
+    },
+    heading: {
+      options: [
+        { model: "paragraph", title: "Párrafo", class: "ck-heading_paragraph" },
+        { model: "heading2", view: "h2", title: "Encabezado 2", class: "ck-heading_heading2" },
+        { model: "heading3", view: "h3", title: "Encabezado 3", class: "ck-heading_heading3" }
+      ]
+    },
+    image: {
+      toolbar: ["imageTextAlternative", "toggleImageCaption"]
+    },
+    link: {
+      addTargetToExternalLinks: true,
+      defaultProtocol: "https://"
+    },
+    mediaEmbed: {
+      previewsInData: false
+    },
+    extraPlugins: [
+      createEditorialUploadAdapterPlugin((file) => this.handleEditorImageUpload(file))
+    ],
+    placeholder: "Redacta aquí la noticia. Puedes insertar intertítulos, citas, enlaces, imágenes y videos dentro del mismo flujo."
+  };
+  articleBodyHtml = "<p></p>";
+  articleBodyPreviewBlocks: ArticleContentBlock[] = [];
+  articleBodyPlainText = "";
 
   articleForm: ArticleFormState = this.emptyArticleForm();
   categoryForm = {
@@ -1599,8 +2953,77 @@ export class DashboardPageComponent {
     void this.loadDashboard();
   }
 
+  onArticleBodyChange(value: string): void {
+    this.articleBodyHtml = value;
+    this.syncArticleBodyPreview(this.editorHtmlToContentBlocks(value));
+    this.cdr.markForCheck();
+  }
+
+  renderPreviewBlockText(block: ArticleContentBlock): string {
+    if (block.type === "heading") {
+      return this.renderRichEditorialContent(block.heading.text);
+    }
+
+    if (block.type === "paragraph") {
+      return this.renderRichEditorialContent(block.text);
+    }
+
+    if (block.type === "quote") {
+      return this.renderRichEditorialContent(block.quote.text);
+    }
+
+    return "";
+  }
+
+  safePreviewEmbedUrl(value: string): SafeResourceUrl | null {
+    const resolved = resolveVideoEmbed(value);
+    return resolved ? this.sanitizer.bypassSecurityTrustResourceUrl(resolved.embedUrl) : null;
+  }
+
   visibleSections(currentUser: UserSession): SectionConfig[] {
     return this.sections.filter((section) => !section.adminOnly || currentUser.role === "admin");
+  }
+
+  setActiveOverviewPanel(panel: OverviewPanel): void {
+    this.activeOverviewPanel = panel;
+    this.cdr.markForCheck();
+  }
+
+  setActiveArticleWorkspaceTab(tab: ArticleWorkspaceTab): void {
+    this.activeArticleWorkspaceTab = tab;
+    this.cdr.markForCheck();
+  }
+
+  overviewPanelTitle(): string {
+    if (this.activeOverviewPanel === "top") {
+      return "Mas vistos";
+    }
+
+    if (this.activeOverviewPanel === "account") {
+      return "Cuenta y atajos";
+    }
+
+    return "Actividad reciente";
+  }
+
+  overviewPanelSubtitle(): string {
+    if (this.activeOverviewPanel === "top") {
+      return "Lecturas, traccion y piezas que hoy estan ganando visibilidad.";
+    }
+
+    if (this.activeOverviewPanel === "account") {
+      return "Perfil, seguridad y accesos directos sin saturar el inicio.";
+    }
+
+    return "Acceso rapido a las piezas que se estan moviendo hoy.";
+  }
+
+  overviewRecentArticles(): DashboardArticle[] {
+    return (this.overview?.recentArticles ?? []).slice(0, 4);
+  }
+
+  overviewTopViewedArticles(): DashboardArticle[] {
+    return (this.overview?.topViewedArticles ?? []).slice(0, 4);
   }
 
   filteredUsers(): UserSession[] {
@@ -1839,6 +3262,181 @@ export class DashboardPageComponent {
     this.openArticleStep("body");
   }
 
+  setEditorPreviewMode(mode: EditorPreviewMode): void {
+    this.editorPreviewMode = mode;
+    this.cdr.markForCheck();
+  }
+
+  setEditorSidebarTab(tab: EditorSidebarTab): void {
+    this.editorSidebarTab = tab;
+    this.cdr.markForCheck();
+  }
+
+  currentArticleStepConfig(): ArticleEditorStepConfig | undefined {
+    return this.articleSteps.find((step) => step.id === this.activeArticleStep);
+  }
+
+  selectContentBlock(index: number, focus = false): void {
+    if (index < 0 || index >= this.articleForm.contentBlocks.length) {
+      return;
+    }
+
+    this.selectedContentBlockIndex = index;
+
+    if (this.activeArticleStep !== "body") {
+      this.openArticleStep("body");
+    } else {
+      this.cdr.markForCheck();
+    }
+
+    if (focus) {
+      this.focusContentBlock(index);
+    }
+  }
+
+  selectedContentBlock(): EditorContentBlock | null {
+    return this.articleForm.contentBlocks[this.selectedContentBlockIndex] ?? null;
+  }
+
+  contentBlockOutline(block: EditorContentBlock, index: number): string {
+    const prefix = `${index + 1}. ${this.contentBlockLabel(block.type)}`;
+
+    if (block.type === "heading") {
+      return `${prefix} · ${block.headingText.trim() || "Sin titulo interno"}`;
+    }
+
+    if (block.type === "quote") {
+      return `${prefix} · ${block.quoteText.trim() || "Cita pendiente"}`;
+    }
+
+    if (block.type === "image") {
+      return `${prefix} · ${block.imageCaption.trim() || block.imageAlt.trim() || "Foto sin leyenda"}`;
+    }
+
+    if (block.type === "embed") {
+      return `${prefix} · ${block.embedTitle.trim() || "Video embebido"}`;
+    }
+
+    return `${prefix} · ${block.text.trim() || "Parrafo vacio"}`;
+  }
+
+  previewBlocks(limit = 5): EditorContentBlock[] {
+    return this.articleForm.contentBlocks.filter((block) => this.blockHasMeaningfulContent(block)).slice(0, limit);
+  }
+
+  articleWordCount(): number {
+    const text = this.flattenArticleText().trim();
+
+    if (!text) {
+      return 0;
+    }
+
+    return text.split(/\s+/).length;
+  }
+
+  articleReadingTimeEstimate(): number {
+    return Math.max(1, Math.ceil(this.articleWordCount() / 220));
+  }
+
+  articleDisplayTitle(): string {
+    const title = this.articleForm.title.trim();
+
+    if (title) {
+      return title;
+    }
+
+    const firstHeading = this.articleBodyPreviewBlocks.find((block) => block.type === "heading" && this.extractTextContent(block.heading.text));
+    return firstHeading?.type === "heading" ? this.extractTextContent(firstHeading.heading.text) : "Sin titular todavia";
+  }
+
+  articleDisplaySubtitle(): string {
+    const subtitle = this.articleForm.subtitle.trim();
+
+    if (subtitle) {
+      return subtitle;
+    }
+
+    return this.articleDisplayExcerpt();
+  }
+
+  articleDisplayExcerpt(): string {
+    const excerpt = this.articleForm.excerpt.trim();
+
+    if (excerpt) {
+      return excerpt;
+    }
+
+    const fallback = this.articlePreviewText().trim();
+    return fallback || "La bajada, el resumen corto y la promesa de lectura apareceran aqui.";
+  }
+
+  articleDisplayCoverUrl(): string {
+    const coverUrl = this.articleForm.coverUrl.trim();
+
+    if (coverUrl) {
+      return coverUrl;
+    }
+
+    const firstImage = this.articleBodyPreviewBlocks.find((block) => block.type === "image" && block.image.url.trim());
+    return firstImage?.type === "image" ? firstImage.image.url.trim() : "";
+  }
+
+  articleDisplayTags(): string[] {
+    return this.articleForm.tags
+      .split(",")
+      .map((tag) => tag.trim())
+      .filter(Boolean)
+      .slice(0, 4);
+  }
+
+  articlePreviewPath(): string {
+    const selectedSlug = this.selectedArticle?.slug?.trim();
+
+    if (selectedSlug) {
+      return `/articulo/${selectedSlug}`;
+    }
+
+    return `/articulo/${this.buildPreviewSlug(this.articleDisplayTitle()) || "vista-previa-editorial"}`;
+  }
+
+  articlePreviewPrimaryLabel(): string {
+    if (this.articleForm.categoryId) {
+      const category = this.categories.find((item) => item.id === this.articleForm.categoryId);
+
+      if (category?.name?.trim()) {
+        return category.name.trim();
+      }
+    }
+
+    const firstTag = this.articleDisplayTags()[0];
+
+    if (firstTag) {
+      return this.humanizeToken(firstTag);
+    }
+
+    return this.selectedArticleId ? "Edicion en curso" : "Borrador nuevo";
+  }
+
+  articleCoverToneLabel(): string {
+    if (!this.articleForm.coverUrl.trim()) {
+      return "Sin portada asignada";
+    }
+
+    if (this.articleForm.coverType === "video") {
+      return "Portada en video";
+    }
+
+    if (this.articleForm.coverType === "audio") {
+      return "Portada en audio";
+    }
+
+    if (this.articleForm.coverType === "infographic") {
+      return "Portada tipo infografia";
+    }
+
+    return "Portada en imagen";
+  }
+
   safeEmbedUrl(value: string): SafeResourceUrl | null {
     const resolved = resolveVideoEmbed(value);
     return resolved ? this.sanitizer.bypassSecurityTrustResourceUrl(resolved.embedUrl) : null;
@@ -1872,12 +3470,62 @@ export class DashboardPageComponent {
     this.appendContentBlock("embed");
   }
 
+  captureBlockCursor(index: number, field: BlockTextField, event: Event): void {
+    const target = event.target as HTMLTextAreaElement | null;
+
+    if (!target) {
+      return;
+    }
+
+    this.selectedContentBlockIndex = index;
+    this.activeBlockCursor = {
+      index,
+      field,
+      start: target.selectionStart ?? target.value.length,
+      end: target.selectionEnd ?? target.value.length
+    };
+  }
+
+  insertSelectedBlock(type: EditorContentBlock["type"]): void {
+    if (this.insertBlockAtCursor(type)) {
+      return;
+    }
+
+    const hasSelectedBlock = this.selectedContentBlockIndex >= 0 && this.selectedContentBlockIndex < this.articleForm.contentBlocks.length;
+
+    if (hasSelectedBlock) {
+      this.insertContentBlock(this.selectedContentBlockIndex, type);
+      return;
+    }
+
+    this.appendContentBlock(type);
+  }
+
+  insertSelectedSubheading(): void {
+    if (this.insertBlockAtCursor("heading", { headingLevel: "h3" })) {
+      return;
+    }
+
+    const hasSelectedBlock = this.selectedContentBlockIndex >= 0 && this.selectedContentBlockIndex < this.articleForm.contentBlocks.length;
+
+    if (hasSelectedBlock) {
+      this.insertPreparedBlock(this.selectedContentBlockIndex + 1, this.buildContentBlock("heading", { headingLevel: "h3" }));
+      return;
+    }
+
+    this.insertPreparedBlock(this.articleForm.contentBlocks.length, this.buildContentBlock("heading", { headingLevel: "h3" }));
+  }
+
   insertParagraphBlock(afterIndex: number): void {
     this.insertContentBlock(afterIndex, "paragraph");
   }
 
   insertHeadingBlock(afterIndex: number): void {
     this.insertContentBlock(afterIndex, "heading");
+  }
+
+  insertSubheadingAfter(afterIndex: number): void {
+    this.insertPreparedBlock(afterIndex + 1, this.buildContentBlock("heading", { headingLevel: "h3" }));
   }
 
   insertQuoteBlock(afterIndex: number): void {
@@ -1894,10 +3542,13 @@ export class DashboardPageComponent {
 
   removeContentBlock(index: number): void {
     this.articleForm.contentBlocks = this.articleForm.contentBlocks.filter((_, currentIndex) => currentIndex !== index);
+    this.activeBlockCursor = null;
 
     if (this.articleForm.contentBlocks.length === 0) {
       this.articleForm.contentBlocks = [this.createParagraphBlock()];
     }
+
+    this.selectedContentBlockIndex = Math.max(0, Math.min(this.selectedContentBlockIndex, this.articleForm.contentBlocks.length - 1));
 
     this.cdr.markForCheck();
   }
@@ -1913,6 +3564,10 @@ export class DashboardPageComponent {
     const [current] = items.splice(index, 1);
     items.splice(nextIndex, 0, current);
     this.articleForm.contentBlocks = items;
+    this.activeBlockCursor = null;
+    if (this.selectedContentBlockIndex === index) {
+      this.selectedContentBlockIndex = nextIndex;
+    }
     this.cdr.markForCheck();
   }
 
@@ -1921,12 +3576,69 @@ export class DashboardPageComponent {
   }
 
   private insertContentBlock(afterIndex: number, type: EditorContentBlock["type"]): void {
+    this.insertPreparedBlock(afterIndex + 1, this.buildContentBlock(type));
+  }
+
+  private insertPreparedBlock(insertIndex: number, block: EditorContentBlock): void {
     const items = [...this.articleForm.contentBlocks];
-    const insertIndex = Math.min(Math.max(afterIndex + 1, 0), items.length);
-    items.splice(insertIndex, 0, this.buildContentBlock(type));
+    const normalizedIndex = Math.min(Math.max(insertIndex, 0), items.length);
+    items.splice(normalizedIndex, 0, block);
     this.articleForm.contentBlocks = items;
+    this.selectedContentBlockIndex = normalizedIndex;
+    this.activeBlockCursor = null;
     this.cdr.markForCheck();
-    this.focusContentBlock(insertIndex);
+    this.focusContentBlock(normalizedIndex);
+  }
+
+  private insertBlockAtCursor(
+    type: EditorContentBlock["type"],
+    options?: { headingLevel?: "h2" | "h3" }
+  ): boolean {
+    const cursor = this.activeBlockCursor;
+
+    if (!cursor) {
+      return false;
+    }
+
+    const block = this.articleForm.contentBlocks[cursor.index];
+
+    if (!block) {
+      return false;
+    }
+
+    if (block.type !== "paragraph" || cursor.field !== "text") {
+      return false;
+    }
+
+    const currentText = block.text ?? "";
+    const splitIndex = Math.max(0, Math.min(cursor.start, currentText.length));
+    const beforeText = currentText.slice(0, splitIndex).replace(/\s+$/, "");
+    const afterText = currentText.slice(splitIndex).replace(/^\s+/, "");
+    const replacement: EditorContentBlock[] = [];
+
+    if (beforeText.trim()) {
+      replacement.push(this.createParagraphBlock(beforeText));
+    }
+
+    replacement.push(this.buildContentBlock(type, options));
+
+    if (afterText.trim()) {
+      replacement.push(this.createParagraphBlock(afterText));
+    }
+
+    if (replacement.length === 1 && replacement[0].type !== "paragraph") {
+      replacement.push(this.createParagraphBlock());
+    }
+
+    const insertFocusIndex = beforeText.trim() ? cursor.index + 1 : cursor.index;
+    const items = [...this.articleForm.contentBlocks];
+    items.splice(cursor.index, 1, ...replacement);
+    this.articleForm.contentBlocks = items;
+    this.selectedContentBlockIndex = insertFocusIndex;
+    this.activeBlockCursor = null;
+    this.cdr.markForCheck();
+    this.focusContentBlock(insertFocusIndex);
+    return true;
   }
 
   private focusContentBlock(index: number): void {
@@ -1945,6 +3657,39 @@ export class DashboardPageComponent {
       const field = blockElement.querySelector("textarea, input:not([type='file'])") as HTMLElement | null;
       field?.focus();
     }, 0);
+  }
+
+  private blockHasMeaningfulContent(block: EditorContentBlock): boolean {
+    if (block.type === "heading") {
+      return block.headingText.trim().length > 0;
+    }
+
+    if (block.type === "quote") {
+      return block.quoteText.trim().length > 0;
+    }
+
+    if (block.type === "image") {
+      return block.imageUrl.trim().length > 0;
+    }
+
+    if (block.type === "embed") {
+      return Boolean(resolveVideoEmbed(block.embedUrl));
+    }
+
+    return block.text.trim().length > 0;
+  }
+
+  private flattenArticleText(): string {
+    return this.articleBodyPlainText.trim();
+  }
+
+  private buildPreviewSlug(value: string): string {
+    return value
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "");
   }
 
   async onCoverImageSelected(event: Event): Promise<void> {
@@ -2099,9 +3844,9 @@ export class DashboardPageComponent {
     };
   }
 
-  private buildContentBlock(type: EditorContentBlock["type"]): EditorContentBlock {
+  private buildContentBlock(type: EditorContentBlock["type"], options?: { headingLevel?: "h2" | "h3" }): EditorContentBlock {
     if (type === "heading") {
-      return this.createHeadingBlock();
+      return this.createHeadingBlock({ level: options?.headingLevel ?? "h2" });
     }
 
     if (type === "quote") {
@@ -2140,93 +3885,466 @@ export class DashboardPageComponent {
   }
 
   private buildContentPayload(): ArticleContentBlock[] {
-    const payload: ArticleContentBlock[] = [];
+    const payload = this.editorHtmlToContentBlocks(this.articleBodyHtml);
+    this.syncArticleBodyPreview(payload);
+    return payload;
+  }
 
-    for (const block of this.articleForm.contentBlocks) {
-      if (block.type === "heading") {
-        const text = block.headingText.trim();
+  private configureCkeditorUploadAdapter(editor: {
+    plugins: {
+      get: (name: string) => {
+        createUploadAdapter?: (loader: CkeditorFileLoader) => EditorialImageUploadAdapter;
+      };
+    };
+  }): void {
+    const repository = editor.plugins.get("FileRepository");
+    repository.createUploadAdapter = (loader: CkeditorFileLoader) =>
+      new EditorialImageUploadAdapter(loader, async (file) => this.handleEditorImageUpload(file));
+  }
 
-        if (!text) {
-          continue;
+  private async handleEditorImageUpload(file: File): Promise<{ url: string }> {
+    const uploaded = await this.uploadImageFile(file, "");
+    return { url: uploaded.url };
+  }
+
+  private syncArticleBodyPreview(blocks: ArticleContentBlock[]): void {
+    this.articleBodyPreviewBlocks = blocks;
+    this.articleBodyPlainText = this.extractTextFromBlocks(blocks);
+    this.articleForm.contentBlocks = blocks.length > 0
+      ? blocks.map((block) =>
+          block.type === "heading"
+            ? this.createHeadingBlock(block.heading)
+            : block.type === "quote"
+            ? this.createQuoteBlock(block.quote)
+            : block.type === "image"
+            ? this.createImageBlock(block.image)
+            : block.type === "embed"
+            ? this.createEmbedBlock(block.embed)
+            : this.createParagraphBlock(block.text)
+        )
+      : [this.createParagraphBlock()];
+    this.selectedContentBlockIndex = Math.min(this.selectedContentBlockIndex, Math.max(0, this.articleForm.contentBlocks.length - 1));
+  }
+
+  private contentBlocksToEditorHtml(blocks: ArticleContentBlock[]): string {
+    if (blocks.length === 0) {
+      return "<p></p>";
+    }
+
+    return blocks
+      .map((block) => {
+        if (block.type === "heading") {
+          const level = block.heading.level === "h3" ? "h3" : "h2";
+          return `<${level}>${this.blockHtmlForEditor(block.heading.text)}</${level}>`;
         }
 
-        payload.push({
+        if (block.type === "quote") {
+          const attribution = block.quote.attribution?.trim()
+            ? `<p><strong>${this.escapeHtml(block.quote.attribution.trim())}</strong></p>`
+            : "";
+          return `<blockquote><p>${this.blockHtmlForEditor(block.quote.text)}</p>${attribution}</blockquote>`;
+        }
+
+        if (block.type === "image") {
+          const caption = block.image.caption?.trim()
+            ? `<figcaption>${this.escapeHtml(block.image.caption.trim())}</figcaption>`
+            : "";
+          return `<figure class="image"><img src="${this.escapeHtml(block.image.url)}" alt="${this.escapeHtml(block.image.alt || "")}">${caption}</figure>`;
+        }
+
+        if (block.type === "embed") {
+          return `<figure class="media"><oembed url="${this.escapeHtml(block.embed.url)}"></oembed></figure>`;
+        }
+
+        return `<p>${this.blockHtmlForEditor(block.text)}</p>`;
+      })
+      .join("");
+  }
+
+  private blockHtmlForEditor(value: string): string {
+    const source = String(value ?? "").trim();
+
+    if (!source) {
+      return "";
+    }
+
+    return this.hasRichHtml(source) ? source : renderEditorialText(source);
+  }
+
+  private editorHtmlToContentBlocks(value: string): ArticleContentBlock[] {
+    const source = String(value ?? "").trim();
+
+    if (!source) {
+      return [];
+    }
+
+    const documentRoot = new DOMParser().parseFromString(`<div>${source}</div>`, "text/html");
+    const wrapper = documentRoot.body.firstElementChild ?? documentRoot.body;
+    const blocks: ArticleContentBlock[] = [];
+
+    for (const node of Array.from(wrapper.childNodes)) {
+      this.appendEditorNodeAsBlocks(node, blocks);
+    }
+
+    return blocks.filter((block) => this.blockHasMeaningfulPayload(block));
+  }
+
+  private appendEditorNodeAsBlocks(node: Node, blocks: ArticleContentBlock[]): void {
+    if (node.nodeType === Node.TEXT_NODE) {
+      const text = node.textContent?.replace(/\s+/g, " ").trim() ?? "";
+
+      if (text) {
+        blocks.push({
+          type: "paragraph",
+          text: this.escapeHtml(text)
+        });
+      }
+
+      return;
+    }
+
+    if (node.nodeType !== Node.ELEMENT_NODE) {
+      return;
+    }
+
+    const element = node as HTMLElement;
+    const tagName = element.tagName.toUpperCase();
+
+    if (tagName === "H2" || tagName === "H3") {
+      const text = this.normalizeInlineHtml(element.innerHTML);
+
+      if (text) {
+        blocks.push({
           type: "heading",
           heading: {
             text,
-            align: block.headingAlign,
-            level: block.headingLevel
+            align: this.extractHeadingAlign(element),
+            level: tagName === "H3" ? "h3" : "h2"
           }
         });
-        continue;
       }
 
-      if (block.type === "quote") {
-        const text = block.quoteText.trim();
-
-        if (!text) {
-          continue;
-        }
-
-        payload.push({
-          type: "quote",
-          quote: {
-            text,
-            attribution: block.quoteAttribution.trim() || undefined
-          }
-        });
-        continue;
-      }
-
-      if (block.type === "image") {
-        const imageUrl = block.imageUrl.trim();
-
-        if (!imageUrl) {
-          continue;
-        }
-
-        payload.push({
-          type: "image",
-          image: {
-            url: imageUrl,
-            alt: block.imageAlt.trim(),
-            caption: block.imageCaption.trim() || undefined
-          }
-        });
-        continue;
-      }
-
-      if (block.type === "embed") {
-        const embed = resolveVideoEmbed(block.embedUrl);
-
-        if (!embed) {
-          continue;
-        }
-
-        payload.push({
-          type: "embed",
-          embed: {
-            url: embed.sourceUrl,
-            provider: embed.provider,
-            title: block.embedTitle.trim() || undefined
-          }
-        });
-        continue;
-      }
-
-      const text = block.text.trim();
-
-      if (!text) {
-        continue;
-      }
-
-      payload.push({
-        type: "paragraph",
-        text
-      });
+      return;
     }
 
-    return payload;
+    if (tagName === "P") {
+      const text = this.normalizeInlineHtml(element.innerHTML);
+
+      if (text) {
+        blocks.push({
+          type: "paragraph",
+          text
+        });
+      }
+
+      return;
+    }
+
+    if (tagName === "BLOCKQUOTE") {
+      const clone = element.cloneNode(true) as HTMLElement;
+      const attributionElement = clone.querySelector("figcaption, footer, cite");
+      const attribution = attributionElement?.textContent?.replace(/\s+/g, " ").trim() ?? "";
+
+      attributionElement?.remove();
+
+      const quoteParagraphs = Array.from(clone.querySelectorAll(":scope > p"));
+      const quoteSource = quoteParagraphs.length > 0
+        ? quoteParagraphs.map((paragraph) => paragraph.innerHTML).join("<br>")
+        : clone.innerHTML;
+      const quoteText = this.normalizeInlineHtml(quoteSource);
+
+      if (quoteText) {
+        blocks.push({
+          type: "quote",
+          quote: {
+            text: quoteText,
+            attribution: attribution || undefined
+          }
+        });
+      }
+
+      return;
+    }
+
+    if (tagName === "UL" || tagName === "OL") {
+      const ordered = tagName === "OL";
+      const items = Array.from(element.children).filter((child) => child.tagName.toUpperCase() === "LI");
+
+      items.forEach((item, index) => {
+        const itemText = this.normalizeInlineHtml(item.innerHTML);
+
+        if (!itemText) {
+          return;
+        }
+
+        blocks.push({
+          type: "paragraph",
+          text: `${ordered ? `${index + 1}.` : "•"} ${itemText}`
+        });
+      });
+
+      return;
+    }
+
+    const imageBlock = this.extractImageBlockFromElement(element);
+
+    if (imageBlock) {
+      blocks.push(imageBlock);
+      return;
+    }
+
+    const embedBlock = this.extractEmbedBlockFromElement(element);
+
+    if (embedBlock) {
+      blocks.push(embedBlock);
+      return;
+    }
+
+    if (["DIV", "SECTION", "ARTICLE", "MAIN", "FIGURE"].includes(tagName)) {
+      for (const child of Array.from(element.childNodes)) {
+        this.appendEditorNodeAsBlocks(child, blocks);
+      }
+      return;
+    }
+
+    const fallbackText = this.normalizeInlineHtml(element.innerHTML);
+
+    if (fallbackText) {
+      blocks.push({
+        type: "paragraph",
+        text: fallbackText
+      });
+    }
+  }
+
+  private extractImageBlockFromElement(element: Element): ArticleContentBlock | null {
+    const imageElement = element.tagName.toUpperCase() === "IMG"
+      ? element as HTMLImageElement
+      : element.querySelector("img");
+    const imageUrl = imageElement?.getAttribute("src")?.trim() ?? "";
+
+    if (!imageUrl) {
+      return null;
+    }
+
+    const captionElement = element.tagName.toUpperCase() === "FIGCAPTION"
+      ? element
+      : element.querySelector("figcaption");
+
+    return {
+      type: "image",
+      image: {
+        url: imageUrl,
+        alt: imageElement?.getAttribute("alt")?.trim() ?? "",
+        caption: captionElement?.textContent?.replace(/\s+/g, " ").trim() || undefined
+      }
+    };
+  }
+
+  private extractEmbedBlockFromElement(element: Element): ArticleContentBlock | null {
+    const sourceUrl =
+      element.querySelector("oembed")?.getAttribute("url")
+      ?? element.querySelector("[data-oembed-url]")?.getAttribute("data-oembed-url")
+      ?? element.querySelector("iframe")?.getAttribute("src")
+      ?? (element.tagName.toUpperCase() === "OEMBED" ? element.getAttribute("url") : null)
+      ?? (element.tagName.toUpperCase() === "IFRAME" ? element.getAttribute("src") : null)
+      ?? "";
+    const resolved = resolveVideoEmbed(sourceUrl ?? "");
+
+    if (!resolved) {
+      return null;
+    }
+
+    const title =
+      element.querySelector("figcaption")?.textContent?.replace(/\s+/g, " ").trim()
+      ?? element.getAttribute("data-caption")
+      ?? "";
+
+    return {
+      type: "embed",
+      embed: {
+        url: resolved.sourceUrl,
+        provider: resolved.provider,
+        title: title || undefined
+      }
+    };
+  }
+
+  private normalizeInlineHtml(value: string): string {
+    const source = String(value ?? "").trim();
+
+    if (!source) {
+      return "";
+    }
+
+    const documentRoot = new DOMParser().parseFromString(`<div>${source}</div>`, "text/html");
+    const wrapper = documentRoot.body.firstElementChild ?? documentRoot.body;
+    this.sanitizeInlineContainer(wrapper);
+    return wrapper.innerHTML.replace(/>\s+</g, "><").trim();
+  }
+
+  private sanitizeInlineContainer(container: ParentNode): void {
+    const allowedTags = new Set(["A", "STRONG", "B", "EM", "I", "U", "S", "DEL", "MARK", "CODE", "BR", "SUB", "SUP", "SPAN"]);
+
+    for (const child of Array.from(container.childNodes)) {
+      if (child.nodeType === Node.TEXT_NODE) {
+        continue;
+      }
+
+      if (child.nodeType !== Node.ELEMENT_NODE) {
+        child.parentNode?.removeChild(child);
+        continue;
+      }
+
+      const element = child as HTMLElement;
+      this.sanitizeInlineContainer(element);
+
+      if (!allowedTags.has(element.tagName)) {
+        while (element.firstChild) {
+          element.parentNode?.insertBefore(element.firstChild, element);
+        }
+
+        element.remove();
+        continue;
+      }
+
+      for (const attribute of Array.from(element.attributes)) {
+        const name = attribute.name.toLowerCase();
+        const keepAttribute =
+          element.tagName === "A"
+          && ["href", "target", "rel", "title"].includes(name);
+
+        if (!keepAttribute) {
+          element.removeAttribute(attribute.name);
+        }
+      }
+
+      if (element.tagName === "A") {
+        const safeHref = this.sanitizeEditorialHref(element.getAttribute("href") ?? "");
+
+        if (!safeHref) {
+          while (element.firstChild) {
+            element.parentNode?.insertBefore(element.firstChild, element);
+          }
+
+          element.remove();
+          continue;
+        }
+
+        element.setAttribute("href", safeHref);
+        element.setAttribute("target", "_blank");
+        element.setAttribute("rel", "noopener noreferrer nofollow");
+      }
+    }
+  }
+
+  private sanitizeEditorialHref(value: string): string {
+    const normalized = value.trim();
+
+    if (!normalized) {
+      return "";
+    }
+
+    if (normalized.startsWith("mailto:")) {
+      return normalized;
+    }
+
+    try {
+      const url = new URL(normalized);
+      return ["http:", "https:"].includes(url.protocol) ? url.toString() : "";
+    } catch {
+      return "";
+    }
+  }
+
+  private renderRichEditorialContent(value: string): string {
+    const source = String(value ?? "").trim();
+    return this.hasRichHtml(source) ? source : renderEditorialText(source);
+  }
+
+  private hasRichHtml(value: string): boolean {
+    return /<([a-z][a-z0-9]*)\b[^>]*>/i.test(value);
+  }
+
+  private extractTextContent(value: string): string {
+    const source = String(value ?? "").trim();
+
+    if (!source) {
+      return "";
+    }
+
+    if (!this.hasRichHtml(source)) {
+      return source.replace(/\s+/g, " ").trim();
+    }
+
+    const documentRoot = new DOMParser().parseFromString(`<div>${source}</div>`, "text/html");
+    return documentRoot.body.textContent?.replace(/\s+/g, " ").trim() ?? "";
+  }
+
+  private extractTextFromBlocks(blocks: ArticleContentBlock[]): string {
+    return blocks
+      .map((block) => {
+        if (block.type === "heading") {
+          return this.extractTextContent(block.heading.text);
+        }
+
+        if (block.type === "quote") {
+          return `${this.extractTextContent(block.quote.text)} ${block.quote.attribution ?? ""}`.trim();
+        }
+
+        if (block.type === "image") {
+          return `${block.image.caption ?? ""} ${block.image.alt ?? ""}`.trim();
+        }
+
+        if (block.type === "embed") {
+          return block.embed.title ?? "";
+        }
+
+        return this.extractTextContent(block.text);
+      })
+      .filter(Boolean)
+      .join(" ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  private extractHeadingAlign(element: HTMLElement): "left" | "center" | "right" {
+    const align = element.style.textAlign?.trim().toLowerCase();
+
+    if (align === "center" || align === "right") {
+      return align;
+    }
+
+    return "left";
+  }
+
+  private blockHasMeaningfulPayload(block: ArticleContentBlock): boolean {
+    if (block.type === "heading") {
+      return this.extractTextContent(block.heading.text).length > 0;
+    }
+
+    if (block.type === "quote") {
+      return this.extractTextContent(block.quote.text).length > 0;
+    }
+
+    if (block.type === "image") {
+      return block.image.url.trim().length > 0;
+    }
+
+    if (block.type === "embed") {
+      return Boolean(resolveVideoEmbed(block.embed.url));
+    }
+
+    return this.extractTextContent(block.text).length > 0;
+  }
+
+  private escapeHtml(value: string): string {
+    return value
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
   }
 
   hasUploadingContentBlocks(): boolean {
@@ -2244,7 +4362,7 @@ export class DashboardPageComponent {
 
     for (const block of contentBlocks) {
       if (block.type === "heading" && "heading" in block) {
-        const text = block.heading.text.trim().replace(/\s+/g, " ");
+        const text = this.extractTextContent(block.heading.text).replace(/\s+/g, " ");
 
         if (text) {
           firstParagraph = text;
@@ -2253,7 +4371,7 @@ export class DashboardPageComponent {
       }
 
       if (block.type === "paragraph" && "text" in block) {
-        const text = block.text.trim().replace(/\s+/g, " ");
+        const text = this.extractTextContent(block.text).replace(/\s+/g, " ");
 
         if (text) {
           firstParagraph = text;
@@ -2262,7 +4380,7 @@ export class DashboardPageComponent {
       }
 
       if (block.type === "quote" && "quote" in block) {
-        const text = block.quote.text.trim().replace(/\s+/g, " ");
+        const text = this.extractTextContent(block.quote.text).replace(/\s+/g, " ");
 
         if (text) {
           firstParagraph = text;
@@ -2889,6 +5007,10 @@ export class DashboardPageComponent {
   }
 
   editArticle(article: DashboardArticle): void {
+    const articleBlocks = Array.isArray(article.contentBlocks) && article.contentBlocks.length > 0
+      ? article.contentBlocks
+      : article.body.map((text) => ({ type: "paragraph", text } as ArticleContentBlock));
+
     this.selectedArticleId = article.id;
     this.selectedArticle = article;
     this.moderationNote = article.moderationNote ?? "";
@@ -2909,8 +5031,14 @@ export class DashboardPageComponent {
       status: article.status,
       contentBlocks: this.mapArticleBlocks(article)
     };
+    this.articleBodyHtml = this.contentBlocksToEditorHtml(articleBlocks);
+    this.syncArticleBodyPreview(articleBlocks);
+    this.activeArticleWorkspaceTab = "redaction";
     this.unlockedArticleStep = "review";
     this.activeArticleStep = "review";
+    this.selectedContentBlockIndex = 0;
+    this.editorPreviewMode = "article";
+    this.editorSidebarTab = "document";
     this.cdr.markForCheck();
   }
 
@@ -2921,8 +5049,14 @@ export class DashboardPageComponent {
     this.uploadingCover = false;
     this.reviewConfirmationOpen = false;
     this.articleForm = this.emptyArticleForm();
+    this.articleBodyHtml = "<p></p>";
+    this.syncArticleBodyPreview([]);
+    this.activeArticleWorkspaceTab = "redaction";
     this.unlockedArticleStep = "body";
     this.activeArticleStep = "body";
+    this.selectedContentBlockIndex = 0;
+    this.editorPreviewMode = "article";
+    this.editorSidebarTab = "document";
     this.cdr.markForCheck();
   }
 
