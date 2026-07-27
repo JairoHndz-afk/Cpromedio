@@ -3,7 +3,15 @@
   "rewrites": [
     {
       "source": "/compartir/:slug",
-      "destination": "/api/compartir/:slug"
+      "destination": "/api/compartir/[slug]"
+    },
+    {
+      "source": "/api/articulo/:slug",
+      "destination": "/api/articulo/[slug]"
+    },
+    {
+      "source": "/api/compartir/:slug",
+      "destination": "/api/compartir/[slug]"
     },
     {
       "source": "/api/:path((?!articulo/|compartir/).*)",
