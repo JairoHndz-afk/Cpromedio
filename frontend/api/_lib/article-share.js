@@ -46,6 +46,29 @@ function resolveCoverImage(article, origin) {
   }
 }
 
+function resolveSocialImage(imageUrl) {
+  if (!imageUrl) {
+    return imageUrl;
+  }
+
+  try {
+    const url = new URL(imageUrl);
+
+    if (url.hostname !== "res.cloudinary.com" || !url.pathname.includes("/image/upload/")) {
+      return imageUrl;
+    }
+
+    url.pathname = url.pathname.replace(
+      "/image/upload/",
+      "/image/upload/f_jpg,q_auto,c_limit,w_1200/"
+    );
+
+    return url.toString();
+  } catch {
+    return imageUrl;
+  }
+}
+
 async function fetchArticleBySlug(slug, backendOrigin) {
   const upstreamUrl = `${backendOrigin}/api/public/articles/${encodeURIComponent(slug)}`;
   const upstreamResponse = await fetch(upstreamUrl, {
@@ -81,6 +104,7 @@ function renderShareDocument({
   const publishedTime = article.publishedAt ? new Date(article.publishedAt).toISOString() : "";
   const updatedTime = article.updatedAt ? new Date(article.updatedAt).toISOString() : publishedTime;
   const authorName = String(article.author?.name ?? "Colombiano Promedio").trim();
+  const socialImageUrl = resolveSocialImage(imageUrl);
   const redirectMarkup = redirectToCanonical
     ? `
     <meta http-equiv="refresh" content="0; url=${escapeHtml(canonicalUrl)}" />
@@ -107,7 +131,8 @@ function renderShareDocument({
     <meta property="og:title" content="${escapeHtml(title)}" />
     <meta property="og:description" content="${escapeHtml(description)}" />
     <meta property="og:url" content="${escapeHtml(canonicalUrl)}" />
-    <meta property="og:image" content="${escapeHtml(imageUrl)}" />
+    <meta property="og:image" content="${escapeHtml(socialImageUrl)}" />
+    <meta property="og:image:secure_url" content="${escapeHtml(socialImageUrl)}" />
     <meta property="og:image:alt" content="${escapeHtml(article.cover?.alt || article.title)}" />
     <meta property="article:author" content="${escapeHtml(authorName)}" />
     ${publishedTime ? `<meta property="article:published_time" content="${escapeHtml(publishedTime)}" />` : ""}
@@ -115,7 +140,8 @@ function renderShareDocument({
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="${escapeHtml(title)}" />
     <meta name="twitter:description" content="${escapeHtml(description)}" />
-    <meta name="twitter:image" content="${escapeHtml(imageUrl)}" />${redirectMarkup}
+    <meta name="twitter:image" content="${escapeHtml(socialImageUrl)}" />
+    <meta name="twitter:image:alt" content="${escapeHtml(article.cover?.alt || article.title)}" />${redirectMarkup}
     <style>
       :root {
         color-scheme: dark;
@@ -187,5 +213,6 @@ export {
   normalizeBackendOrigin,
   renderShareDocument,
   resolveCoverImage,
+  resolveSocialImage,
   resolveSiteOrigin
 };

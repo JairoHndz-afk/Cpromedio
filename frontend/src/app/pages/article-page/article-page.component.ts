@@ -246,6 +246,7 @@ export class ArticlePageComponent {
     }
 
     const articleUrl = `${window.location.origin}/articulo/${this.article.slug}`;
+    const shareUrl = `${window.location.origin}/compartir/${this.article.slug}`;
     const shareText = `${this.article.title} | Colombiano Promedio`;
 
     if (channel === "copy") {
@@ -263,10 +264,10 @@ export class ArticlePageComponent {
     }
 
     const destinations: Record<Exclude<ShareChannel, "copy">, string> = {
-      whatsapp: `https://wa.me/?text=${encodeURIComponent(`${shareText} ${articleUrl}`)}`,
-      telegram: `https://t.me/share/url?url=${encodeURIComponent(articleUrl)}&text=${encodeURIComponent(shareText)}`,
-      x: `https://twitter.com/intent/tweet?url=${encodeURIComponent(articleUrl)}&text=${encodeURIComponent(shareText)}`,
-      facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(articleUrl)}`
+      whatsapp: `https://wa.me/?text=${encodeURIComponent(`${shareText} ${shareUrl}`)}`,
+      telegram: `https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(shareText)}`,
+      x: `https://twitter.com/intent/tweet?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(shareText)}`,
+      facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`
     };
 
     this.shareMessage = "";
