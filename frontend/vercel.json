@@ -6,6 +6,19 @@
       "destination": "/api/compartir/:slug"
     },
     {
+      "source": "/articulo/:slug",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": {
+            "re": "(facebookexternalhit|meta-externalagent|[Ww]hats[Aa]pp|Twitterbot|TelegramBot|Slackbot|Discordbot|LinkedInBot|SkypeUriPreview|[Bb]ot|crawler|spider)"
+          }
+        }
+      ],
+      "destination": "/api/articulo/:slug"
+    },
+    {
       "source": "/api/:path*",
       "destination": "https://colombiano-promedio-backend.onrender.com/api/:path*"
     },

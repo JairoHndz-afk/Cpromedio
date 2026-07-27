@@ -29,7 +29,7 @@ export default async function handler(req, res) {
     }
 
     const canonicalUrl = absoluteUrl(`/articulo/${article.slug}`, siteOrigin);
-    const requestUrl = absoluteUrl(`/compartir/${article.slug}`, siteOrigin);
+    const requestUrl = canonicalUrl;
     const imageUrl = resolveCoverImage(article, siteOrigin);
     const html = renderShareDocument({
       article,
@@ -37,7 +37,7 @@ export default async function handler(req, res) {
       requestUrl,
       canonicalUrl,
       imageUrl,
-      redirectToCanonical: true
+      redirectToCanonical: false
     });
 
     res.setHeader("Content-Type", "text/html; charset=utf-8");
@@ -55,7 +55,7 @@ export default async function handler(req, res) {
     const target = absoluteUrl(`/articulo/${slug}`, fallbackOrigin);
 
     if (error instanceof Error) {
-      console.error("No fue posible construir la vista de compartido del articulo.");
+      console.error("No fue posible construir la vista social del articulo.");
       console.error(error);
     }
 
