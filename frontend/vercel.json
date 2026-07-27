@@ -6,7 +6,7 @@
       "destination": "/api/compartir/:slug"
     },
     {
-      "source": "/api/:path*",
+      "source": "/api/:path((?!articulo/|compartir/).*)",
       "destination": "https://colombiano-promedio-backend.onrender.com/api/:path*"
     },
     {
