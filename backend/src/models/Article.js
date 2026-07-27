@@ -68,7 +68,7 @@ const articleContentBlockSchema = new mongoose.Schema(
       url: String,
       provider: {
         type: String,
-        enum: ["youtube", "vimeo"]
+        enum: ["youtube", "vimeo", "twitter", "instagram"]
       },
       title: String
     }

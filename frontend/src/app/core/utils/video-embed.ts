@@ -1,9 +1,9 @@
-export type VideoEmbedProvider = "youtube" | "vimeo";
+export type MediaEmbedProvider = "youtube" | "vimeo" | "twitter" | "instagram";
 
-export interface VideoEmbedDescriptor {
-  provider: VideoEmbedProvider;
+export interface MediaEmbedDescriptor {
+  provider: MediaEmbedProvider;
   sourceUrl: string;
-  embedUrl: string;
+  embedUrl: string | null;
 }
 
 function safeUrl(value: string): URL | null {
@@ -14,7 +14,7 @@ function safeUrl(value: string): URL | null {
   }
 }
 
-function buildYouTubeDescriptor(url: URL): VideoEmbedDescriptor | null {
+function buildYouTubeDescriptor(url: URL): MediaEmbedDescriptor | null {
   const host = url.hostname.replace(/^www\./, "").toLowerCase();
   let videoId = "";
 
@@ -41,7 +41,7 @@ function buildYouTubeDescriptor(url: URL): VideoEmbedDescriptor | null {
   };
 }
 
-function buildVimeoDescriptor(url: URL): VideoEmbedDescriptor | null {
+function buildVimeoDescriptor(url: URL): MediaEmbedDescriptor | null {
   const host = url.hostname.replace(/^www\./, "").toLowerCase();
 
   if (host !== "vimeo.com" && host !== "player.vimeo.com") {
@@ -61,12 +61,80 @@ function buildVimeoDescriptor(url: URL): VideoEmbedDescriptor | null {
   };
 }
 
-export function resolveVideoEmbed(value: string): VideoEmbedDescriptor | null {
+function buildTwitterDescriptor(url: URL): MediaEmbedDescriptor | null {
+  const host = url.hostname.replace(/^www\./, "").toLowerCase();
+
+  if (!["twitter.com", "x.com", "mobile.twitter.com", "mobile.x.com"].includes(host)) {
+    return null;
+  }
+
+  const match = url.pathname.match(/^\/([^/]+)\/status(?:es)?\/(\d+)(?:\/)?$/i);
+
+  if (!match?.[1] || !match?.[2]) {
+    return null;
+  }
+
+  const author = match[1].trim();
+  const statusId = match[2].trim();
+
+  if (!author || !/^\d{6,}$/.test(statusId)) {
+    return null;
+  }
+
+  return {
+    provider: "twitter",
+    sourceUrl: `https://twitter.com/${author}/status/${statusId}`,
+    embedUrl: null
+  };
+}
+
+function buildInstagramDescriptor(url: URL): MediaEmbedDescriptor | null {
+  const host = url.hostname.replace(/^www\./, "").toLowerCase();
+
+  if (!["instagram.com", "instagr.am"].includes(host)) {
+    return null;
+  }
+
+  const match = url.pathname.match(/^\/(p|reel|tv)\/([A-Za-z0-9_-]{5,})(?:\/)?$/i);
+
+  if (!match?.[1] || !match?.[2]) {
+    return null;
+  }
+
+  const mediaType = match[1].toLowerCase();
+  const mediaId = match[2].trim();
+
+  return {
+    provider: "instagram",
+    sourceUrl: `https://www.instagram.com/${mediaType}/${mediaId}/`,
+    embedUrl: null
+  };
+}
+
+export function resolveVideoEmbed(value: string): MediaEmbedDescriptor | null {
   const url = safeUrl(value.trim());
 
   if (!url || !["http:", "https:"].includes(url.protocol)) {
     return null;
   }
 
-  return buildYouTubeDescriptor(url) ?? buildVimeoDescriptor(url);
+  return buildYouTubeDescriptor(url) ?? buildVimeoDescriptor(url) ?? buildTwitterDescriptor(url) ?? buildInstagramDescriptor(url);
+}
+
+export function isTweetEmbed(value: string): boolean {
+  return resolveVideoEmbed(value)?.provider === "twitter";
+}
+
+export function resolveTweetEmbedSource(value: string): string | null {
+  const resolved = resolveVideoEmbed(value);
+  return resolved?.provider === "twitter" ? resolved.sourceUrl : null;
+}
+
+export function isInstagramEmbed(value: string): boolean {
+  return resolveVideoEmbed(value)?.provider === "instagram";
+}
+
+export function resolveInstagramEmbedSource(value: string): string | null {
+  const resolved = resolveVideoEmbed(value);
+  return resolved?.provider === "instagram" ? resolved.sourceUrl : null;
 }

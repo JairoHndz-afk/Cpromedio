@@ -8,7 +8,7 @@ import { PublicApiService } from "../../core/services/public-api.service";
 import { SeoService } from "../../core/services/seo.service";
 import { ArticleContentBlock, PublicArticle, PublicArticlePreview } from "../../core/types/api.types";
 import { renderEditorialText } from "../../core/utils/editorial-rich-text";
-import { resolveVideoEmbed } from "../../core/utils/video-embed";
+import { isInstagramEmbed, isTweetEmbed, resolveInstagramEmbedSource, resolveTweetEmbedSource, resolveVideoEmbed } from "../../core/utils/video-embed";
 
 type ShareChannel = "whatsapp" | "telegram" | "x" | "facebook" | "copy";
 
@@ -102,16 +102,34 @@ type ShareChannel = "whatsapp" | "telegram" | "x" | "facebook" | "copy";
             <figcaption *ngIf="block.image.caption || block.image.alt">{{ block.image.caption || block.image.alt }}</figcaption>
           </figure>
 
-          <figure class="article-inline-embed" *ngIf="block.type === 'embed' && safeArticleEmbedUrl(block.embed.url) as embedUrl">
-            <iframe
-              [src]="embedUrl"
-              [title]="block.embed.title || article.title"
-              loading="lazy"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-              allowfullscreen
-            ></iframe>
-            <figcaption *ngIf="block.embed.title">{{ block.embed.title }}</figcaption>
-          </figure>
+          <ng-container *ngIf="block.type === 'embed'">
+            <figure class="article-inline-embed article-inline-embed--tweet" *ngIf="isTweetEmbedUrl(block.embed.url) && tweetEmbedSource(block.embed.url) as tweetUrl; else articleVideoEmbed">
+              <blockquote class="twitter-tweet" [attr.data-theme]="tweetTheme()" data-dnt="true">
+                <a [href]="tweetUrl" target="_blank" rel="noopener noreferrer">Ver publicacion en X / Twitter</a>
+              </blockquote>
+              <figcaption *ngIf="block.embed.title">{{ block.embed.title }}</figcaption>
+            </figure>
+            <ng-template #articleVideoEmbed>
+              <figure class="article-inline-embed article-inline-embed--instagram" *ngIf="isInstagramEmbedUrl(block.embed.url) && instagramEmbedSource(block.embed.url) as instagramUrl; else articleMediaEmbed">
+                <blockquote class="instagram-media" data-instgrm-captioned [attr.data-instgrm-permalink]="instagramUrl" data-instgrm-version="14">
+                  <a [href]="instagramUrl" target="_blank" rel="noopener noreferrer">Ver publicacion en Instagram</a>
+                </blockquote>
+                <figcaption *ngIf="block.embed.title">{{ block.embed.title }}</figcaption>
+              </figure>
+              <ng-template #articleMediaEmbed>
+                <figure class="article-inline-embed" *ngIf="safeArticleEmbedUrl(block.embed.url) as embedUrl">
+                  <iframe
+                    [src]="embedUrl"
+                    [title]="block.embed.title || article.title"
+                    loading="lazy"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    allowfullscreen
+                  ></iframe>
+                  <figcaption *ngIf="block.embed.title">{{ block.embed.title }}</figcaption>
+                </figure>
+              </ng-template>
+            </ng-template>
+          </ng-container>
         </ng-container>
       </article>
 
@@ -237,7 +255,27 @@ export class ArticlePageComponent {
 
   safeArticleEmbedUrl(value: string): SafeResourceUrl | null {
     const resolved = resolveVideoEmbed(value);
-    return resolved ? this.sanitizer.bypassSecurityTrustResourceUrl(resolved.embedUrl) : null;
+    return resolved?.embedUrl ? this.sanitizer.bypassSecurityTrustResourceUrl(resolved.embedUrl) : null;
+  }
+
+  isTweetEmbedUrl(value: string): boolean {
+    return isTweetEmbed(value);
+  }
+
+  tweetEmbedSource(value: string): string | null {
+    return resolveTweetEmbedSource(value);
+  }
+
+  isInstagramEmbedUrl(value: string): boolean {
+    return isInstagramEmbed(value);
+  }
+
+  instagramEmbedSource(value: string): string | null {
+    return resolveInstagramEmbedSource(value);
+  }
+
+  tweetTheme(): "dark" | "light" {
+    return document.documentElement.dataset["theme"] === "dark" ? "dark" : "light";
   }
 
   shareTo(channel: ShareChannel): void {
@@ -308,6 +346,8 @@ export class ArticlePageComponent {
   }
 
   async loadArticle(currentSlug: string): Promise<void> {
+    let shouldRenderSocialEmbeds = false;
+
     this.article = null;
     this.nextArticle = null;
     this.errorMessage = "";
@@ -321,6 +361,7 @@ export class ArticlePageComponent {
       const response = await this.publicApi.getArticle(currentSlug);
       this.article = response.article;
       this.nextArticle = response.nextArticle;
+      shouldRenderSocialEmbeds = this.articleHasSocialEmbeds(response.article);
       this.syncTopicState();
       this.applySeo(response.article);
       window.scrollTo({ top: 0, behavior: "smooth" });
@@ -329,6 +370,100 @@ export class ArticlePageComponent {
       this.seo.setNoIndex("Artículo no disponible | Colombiano Promedio", this.errorMessage);
     } finally {
       this.cdr.markForCheck();
+
+      if (shouldRenderSocialEmbeds) {
+        setTimeout(() => this.renderSocialEmbeds(), 0);
+      }
     }
+  }
+
+  private articleHasSocialEmbeds(article: PublicArticle | null): boolean {
+    return article?.contentBlocks.some((block) => block.type === "embed" && (isTweetEmbed(block.embed.url) || isInstagramEmbed(block.embed.url))) ?? false;
+  }
+
+  private renderSocialEmbeds(): void {
+    const articleBody = document.querySelector(".article-body");
+
+    if (!(articleBody instanceof HTMLElement)) {
+      return;
+    }
+
+    this.renderTweetEmbeds(articleBody);
+    this.renderInstagramEmbeds();
+  }
+
+  private renderTweetEmbeds(articleBody: HTMLElement): void {
+    if (!this.articleHasTweetEmbeds(this.article)) {
+      return;
+    }
+
+    const twitterWindow = window as Window & {
+      twttr?: {
+        widgets?: {
+          load?: (element?: HTMLElement) => void;
+        };
+      };
+    };
+
+    if (twitterWindow.twttr?.widgets?.load) {
+      twitterWindow.twttr.widgets.load(articleBody);
+      return;
+    }
+
+    const existingScript = document.querySelector('script[data-twitter-widgets="true"]') as HTMLScriptElement | null;
+
+    if (existingScript) {
+      existingScript.addEventListener("load", () => twitterWindow.twttr?.widgets?.load?.(articleBody), { once: true });
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = "https://platform.twitter.com/widgets.js";
+    script.async = true;
+    script.charset = "utf-8";
+    script.setAttribute("data-twitter-widgets", "true");
+    script.addEventListener("load", () => twitterWindow.twttr?.widgets?.load?.(articleBody), { once: true });
+    document.body.appendChild(script);
+  }
+
+  private articleHasTweetEmbeds(article: PublicArticle | null): boolean {
+    return article?.contentBlocks.some((block) => block.type === "embed" && isTweetEmbed(block.embed.url)) ?? false;
+  }
+
+  private articleHasInstagramEmbeds(article: PublicArticle | null): boolean {
+    return article?.contentBlocks.some((block) => block.type === "embed" && isInstagramEmbed(block.embed.url)) ?? false;
+  }
+
+  private renderInstagramEmbeds(): void {
+    if (!this.articleHasInstagramEmbeds(this.article)) {
+      return;
+    }
+
+    const instagramWindow = window as Window & {
+      instgrm?: {
+        Embeds?: {
+          process?: () => void;
+        };
+      };
+    };
+
+    if (instagramWindow.instgrm?.Embeds?.process) {
+      instagramWindow.instgrm.Embeds.process();
+      return;
+    }
+
+    const existingScript = document.querySelector('script[data-instagram-embeds="true"]') as HTMLScriptElement | null;
+
+    if (existingScript) {
+      existingScript.addEventListener("load", () => instagramWindow.instgrm?.Embeds?.process?.(), { once: true });
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = "https://www.instagram.com/embed.js";
+    script.async = true;
+    script.setAttribute("data-instagram-embeds", "true");
+    script.addEventListener("load", () => instagramWindow.instgrm?.Embeds?.process?.(), { once: true });
+    document.body.appendChild(script);
   }
 }

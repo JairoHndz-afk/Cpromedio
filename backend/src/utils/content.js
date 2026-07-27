@@ -281,6 +281,54 @@ function buildVimeoEmbed(url) {
   };
 }
 
+function buildTwitterEmbed(url) {
+  const host = url.hostname.replace(/^www\./, "").toLowerCase();
+
+  if (!["twitter.com", "x.com", "mobile.twitter.com", "mobile.x.com"].includes(host)) {
+    return null;
+  }
+
+  const match = url.pathname.match(/^\/([^/]+)\/status(?:es)?\/(\d+)(?:\/)?$/i);
+
+  if (!match?.[1] || !match?.[2]) {
+    return null;
+  }
+
+  const author = match[1].trim();
+  const statusId = match[2].trim();
+
+  if (!author || !/^\d{6,}$/.test(statusId)) {
+    return null;
+  }
+
+  return {
+    provider: "twitter",
+    sourceUrl: `https://twitter.com/${author}/status/${statusId}`
+  };
+}
+
+function buildInstagramEmbed(url) {
+  const host = url.hostname.replace(/^www\./, "").toLowerCase();
+
+  if (!["instagram.com", "instagr.am"].includes(host)) {
+    return null;
+  }
+
+  const match = url.pathname.match(/^\/(p|reel|tv)\/([A-Za-z0-9_-]{5,})(?:\/)?$/i);
+
+  if (!match?.[1] || !match?.[2]) {
+    return null;
+  }
+
+  const mediaType = match[1].toLowerCase();
+  const mediaId = match[2].trim();
+
+  return {
+    provider: "instagram",
+    sourceUrl: `https://www.instagram.com/${mediaType}/${mediaId}/`
+  };
+}
+
 export function resolveVideoEmbedSource(value) {
   if (!value) {
     return null;
@@ -292,7 +340,7 @@ export function resolveVideoEmbedSource(value) {
     return null;
   }
 
-  return buildYouTubeEmbed(url) ?? buildVimeoEmbed(url);
+  return buildYouTubeEmbed(url) ?? buildVimeoEmbed(url) ?? buildTwitterEmbed(url) ?? buildInstagramEmbed(url);
 }
 
 export function sanitizeOwnedMediaUrl(value) {

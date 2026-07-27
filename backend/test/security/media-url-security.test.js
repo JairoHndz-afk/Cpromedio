@@ -85,6 +85,81 @@ test("acepta uploads propios y sanea medios remotos ya almacenados", () => {
   assert.equal(blocks[1].image.url, allowedUploadUrl);
 });
 
+test("acepta embeds de X/Twitter y sigue rechazando proveedores arbitrarios", () => {
+  const parsed = articleInputSchema.parse({
+    title: "Titular con publicacion embebida",
+    subtitle: "Subtitulo breve",
+    excerpt: "Resumen breve con una publicacion de red social incrustada.",
+    contentBlocks: [
+      {
+        type: "paragraph",
+        text: "Contexto suficiente para la nota."
+      },
+      {
+        type: "embed",
+        embed: {
+          url: "https://x.com/OpenAI/status/1949865123456789012",
+          title: "Mensaje incrustado"
+        }
+      }
+    ]
+  });
+
+  assert.equal(parsed.contentBlocks[1].type, "embed");
+
+  const { blocks } = sanitizeContentBlocks(parsed.contentBlocks);
+  assert.equal(blocks[1].type, "embed");
+  assert.equal(blocks[1].embed.provider, "twitter");
+  assert.equal(blocks[1].embed.url, "https://twitter.com/OpenAI/status/1949865123456789012");
+
+  const instagramParsed = articleInputSchema.parse({
+    title: "Titular con post de Instagram",
+    subtitle: "Subtitulo breve",
+    excerpt: "Resumen breve con una publicacion de Instagram incrustada.",
+    contentBlocks: [
+      {
+        type: "paragraph",
+        text: "Contexto suficiente para la nota."
+      },
+      {
+        type: "embed",
+        embed: {
+          url: "https://www.instagram.com/p/DMj4R8at9Q1/",
+          title: "Post incrustado"
+        }
+      }
+    ]
+  });
+
+  const instagramSanitized = sanitizeContentBlocks(instagramParsed.contentBlocks);
+  assert.equal(instagramSanitized.blocks[1].type, "embed");
+  assert.equal(instagramSanitized.blocks[1].embed.provider, "instagram");
+  assert.equal(instagramSanitized.blocks[1].embed.url, "https://www.instagram.com/p/DMj4R8at9Q1/");
+
+  assert.throws(
+    () =>
+      articleInputSchema.parse({
+        title: "Titular con embed invalido",
+        subtitle: "Subtitulo breve",
+        excerpt: "Resumen breve con embed de origen no permitido.",
+        contentBlocks: [
+          {
+            type: "paragraph",
+            text: "Primer parrafo seguro."
+          },
+          {
+            type: "embed",
+            embed: {
+              url: "https://evil.example/social/post/123456",
+              title: "Fuente no valida"
+            }
+          }
+        ]
+      }),
+    /youtube, vimeo, x\/twitter o instagram/i
+  );
+});
+
 test("acepta assets de Cloudinary del cloud configurado y rechaza clouds ajenos", (t) => {
   const originalCloudinaryCloudName = env.cloudinaryCloudName;
   const originalCloudinaryConfigured = env.cloudinaryConfigured;

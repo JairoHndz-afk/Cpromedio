@@ -13,9 +13,9 @@ const articleImageSchema = z.object({
 });
 
 const articleEmbedSchema = z.object({
-  url: z.string().refine((value) => Boolean(resolveVideoEmbedSource(value)), "Solo se aceptan enlaces de YouTube o Vimeo."),
-  provider: z.enum(["youtube", "vimeo"]).optional(),
-  title: z.string().max(160, "El titulo del video no puede superar 160 caracteres.").optional().default("")
+  url: z.string().refine((value) => Boolean(resolveVideoEmbedSource(value)), "Solo se aceptan enlaces de YouTube, Vimeo, X/Twitter o Instagram."),
+  provider: z.enum(["youtube", "vimeo", "twitter", "instagram"]).optional(),
+  title: z.string().max(160, "El titulo del embed no puede superar 160 caracteres.").optional().default("")
 });
 
 const articleContentBlockSchema = z.discriminatedUnion("type", [

@@ -1655,6 +1655,103 @@ h3 {
   line-height: 1.5;
 }
 
+.article-inline-embed--tweet,
+.article-inline-embed--instagram {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.article-inline-embed--tweet .twitter-tweet {
+  width: 100% !important;
+  max-width: min(100%, 560px) !important;
+  margin: 0 auto !important;
+}
+
+.article-inline-embed--instagram .instagram-media {
+  width: 100% !important;
+  max-width: min(100%, 560px) !important;
+  margin: 0 auto !important;
+  min-width: 0 !important;
+}
+
+.article-inline-embed--social-preview {
+  display: grid;
+}
+
+.article-social-preview {
+  display: grid;
+  gap: 0.65rem;
+  padding: 1rem 1.05rem;
+  border-radius: 18px;
+  border: 1px solid rgba(102, 137, 255, 0.18);
+  background:
+    linear-gradient(135deg, rgba(102, 137, 255, 0.08), rgba(248, 196, 0, 0.08)),
+    rgba(10, 14, 24, 0.62);
+}
+
+.article-social-preview strong {
+  color: var(--text);
+  font-size: 1rem;
+}
+
+.article-social-preview p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.article-social-preview a {
+  color: var(--accent-cool);
+  word-break: break-word;
+  text-decoration: none;
+}
+
+.article-social-preview a:hover {
+  text-decoration: underline;
+}
+
+.ck-embed-preview {
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.95rem 1rem;
+  border-radius: 16px;
+  border: 1px solid rgba(102, 137, 255, 0.18);
+  background:
+    linear-gradient(135deg, rgba(102, 137, 255, 0.08), rgba(248, 196, 0, 0.08)),
+    rgba(255, 255, 255, 0.96);
+  color: #162033;
+}
+
+.ck-embed-preview strong {
+  font-size: 0.95rem;
+}
+
+.ck-embed-preview p {
+  margin: 0;
+  color: #4f5e79;
+}
+
+.ck-embed-preview a {
+  color: #2759d7;
+  word-break: break-word;
+}
+
+:root[data-theme="dark"] .ck-embed-preview {
+  border-color: rgba(102, 137, 255, 0.22);
+  background:
+    linear-gradient(135deg, rgba(102, 137, 255, 0.12), rgba(248, 196, 0, 0.08)),
+    rgba(8, 12, 22, 0.96);
+  color: #eef3ff;
+}
+
+:root[data-theme="dark"] .ck-embed-preview p {
+  color: #b8c6db;
+}
+
+:root[data-theme="dark"] .ck-embed-preview a {
+  color: #8fb4ff;
+}
+
 .article-body p:first-child::first-letter {
   float: left;
   margin-right: 0.3rem;

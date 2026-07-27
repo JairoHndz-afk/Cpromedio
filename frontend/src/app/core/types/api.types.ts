@@ -24,7 +24,7 @@ export interface ArticleImageAsset {
 
 export interface ArticleEmbedAsset {
   url: string;
-  provider: "youtube" | "vimeo";
+  provider: "youtube" | "vimeo" | "twitter" | "instagram";
   title?: string;
 }
 

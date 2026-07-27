@@ -17,7 +17,7 @@ import {
   UserSession
 } from "../../core/types/api.types";
 import { renderEditorialText } from "../../core/utils/editorial-rich-text";
-import { resolveVideoEmbed } from "../../core/utils/video-embed";
+import { isInstagramEmbed, isTweetEmbed, resolveInstagramEmbedSource, resolveTweetEmbedSource, resolveVideoEmbed } from "../../core/utils/video-embed";
 import { CKEditorModule } from "@ckeditor/ckeditor5-angular";
 import {
   AutoImage,
@@ -631,23 +631,35 @@ function createEditorialUploadAdapterPlugin(
                           <figcaption *ngIf="block.image.caption || block.image.alt">{{ block.image.caption || block.image.alt }}</figcaption>
                         </figure>
 
-                        <figure class="article-inline-embed" *ngIf="block.type === 'embed' && safePreviewEmbedUrl(block.embed.url) as embedUrl">
-                          <iframe
-                            [src]="embedUrl"
-                            [title]="block.embed.title || articleDisplayTitle()"
-                            loading="lazy"
-                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                            allowfullscreen
-                          ></iframe>
-                          <figcaption *ngIf="block.embed.title">{{ block.embed.title }}</figcaption>
-                        </figure>
+                        <ng-container *ngIf="block.type === 'embed'">
+                          <figure class="article-inline-embed article-inline-embed--social-preview" *ngIf="socialEmbedPreviewData(block.embed.url) as socialEmbed; else previewVideoEmbedBlock">
+                            <div class="article-social-preview">
+                              <p class="eyebrow">{{ socialEmbed.label }}</p>
+                              <strong>{{ block.embed.title || socialEmbed.title }}</strong>
+                              <p>{{ socialEmbed.description }}</p>
+                              <a [href]="socialEmbed.url" target="_blank" rel="noopener noreferrer">{{ socialEmbed.url }}</a>
+                            </div>
+                          </figure>
+                          <ng-template #previewVideoEmbedBlock>
+                            <figure class="article-inline-embed" *ngIf="safePreviewEmbedUrl(block.embed.url) as embedUrl">
+                              <iframe
+                                [src]="embedUrl"
+                                [title]="block.embed.title || articleDisplayTitle()"
+                                loading="lazy"
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                                allowfullscreen
+                              ></iframe>
+                              <figcaption *ngIf="block.embed.title">{{ block.embed.title }}</figcaption>
+                            </figure>
+                          </ng-template>
+                        </ng-container>
                       </ng-container>
                     </article>
                   </section>
                   <ng-template #emptyEditorialPreview>
                     <div class="editor-preview-placeholder">
                       <strong>La vista previa aparecera cuando empieces a redactar.</strong>
-                      <p>Agrega texto, imagenes o videos en Redaccion para revisar aqui el resultado final.</p>
+                      <p>Agrega texto, imagenes o embeds editoriales en Redaccion para revisar aqui el resultado final.</p>
                     </div>
                   </ng-template>
                 </section>
@@ -2903,12 +2915,48 @@ export class DashboardPageComponent {
       defaultProtocol: "https://"
     },
     mediaEmbed: {
-      previewsInData: false
+      previewsInData: false,
+      extraProviders: [
+        {
+          name: "x",
+          url: [
+            /^https?:\/\/(?:www\.)?(?:twitter\.com|x\.com|mobile\.twitter\.com|mobile\.x\.com)\/[^/]+\/status(?:es)?\/\d+(?:\?.*)?$/i
+          ],
+          html: (match: RegExpMatchArray) => {
+            const sourceUrl = Array.isArray(match) ? match[0] ?? "" : "";
+            const safeUrl = this.escapeHtml(sourceUrl);
+            return [
+              "<div class=\"ck-embed-preview ck-embed-preview--tweet\">",
+              "<strong>Tweet incrustado</strong>",
+              "<p>Se publicara dentro del articulo como una tarjeta de X/Twitter.</p>",
+              `<a href="${safeUrl}" target="_blank" rel="noopener noreferrer">${safeUrl}</a>`,
+              "</div>"
+            ].join("");
+          }
+        },
+        {
+          name: "instagramSocial",
+          url: [
+            /^https?:\/\/(?:www\.)?(?:instagram\.com|instagr\.am)\/(?:p|reel|tv)\/[A-Za-z0-9_-]{5,}(?:\/)?(?:\?.*)?$/i
+          ],
+          html: (match: RegExpMatchArray) => {
+            const sourceUrl = Array.isArray(match) ? match[0] ?? "" : "";
+            const safeUrl = this.escapeHtml(sourceUrl);
+            return [
+              "<div class=\"ck-embed-preview ck-embed-preview--instagram\">",
+              "<strong>Post de Instagram</strong>",
+              "<p>Se publicara dentro del articulo como una tarjeta incrustada de Instagram.</p>",
+              `<a href="${safeUrl}" target="_blank" rel="noopener noreferrer">${safeUrl}</a>`,
+              "</div>"
+            ].join("");
+          }
+        }
+      ]
     },
     extraPlugins: [
       createEditorialUploadAdapterPlugin((file) => this.handleEditorImageUpload(file))
     ],
-    placeholder: "Redacta aquí la noticia. Puedes insertar intertítulos, citas, enlaces, imágenes y videos dentro del mismo flujo."
+    placeholder: "Redacta aqui la noticia. Puedes insertar intertitulos, citas, enlaces, imagenes, videos y publicaciones sociales dentro del mismo flujo."
   };
   articleBodyHtml = "<p></p>";
   articleBodyPreviewBlocks: ArticleContentBlock[] = [];
@@ -2977,7 +3025,49 @@ export class DashboardPageComponent {
 
   safePreviewEmbedUrl(value: string): SafeResourceUrl | null {
     const resolved = resolveVideoEmbed(value);
-    return resolved ? this.sanitizer.bypassSecurityTrustResourceUrl(resolved.embedUrl) : null;
+    return resolved?.embedUrl ? this.sanitizer.bypassSecurityTrustResourceUrl(resolved.embedUrl) : null;
+  }
+
+  isTweetEmbedUrl(value: string): boolean {
+    return isTweetEmbed(value);
+  }
+
+  tweetEmbedSource(value: string): string | null {
+    return resolveTweetEmbedSource(value);
+  }
+
+  isInstagramEmbedUrl(value: string): boolean {
+    return isInstagramEmbed(value);
+  }
+
+  instagramEmbedSource(value: string): string | null {
+    return resolveInstagramEmbedSource(value);
+  }
+
+  socialEmbedPreviewData(value: string): { label: string; title: string; description: string; url: string } | null {
+    const tweetUrl = this.tweetEmbedSource(value);
+
+    if (tweetUrl) {
+      return {
+        label: "X / Twitter",
+        title: "Tweet incrustado",
+        description: "Se mostrara dentro del articulo como una tarjeta editorial de X/Twitter.",
+        url: tweetUrl
+      };
+    }
+
+    const instagramUrl = this.instagramEmbedSource(value);
+
+    if (instagramUrl) {
+      return {
+        label: "Instagram",
+        title: "Post de Instagram",
+        description: "Se mostrara dentro del articulo como una tarjeta incrustada de Instagram.",
+        url: instagramUrl
+      };
+    }
+
+    return null;
   }
 
   visibleSections(currentUser: UserSession): SectionConfig[] {
@@ -3140,7 +3230,7 @@ export class DashboardPageComponent {
     }
 
     if (type === "embed") {
-      return "Video";
+      return "Embed";
     }
 
     return "Parrafo";
@@ -3314,7 +3404,7 @@ export class DashboardPageComponent {
     }
 
     if (block.type === "embed") {
-      return `${prefix} · ${block.embedTitle.trim() || "Video embebido"}`;
+      return `${prefix} · ${block.embedTitle.trim() || this.embedFallbackLabel(block.embedUrl)}`;
     }
 
     return `${prefix} · ${block.text.trim() || "Parrafo vacio"}`;
@@ -3437,9 +3527,21 @@ export class DashboardPageComponent {
     return "Portada en imagen";
   }
 
+  private embedFallbackLabel(value: string): string {
+    if (this.isTweetEmbedUrl(value)) {
+      return "Tweet incrustado";
+    }
+
+    if (this.isInstagramEmbedUrl(value)) {
+      return "Post de Instagram";
+    }
+
+    return "Embed editorial";
+  }
+
   safeEmbedUrl(value: string): SafeResourceUrl | null {
     const resolved = resolveVideoEmbed(value);
-    return resolved ? this.sanitizer.bypassSecurityTrustResourceUrl(resolved.embedUrl) : null;
+    return resolved?.embedUrl ? this.sanitizer.bypassSecurityTrustResourceUrl(resolved.embedUrl) : null;
   }
 
   safeBlockEmbedUrl(block: EditorContentBlock): SafeResourceUrl | null {
@@ -3986,7 +4088,80 @@ export class DashboardPageComponent {
       this.appendEditorNodeAsBlocks(node, blocks);
     }
 
-    return blocks.filter((block) => this.blockHasMeaningfulPayload(block));
+    return this.removeStandaloneEmbedLinks(blocks)
+      .filter((block) => this.blockHasMeaningfulPayload(block));
+  }
+
+  private removeStandaloneEmbedLinks(blocks: ArticleContentBlock[]): ArticleContentBlock[] {
+    const sanitized: ArticleContentBlock[] = [];
+
+    for (const block of blocks) {
+      const previous = sanitized[sanitized.length - 1];
+
+      if (
+        block.type === "embed"
+        && previous?.type === "embed"
+        && previous.embed.url.trim() === block.embed.url.trim()
+      ) {
+        continue;
+      }
+
+      if (block.type === "paragraph") {
+        const standaloneLink = this.extractStandaloneEmbedLink(block.text);
+
+        if (standaloneLink) {
+          const nextBlock = blocks[sanitized.length + 1];
+
+          if (
+            previous?.type === "embed"
+            && this.sameResolvedEmbedSource(previous.embed.url, standaloneLink)
+          ) {
+            continue;
+          }
+
+          if (
+            nextBlock?.type === "embed"
+            && this.sameResolvedEmbedSource(nextBlock.embed.url, standaloneLink)
+          ) {
+            continue;
+          }
+        }
+      }
+
+      sanitized.push(block);
+    }
+
+    return sanitized;
+  }
+
+  private extractStandaloneEmbedLink(value: string): string | null {
+    const plainText = this.extractTextContent(value).trim();
+    const resolvedPlainText = resolveVideoEmbed(plainText);
+
+    if (resolvedPlainText) {
+      return resolvedPlainText.sourceUrl;
+    }
+
+    const documentRoot = new DOMParser().parseFromString(`<div>${value}</div>`, "text/html");
+    const anchor = documentRoot.body.querySelector("a[href]");
+
+    if (!anchor || documentRoot.body.querySelectorAll("a[href]").length !== 1) {
+      return null;
+    }
+
+    const normalizedText = documentRoot.body.textContent?.replace(/\s+/g, " ").trim() ?? "";
+
+    if (normalizedText.length === 0 || normalizedText !== anchor.textContent?.replace(/\s+/g, " ").trim()) {
+      return null;
+    }
+
+    return resolveVideoEmbed(anchor.getAttribute("href") ?? "")?.sourceUrl ?? null;
+  }
+
+  private sameResolvedEmbedSource(left: string, right: string): boolean {
+    const leftSource = resolveVideoEmbed(left)?.sourceUrl ?? "";
+    const rightSource = resolveVideoEmbed(right)?.sourceUrl ?? "";
+    return leftSource.length > 0 && leftSource === rightSource;
   }
 
   private appendEditorNodeAsBlocks(node: Node, blocks: ArticleContentBlock[]): void {
@@ -4408,7 +4583,7 @@ export class DashboardPageComponent {
       title: string;
       subtitle: string;
       excerpt: string;
-      contentBlocks: ArticleContentBlock[];
+      contentBlocks: Array<Record<string, unknown>>;
       cover: {
         url: string;
         alt: string;
@@ -4432,7 +4607,7 @@ export class DashboardPageComponent {
         title: this.articleForm.title.trim(),
         subtitle: this.articleForm.subtitle.trim(),
         excerpt,
-        contentBlocks,
+        contentBlocks: this.serializeContentBlocksForApi(contentBlocks),
         cover: {
           url: this.articleForm.coverUrl.trim(),
           alt: this.articleForm.coverAlt.trim(),
@@ -4452,10 +4627,26 @@ export class DashboardPageComponent {
     };
   }
 
+  private serializeContentBlocksForApi(contentBlocks: ArticleContentBlock[]): Array<Record<string, unknown>> {
+    return contentBlocks.map((block) => {
+      if (block.type === "embed") {
+        return {
+          type: "embed",
+          embed: {
+            url: block.embed.url,
+            title: block.embed.title ?? ""
+          }
+        };
+      }
+
+      return block as unknown as Record<string, unknown>;
+    });
+  }
+
   private validateArticlePayload(payload: {
     title: string;
     excerpt: string;
-    contentBlocks: ArticleContentBlock[];
+    contentBlocks: Array<Record<string, unknown>>;
   }): string | null {
     if (this.uploadingCover || this.hasUploadingContentBlocks()) {
       return "Espera a que terminen de subir todas las imagenes antes de guardar el articulo.";
@@ -4466,7 +4657,7 @@ export class DashboardPageComponent {
     }
 
     if (payload.contentBlocks.length === 0) {
-      return "Agrega al menos un parrafo, una cita, una foto o un video embebido al cuerpo del articulo.";
+      return "Agrega al menos un parrafo, una cita, una foto o un embed editorial al cuerpo del articulo.";
     }
 
     if (payload.excerpt.trim().length < 20) {
@@ -4561,7 +4752,7 @@ export class DashboardPageComponent {
       }
 
       if (this.buildContentPayload().length === 0) {
-        return "Agrega al menos un parrafo, una cita, una foto o un video embebido para empezar la noticia.";
+        return "Agrega al menos un parrafo, una cita, una foto o un embed editorial para empezar la noticia.";
       }
 
       return null;
