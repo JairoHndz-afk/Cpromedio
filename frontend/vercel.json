@@ -2,6 +2,10 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "rewrites": [
     {
+      "source": "/compartir/:slug",
+      "destination": "/api/compartir/:slug"
+    },
+    {
       "source": "/api/:path*",
       "destination": "https://colombiano-promedio-backend.onrender.com/api/:path*"
     },
