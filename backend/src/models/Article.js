@@ -34,13 +34,26 @@ const articleContentBlockSchema = new mongoose.Schema(
   {
     type: {
       type: String,
-      enum: ["paragraph", "quote", "image", "embed"],
+      enum: ["heading", "paragraph", "quote", "image", "embed"],
       required: true
     },
     text: {
       type: String,
       default: "",
       trim: true
+    },
+    heading: {
+      text: String,
+      align: {
+        type: String,
+        enum: ["left", "center", "right"],
+        default: "left"
+      },
+      level: {
+        type: String,
+        enum: ["h2", "h3"],
+        default: "h2"
+      }
     },
     quote: {
       text: String,

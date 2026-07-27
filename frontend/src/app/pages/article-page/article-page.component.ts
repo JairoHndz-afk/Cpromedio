@@ -72,6 +72,24 @@ type ShareChannel = "whatsapp" | "telegram" | "x" | "facebook" | "copy";
 
       <article class="article-body">
         <ng-container *ngFor="let block of article.contentBlocks">
+          <ng-container *ngIf="block.type === 'heading'">
+            <h2
+              *ngIf="block.heading.level === 'h2'; else compactHeading"
+              class="article-section-heading"
+              [class.article-section-heading--center]="block.heading.align === 'center'"
+              [class.article-section-heading--right]="block.heading.align === 'right'"
+              [innerHTML]="renderBlockText(block)"
+            ></h2>
+            <ng-template #compactHeading>
+              <h3
+                class="article-section-heading article-section-heading--compact"
+                [class.article-section-heading--center]="block.heading.align === 'center'"
+                [class.article-section-heading--right]="block.heading.align === 'right'"
+                [innerHTML]="renderBlockText(block)"
+              ></h3>
+            </ng-template>
+          </ng-container>
+
           <p *ngIf="block.type === 'paragraph'" [innerHTML]="renderBlockText(block)"></p>
 
           <blockquote class="article-quote" *ngIf="block.type === 'quote'">
@@ -185,6 +203,10 @@ export class ArticlePageComponent {
   }
 
   renderBlockText(block: ArticleContentBlock): string {
+    if (block.type === "heading") {
+      return renderEditorialText(block.heading.text);
+    }
+
     if (block.type === "paragraph") {
       return renderEditorialText(block.text);
     }

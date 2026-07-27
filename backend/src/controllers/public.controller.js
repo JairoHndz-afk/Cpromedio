@@ -437,7 +437,13 @@ async function sendConfirmationOrThrow(subscription, tokens) {
   } catch (error) {
     console.error("No fue posible enviar el correo de confirmacion del boletin.");
     console.error(error);
-    throw createHttpError(502, "No fue posible enviar el correo de confirmacion. Intenta de nuevo en unos minutos.");
+    const reason = sanitizeText(error?.message ?? "", 220);
+    throw createHttpError(
+      502,
+      reason
+        ? `No fue posible enviar el correo de confirmacion. ${reason}`
+        : "No fue posible enviar el correo de confirmacion. Intenta de nuevo en unos minutos."
+    );
   }
 }
 
@@ -447,7 +453,13 @@ async function sendWelcomeOrThrow(subscription, tokens) {
   } catch (error) {
     console.error("No fue posible enviar el correo de bienvenida del boletin.");
     console.error(error);
-    throw createHttpError(502, "No fue posible enviar el correo de bienvenida. Intenta de nuevo en unos minutos.");
+    const reason = sanitizeText(error?.message ?? "", 220);
+    throw createHttpError(
+      502,
+      reason
+        ? `No fue posible enviar el correo de bienvenida. ${reason}`
+        : "No fue posible enviar el correo de bienvenida. Intenta de nuevo en unos minutos."
+    );
   }
 }
 

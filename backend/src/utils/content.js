@@ -65,6 +65,25 @@ export function sanitizeContentBlocks(input) {
       continue;
     }
 
+    if (item.type === "heading") {
+      const text = sanitizeText(item.heading?.text ?? item.text ?? "", 220);
+
+      if (!text) {
+        continue;
+      }
+
+      blocks.push({
+        type: "heading",
+        heading: {
+          text,
+          align: ["left", "center", "right"].includes(item.heading?.align) ? item.heading.align : "left",
+          level: item.heading?.level === "h3" ? "h3" : "h2"
+        }
+      });
+      paragraphs.push(text);
+      continue;
+    }
+
     if (item.type === "image") {
       const url = sanitizeOwnedMediaUrl(item.image?.url ?? "");
 

@@ -20,6 +20,14 @@ const articleEmbedSchema = z.object({
 
 const articleContentBlockSchema = z.discriminatedUnion("type", [
   z.object({
+    type: z.literal("heading"),
+    heading: z.object({
+      text: z.string().min(1, "Cada encabezado debe incluir contenido.").max(220, "Cada encabezado no puede superar 220 caracteres."),
+      align: z.enum(["left", "center", "right"]).optional().default("left"),
+      level: z.enum(["h2", "h3"]).optional().default("h2")
+    })
+  }),
+  z.object({
     type: z.literal("paragraph"),
     text: z.string().min(1, "Cada parrafo debe incluir contenido.").max(4000, "Cada parrafo no puede superar 4000 caracteres.")
   }),

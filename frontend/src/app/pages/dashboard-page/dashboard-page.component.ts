@@ -55,6 +55,9 @@ interface ArticleFormState {
 
 interface EditorContentBlock {
   type: ArticleContentBlock["type"];
+  headingText: string;
+  headingAlign: "left" | "center" | "right";
+  headingLevel: "h2" | "h3";
   text: string;
   quoteText: string;
   quoteAttribution: string;
@@ -311,9 +314,10 @@ interface ConfirmDialogState {
                   <p class="panel-subtitle">Empieza por el contenido real: parrafos, fotos y videos embebidos entre bloques.</p>
                 </div>
                 <div class="button-row">
+                  <button class="button button--secondary" type="button" (click)="addHeadingBlock()">Agregar titulo</button>
                   <button class="button button--ghost" type="button" (click)="addParagraphBlock()">Agregar parrafo</button>
                   <button class="button button--ghost" type="button" (click)="addQuoteBlock()">Agregar cita</button>
-                  <button class="button button--secondary" type="button" (click)="addImageBlock()">Agregar foto</button>
+                  <button class="button button--ghost" type="button" (click)="addImageBlock()">Agregar foto</button>
                   <button class="button button--ghost" type="button" (click)="addEmbedBlock()">Agregar video</button>
                 </div>
               </div>
@@ -329,9 +333,10 @@ interface ConfirmDialogState {
                   <span>Esta barra se queda visible mientras redactas y cada bloque tambien te deja agregar contenido justo debajo.</span>
                 </div>
                 <div class="button-row">
+                  <button class="button button--secondary" type="button" (click)="addHeadingBlock()">Agregar titulo</button>
                   <button class="button button--ghost" type="button" (click)="addParagraphBlock()">Agregar parrafo</button>
                   <button class="button button--ghost" type="button" (click)="addQuoteBlock()">Agregar cita</button>
-                  <button class="button button--secondary" type="button" (click)="addImageBlock()">Agregar foto</button>
+                  <button class="button button--ghost" type="button" (click)="addImageBlock()">Agregar foto</button>
                   <button class="button button--ghost" type="button" (click)="addEmbedBlock()">Agregar video</button>
                 </div>
               </div>
@@ -346,6 +351,48 @@ interface ConfirmDialogState {
                       <button class="button button--ghost" type="button" (click)="removeContentBlock(blockIndex)">Quitar</button>
                     </div>
                   </div>
+
+                  <ng-container *ngIf="block.type === 'heading'">
+                    <div class="stack-form">
+                      <label>
+                        <span>Titulo interno</span>
+                        <textarea
+                          [(ngModel)]="block.headingText"
+                          [name]="'blockHeadingText' + blockIndex"
+                          rows="2"
+                          placeholder="EL PASADO"
+                        ></textarea>
+                      </label>
+
+                      <div class="form-grid">
+                        <label>
+                          <span>Alineacion</span>
+                          <select [(ngModel)]="block.headingAlign" [name]="'blockHeadingAlign' + blockIndex">
+                            <option value="left">Izquierda</option>
+                            <option value="center">Centro</option>
+                            <option value="right">Derecha</option>
+                          </select>
+                        </label>
+
+                        <label>
+                          <span>Jerarquia</span>
+                          <select [(ngModel)]="block.headingLevel" [name]="'blockHeadingLevel' + blockIndex">
+                            <option value="h2">Titulo principal del bloque</option>
+                            <option value="h3">Subtitulo del bloque</option>
+                          </select>
+                        </label>
+                      </div>
+
+                      <div class="editor-heading-preview" [attr.data-align]="block.headingAlign">
+                        <p class="eyebrow">Vista previa</p>
+                        <h3 [class.editor-heading-preview__title--compact]="block.headingLevel === 'h3'">
+                          {{ block.headingText.trim() || "Tu titulo interno aparecera aqui" }}
+                        </h3>
+                      </div>
+
+                      <p class="helper-text">Usa este bloque para entradas como "EL PASADO" o separadores editoriales dentro de la nota.</p>
+                    </div>
+                  </ng-container>
 
                   <ng-container *ngIf="block.type === 'paragraph'">
                     <div class="button-row">
@@ -457,9 +504,10 @@ interface ConfirmDialogState {
                   <div class="content-block__quick-add">
                     <span class="helper-text">Agregar debajo de este bloque</span>
                     <div class="button-row">
+                      <button class="button button--secondary" type="button" (click)="insertHeadingBlock(blockIndex)">Titulo debajo</button>
                       <button class="button button--ghost" type="button" (click)="insertParagraphBlock(blockIndex)">Texto debajo</button>
                       <button class="button button--ghost" type="button" (click)="insertQuoteBlock(blockIndex)">Cita debajo</button>
-                      <button class="button button--secondary" type="button" (click)="insertImageBlock(blockIndex)">Foto debajo</button>
+                      <button class="button button--ghost" type="button" (click)="insertImageBlock(blockIndex)">Foto debajo</button>
                       <button class="button button--ghost" type="button" (click)="insertEmbedBlock(blockIndex)">Video debajo</button>
                     </div>
                   </div>
@@ -710,7 +758,7 @@ interface ConfirmDialogState {
 
                 <section class="editor-stage-card">
                   <p class="eyebrow">Cuerpo</p>
-                  <strong>{{ contentBlockCount('paragraph') }} parrafos y {{ contentBlockCount('quote') }} citas</strong>
+                  <strong>{{ contentBlockCount('heading') }} titulos internos, {{ contentBlockCount('paragraph') }} parrafos y {{ contentBlockCount('quote') }} citas</strong>
                   <p>{{ contentBlockCount('image') }} fotos y {{ contentBlockCount('embed') }} videos embebidos</p>
                 </section>
 
@@ -1656,6 +1704,10 @@ export class DashboardPageComponent {
   }
 
   contentBlockLabel(type: EditorContentBlock["type"]): string {
+    if (type === "heading") {
+      return "Titulo";
+    }
+
     if (type === "quote") {
       return "Cita";
     }
@@ -1748,6 +1800,10 @@ export class DashboardPageComponent {
         return false;
       }
 
+      if (type === "heading") {
+        return block.headingText.trim().length > 0;
+      }
+
       if (type === "paragraph") {
         return block.text.trim().length > 0;
       }
@@ -1800,6 +1856,10 @@ export class DashboardPageComponent {
     this.appendContentBlock("paragraph");
   }
 
+  addHeadingBlock(): void {
+    this.appendContentBlock("heading");
+  }
+
   addQuoteBlock(): void {
     this.appendContentBlock("quote");
   }
@@ -1814,6 +1874,10 @@ export class DashboardPageComponent {
 
   insertParagraphBlock(afterIndex: number): void {
     this.insertContentBlock(afterIndex, "paragraph");
+  }
+
+  insertHeadingBlock(afterIndex: number): void {
+    this.insertContentBlock(afterIndex, "heading");
   }
 
   insertQuoteBlock(afterIndex: number): void {
@@ -1948,7 +2012,28 @@ export class DashboardPageComponent {
   private createParagraphBlock(text = ""): EditorContentBlock {
     return {
       type: "paragraph",
+      headingText: "",
+      headingAlign: "center",
+      headingLevel: "h2",
       text,
+      quoteText: "",
+      quoteAttribution: "",
+      imageUrl: "",
+      imageAlt: "",
+      imageCaption: "",
+      embedUrl: "",
+      embedTitle: "",
+      uploading: false
+    };
+  }
+
+  private createHeadingBlock(heading?: { text?: string; align?: "left" | "center" | "right"; level?: "h2" | "h3" }): EditorContentBlock {
+    return {
+      type: "heading",
+      headingText: heading?.text ?? "",
+      headingAlign: heading?.align ?? "center",
+      headingLevel: heading?.level ?? "h2",
+      text: "",
       quoteText: "",
       quoteAttribution: "",
       imageUrl: "",
@@ -1963,6 +2048,9 @@ export class DashboardPageComponent {
   private createQuoteBlock(quote?: { text?: string; attribution?: string }): EditorContentBlock {
     return {
       type: "quote",
+      headingText: "",
+      headingAlign: "center",
+      headingLevel: "h2",
       text: "",
       quoteText: quote?.text ?? "",
       quoteAttribution: quote?.attribution ?? "",
@@ -1978,6 +2066,9 @@ export class DashboardPageComponent {
   private createImageBlock(image?: { url?: string; alt?: string; caption?: string }): EditorContentBlock {
     return {
       type: "image",
+      headingText: "",
+      headingAlign: "center",
+      headingLevel: "h2",
       text: "",
       quoteText: "",
       quoteAttribution: "",
@@ -1993,6 +2084,9 @@ export class DashboardPageComponent {
   private createEmbedBlock(embed?: { url?: string; title?: string }): EditorContentBlock {
     return {
       type: "embed",
+      headingText: "",
+      headingAlign: "center",
+      headingLevel: "h2",
       text: "",
       quoteText: "",
       quoteAttribution: "",
@@ -2006,6 +2100,10 @@ export class DashboardPageComponent {
   }
 
   private buildContentBlock(type: EditorContentBlock["type"]): EditorContentBlock {
+    if (type === "heading") {
+      return this.createHeadingBlock();
+    }
+
     if (type === "quote") {
       return this.createQuoteBlock();
     }
@@ -2027,7 +2125,9 @@ export class DashboardPageComponent {
       : article.body.map((text) => ({ type: "paragraph", text } as ArticleContentBlock));
 
     const blocks = source.map((block) =>
-      block.type === "quote"
+      block.type === "heading"
+        ? this.createHeadingBlock(block.heading)
+        : block.type === "quote"
         ? this.createQuoteBlock(block.quote)
         : block.type === "image"
         ? this.createImageBlock(block.image)
@@ -2043,6 +2143,24 @@ export class DashboardPageComponent {
     const payload: ArticleContentBlock[] = [];
 
     for (const block of this.articleForm.contentBlocks) {
+      if (block.type === "heading") {
+        const text = block.headingText.trim();
+
+        if (!text) {
+          continue;
+        }
+
+        payload.push({
+          type: "heading",
+          heading: {
+            text,
+            align: block.headingAlign,
+            level: block.headingLevel
+          }
+        });
+        continue;
+      }
+
       if (block.type === "quote") {
         const text = block.quoteText.trim();
 
@@ -2125,6 +2243,15 @@ export class DashboardPageComponent {
     let firstParagraph = "";
 
     for (const block of contentBlocks) {
+      if (block.type === "heading" && "heading" in block) {
+        const text = block.heading.text.trim().replace(/\s+/g, " ");
+
+        if (text) {
+          firstParagraph = text;
+          break;
+        }
+      }
+
       if (block.type === "paragraph" && "text" in block) {
         const text = block.text.trim().replace(/\s+/g, " ");
 

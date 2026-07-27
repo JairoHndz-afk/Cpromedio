@@ -33,7 +33,17 @@ export interface ArticleQuoteAsset {
   attribution?: string;
 }
 
+export interface ArticleHeadingAsset {
+  text: string;
+  align: "left" | "center" | "right";
+  level: "h2" | "h3";
+}
+
 export type ArticleContentBlock =
+  | {
+      type: "heading";
+      heading: ArticleHeadingAsset;
+    }
   | {
       type: "paragraph";
       text: string;
