@@ -2,27 +2,27 @@ function humanizeField(path) {
   const labels = {
     name: "nombre",
     email: "correo",
-    password: "contrasena",
-    title: "titulo",
-    subtitle: "subtitulo",
+    password: "contraseña",
+    title: "título",
+    subtitle: "subtítulo",
     excerpt: "extracto",
     body: "cuerpo",
     contentBlocks: "contenido",
     heading: "encabezado",
     text: "texto",
-    align: "alineacion",
+    align: "alineación",
     level: "nivel",
     cover: "portada",
     url: "URL",
     alt: "texto alternativo",
     caption: "leyenda",
-    categoryId: "categoria",
+    categoryId: "categoría",
     tags: "etiquetas",
     note: "nota",
     token: "token",
-    currentPassword: "contrasena actual",
-    nextPassword: "nueva contrasena",
-    confirmPassword: "confirmacion de contrasena",
+    currentPassword: "contraseña actual",
+    nextPassword: "nueva contraseña",
+    confirmPassword: "confirmación de contraseña",
     filename: "nombre del archivo",
     dataUrl: "archivo"
   };
@@ -61,23 +61,23 @@ function formatZodIssue(issue) {
 
       return `El campo ${field} es demasiado largo.`;
     case "invalid_type":
-      return `El campo ${field} tiene un tipo de dato invalido.`;
+      return `El campo ${field} tiene un tipo de dato inválido.`;
     case "invalid_format":
       if (issue.format === "email") {
-        return `El campo ${field} debe ser un correo valido.`;
+        return `El campo ${field} debe ser un correo válido.`;
       }
 
       if (issue.format === "url") {
-        return `El campo ${field} debe ser una URL valida.`;
+        return `El campo ${field} debe ser una URL válida.`;
       }
 
-      return `El campo ${field} tiene un formato invalido.`;
+      return `El campo ${field} tiene un formato inválido.`;
     case "invalid_value":
       return `El campo ${field} contiene un valor no permitido.`;
     case "custom":
-      return issue.message || `El campo ${field} no es valido.`;
+      return issue.message || `El campo ${field} no es válido.`;
     default:
-      return `El campo ${field} no es valido.`;
+      return `El campo ${field} no es válido.`;
   }
 }
 
@@ -86,14 +86,14 @@ export function errorHandler(error, _req, res, _next) {
 
   if (error.name === "ZodError") {
     return res.status(400).json({
-      message: "Datos invalidos.",
+      message: "Datos inválidos.",
       details: error.issues.map((issue) => formatZodIssue(issue))
     });
   }
 
   if (error.name === "ValidationError") {
     return res.status(400).json({
-      message: "Datos invalidos.",
+      message: "Datos inválidos.",
       details: Object.values(error.errors).map((entry) => entry.message)
     });
   }
@@ -106,17 +106,17 @@ export function errorHandler(error, _req, res, _next) {
 
   if (error.name === "JsonWebTokenError") {
     return res.status(401).json({
-      message: "Sesion invalida."
+      message: "Sesión inválida."
     });
   }
 
   if (typeof error.status === "number") {
     return res.status(error.status).json({
-      message: error.message || "Solicitud invalida."
+      message: error.message || "Solicitud inválida."
     });
   }
 
   res.status(500).json({
-    message: "Ocurrio un error interno en el servidor."
+    message: "Ocurrió un error interno en el servidor."
   });
 }

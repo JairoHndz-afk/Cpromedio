@@ -24,8 +24,8 @@ const recentArticleViewsCookieName = "cp_recent_views";
 const publicConsentCookieName = "cp_cookie_preferences";
 const recentArticleViewWindowMs = 1000 * 60 * 45;
 const recentArticleViewLimit = 24;
-const publicSubscriptionAcceptedMessage = "Si el correo es valido, revisa tu bandeja para continuar con el boletin.";
-const publicSubscriptionProcessedMessage = "Si el correo es valido, la suscripcion fue procesada correctamente.";
+const publicSubscriptionAcceptedMessage = "Si el correo es válido, revisa tu bandeja para continuar con el boletín.";
+const publicSubscriptionProcessedMessage = "Si el correo es válido, la suscripción fue procesada correctamente.";
 
 function clampCoverPosition(value, fallback = 50) {
   const numericValue = Number(value);
@@ -202,7 +202,7 @@ async function registerArticleView(req, articleId, now = Date.now()) {
       return false;
     }
 
-    console.error("No fue posible registrar la vista unica del articulo.");
+    console.error("No fue posible registrar la vista única del artículo.");
     console.error(error);
     return false;
   }
@@ -396,7 +396,7 @@ async function rollbackSubscriptionMutation(subscription, previousState, wasExis
       await Subscription.deleteOne({ _id: subscription._id });
     }
   } catch (rollbackError) {
-    console.error("No fue posible revertir la suscripcion tras un fallo de correo.");
+    console.error("No fue posible revertir la suscripción tras un fallo de correo.");
     console.error(rollbackError);
   }
 }
@@ -435,14 +435,14 @@ async function sendConfirmationOrThrow(subscription, tokens) {
   try {
     await sendNewsletterConfirmationEmail(subscription, tokens);
   } catch (error) {
-    console.error("No fue posible enviar el correo de confirmacion del boletin.");
+    console.error("No fue posible enviar el correo de confirmación del boletín.");
     console.error(error);
     const reason = sanitizeText(error?.message ?? "", 220);
     throw createHttpError(
       502,
       reason
-        ? `No fue posible enviar el correo de confirmacion. ${reason}`
-        : "No fue posible enviar el correo de confirmacion. Intenta de nuevo en unos minutos."
+        ? `No fue posible enviar el correo de confirmación. ${reason}`
+        : "No fue posible enviar el correo de confirmación. Intenta de nuevo en unos minutos."
     );
   }
 }
@@ -451,7 +451,7 @@ async function sendWelcomeOrThrow(subscription, tokens) {
   try {
     await sendNewsletterWelcomeEmail(subscription, tokens);
   } catch (error) {
-    console.error("No fue posible enviar el correo de bienvenida del boletin.");
+    console.error("No fue posible enviar el correo de bienvenida del boletín.");
     console.error(error);
     const reason = sanitizeText(error?.message ?? "", 220);
     throw createHttpError(
@@ -467,7 +467,7 @@ async function sendGoodbyeBestEffort(subscription, tokens) {
   try {
     await sendNewsletterGoodbyeEmail(subscription, tokens);
   } catch (error) {
-    console.error("No fue posible enviar el correo de despedida del boletin.");
+    console.error("No fue posible enviar el correo de despedida del boletín.");
     console.error(error);
   }
 }
@@ -907,15 +907,15 @@ export async function confirmPublicSubscription(req, res, next) {
     const subscription = await Subscription.findOne({ confirmationTokenHash: tokenHash });
 
     if (!subscription) {
-      throw createHttpError(404, "El enlace de confirmacion no es valido.");
+      throw createHttpError(404, "El enlace de confirmación no es válido.");
     }
 
     if (subscription.confirmationTokenExpiresAt && subscription.confirmationTokenExpiresAt < new Date()) {
-      throw createHttpError(410, "El enlace de confirmacion ya vencio. Solicita una nueva suscripcion.");
+      throw createHttpError(410, "El enlace de confirmación ya venció. Solicita una nueva suscripción.");
     }
 
     if (subscription.status !== "pending") {
-      throw createHttpError(409, "El enlace de confirmacion ya no esta disponible.");
+      throw createHttpError(409, "El enlace de confirmación ya no está disponible.");
     }
 
     const confirmedAt = new Date();
@@ -941,7 +941,7 @@ export async function confirmPublicSubscription(req, res, next) {
       confirmedAt: subscription.confirmedAt
     });
 
-    res.json(serializeSubscriptionMessage("Suscripcion confirmada. Ya puedes recibir nuevas publicaciones del boletin."));
+    res.json(serializeSubscriptionMessage("Suscripción confirmada. Ya puedes recibir nuevas publicaciones del boletín."));
   } catch (error) {
     next(error);
   }
@@ -954,15 +954,15 @@ export async function reactivatePublicSubscription(req, res, next) {
     const subscription = await Subscription.findOne({ confirmationTokenHash: tokenHash });
 
     if (!subscription) {
-      throw createHttpError(404, "El enlace de reactivacion no es valido.");
+      throw createHttpError(404, "El enlace de reactivación no es válido.");
     }
 
     if (subscription.confirmationTokenExpiresAt && subscription.confirmationTokenExpiresAt < new Date()) {
-      throw createHttpError(410, "El enlace de reactivacion ya vencio. Puedes volver a suscribirte desde la portada.");
+      throw createHttpError(410, "El enlace de reactivación ya venció. Puedes volver a suscribirte desde la portada.");
     }
 
     if (subscription.status !== "cancelled") {
-      throw createHttpError(409, "La suscripcion ya no necesita reactivacion.");
+      throw createHttpError(409, "La suscripción ya no necesita reactivación.");
     }
 
     const reactivatedAt = new Date();
@@ -988,7 +988,7 @@ export async function reactivatePublicSubscription(req, res, next) {
       reactivatedAt
     });
 
-    res.json(serializeSubscriptionMessage("Suscripcion reactivada. Volveras a recibir nuevas publicaciones del boletin."));
+    res.json(serializeSubscriptionMessage("Suscripción reactivada. Volverás a recibir nuevas publicaciones del boletín."));
   } catch (error) {
     next(error);
   }
@@ -1020,7 +1020,7 @@ export async function unsubscribePublicSubscription(req, res, next) {
 
     res.json(
       serializeSubscriptionMessage(
-        "Tu suscripcion fue cancelada correctamente. Si cambias de idea, puedes volver desde el correo de despedida o desde la portada."
+        "Tu suscripción fue cancelada correctamente. Si cambias de idea, puedes volver desde el correo de despedida o desde la portada."
       )
     );
   } catch (error) {

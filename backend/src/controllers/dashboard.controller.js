@@ -147,7 +147,7 @@ async function normalizeArticlePayload(input, currentArticle = null) {
   const { blocks: contentBlocks, paragraphs: body } = sanitizeContentBlocks(contentSource);
 
   if (contentBlocks.length === 0) {
-    const error = new Error("El articulo debe incluir contenido.");
+    const error = new Error("El artículo debe incluir contenido.");
     error.status = 400;
     throw error;
   }
@@ -158,14 +158,14 @@ async function normalizeArticlePayload(input, currentArticle = null) {
 
   if (parsed.categoryId) {
     if (!mongoose.isValidObjectId(parsed.categoryId)) {
-      const error = new Error("La categoria seleccionada no es valida.");
+      const error = new Error("La categoría seleccionada no es válida.");
       error.status = 400;
       throw error;
     }
 
     const category = await Category.findById(parsed.categoryId).select("_id");
     if (!category) {
-      const error = new Error("La categoria seleccionada no existe.");
+      const error = new Error("La categoría seleccionada no existe.");
       error.status = 400;
       throw error;
     }
@@ -271,7 +271,7 @@ async function sendPublishedArticleBulletinSafely(article) {
   try {
     await dispatchPublishedArticleBulletin(article);
   } catch (error) {
-    console.error("No fue posible despachar el boletin de nueva publicacion.");
+    console.error("No fue posible despachar el boletín de nueva publicación.");
     console.error(error);
   }
 }
@@ -574,7 +574,7 @@ export async function submitArticleForReview(req, res, next) {
     }
 
     if (article.status === "review") {
-      return res.status(409).json({ message: "El articulo ya esta en revision." });
+      return res.status(409).json({ message: "El artículo ya está en revisión." });
     }
 
     if (req.user.role !== "admin" && !["draft", "changes_requested", "rejected"].includes(article.status)) {
@@ -617,21 +617,21 @@ export async function deleteDashboardArticle(req, res, next) {
     const article = await Article.findById(req.params.articleId).populate("author");
 
     if (!article) {
-      return res.status(404).json({ message: "Articulo no encontrado." });
+      return res.status(404).json({ message: "Artículo no encontrado." });
     }
 
     if (!canAccessArticle(req.user, article)) {
-      return res.status(403).json({ message: "No puedes eliminar este articulo." });
+      return res.status(403).json({ message: "No puedes eliminar este artículo." });
     }
 
     if (req.user.role !== "admin" && !["draft", "changes_requested", "rejected"].includes(article.status)) {
       return res.status(409).json({
-        message: "Solo el administrador puede enviar a papelera articulos en revision, aprobados, publicados o archivados."
+        message: "Solo el administrador puede enviar a papelera artículos en revisión, aprobados, publicados o archivados."
       });
     }
 
     if (article.deletedAt) {
-      return res.json({ message: "Articulo ya estaba en la papelera editorial." });
+      return res.json({ message: "El artículo ya estaba en la papelera editorial." });
     }
 
     article.deletedAt = new Date();
@@ -659,7 +659,7 @@ export async function deleteDashboardArticle(req, res, next) {
       }
     });
 
-    res.json({ message: "Articulo enviado a papelera editorial." });
+    res.json({ message: "Artículo enviado a papelera editorial." });
   } catch (error) {
     next(error);
   }
@@ -708,7 +708,7 @@ export async function moderateArticle(req, res, next) {
       case "feature":
         if (article.status !== "published") {
           return res.status(409).json({
-            message: "Solo los articulos publicados pueden destacarse en portada."
+            message: "Solo los artículos publicados pueden destacarse en portada."
           });
         }
         article.featured = true;
@@ -982,7 +982,7 @@ export async function deleteUser(req, res, next) {
 
     if (linkedArticles > 0) {
       return res.status(409).json({
-        message: "No puedes eliminar este usuario mientras tenga articulos asociados. Reasignalos o bloquea la cuenta."
+        message: "No puedes eliminar este usuario mientras tenga artículos asociados. Reasígnalos o bloquea la cuenta."
       });
     }
 
@@ -1041,14 +1041,14 @@ export async function changeOwnPassword(req, res, next) {
     const passwordMatches = await bcrypt.compare(payload.currentPassword, user.passwordHash);
     if (!passwordMatches) {
       return res.status(401).json({
-        message: "La contrasena actual no es correcta."
+        message: "La contraseña actual no es correcta."
       });
     }
 
     const samePassword = await bcrypt.compare(payload.nextPassword, user.passwordHash);
     if (samePassword) {
       return res.status(409).json({
-        message: "La nueva contrasena debe ser diferente a la actual."
+        message: "La nueva contraseña debe ser diferente a la actual."
       });
     }
 
@@ -1067,7 +1067,7 @@ export async function changeOwnPassword(req, res, next) {
     });
 
     res.json({
-      message: "Contrasena actualizada."
+      message: "Contraseña actualizada."
     });
   } catch (error) {
     next(error);
@@ -1144,7 +1144,7 @@ export async function updateSubscription(req, res, next) {
     const subscription = await Subscription.findById(req.params.subscriptionId);
 
     if (!subscription) {
-      return res.status(404).json({ message: "Suscripcion no encontrada." });
+      return res.status(404).json({ message: "Suscripción no encontrada." });
     }
 
     subscription.status = payload.status;
@@ -1191,7 +1191,7 @@ export async function deleteSubscription(req, res, next) {
     const subscription = await Subscription.findById(req.params.subscriptionId);
 
     if (!subscription) {
-      return res.status(404).json({ message: "Suscripcion no encontrada." });
+      return res.status(404).json({ message: "Suscripción no encontrada." });
     }
 
     await Subscription.deleteOne({ _id: subscription._id });
@@ -1208,7 +1208,7 @@ export async function deleteSubscription(req, res, next) {
       }
     });
 
-    res.json({ message: "Suscripcion eliminada." });
+    res.json({ message: "Suscripción eliminada." });
   } catch (error) {
     next(error);
   }

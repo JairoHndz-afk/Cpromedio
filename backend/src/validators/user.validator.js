@@ -4,7 +4,7 @@ const passwordSchema = z
   .string()
   .min(10)
   .max(120)
-  .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).+$/, "La contrasena debe incluir mayuscula, minuscula, numero y simbolo.");
+  .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).+$/, "La contraseña debe incluir mayúscula, minúscula, número y símbolo.");
 
 export const userCreateSchema = z.object({
   name: z.string().min(2).max(80),
@@ -36,6 +36,6 @@ export const passwordChangeSchema = z
     confirmPassword: z.string().min(1)
   })
   .refine((value) => value.nextPassword === value.confirmPassword, {
-    message: "La confirmacion no coincide con la nueva contrasena.",
+    message: "La confirmación no coincide con la nueva contraseña.",
     path: ["confirmPassword"]
   });

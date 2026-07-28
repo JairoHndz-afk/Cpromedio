@@ -139,5 +139,5 @@ test("limita intentos repetidos sobre enlaces de confirmar o salir del boletin",
 
   assert.equal(blockedResponse.status, 429);
   const payload = await blockedResponse.json();
-  assert.match(payload.message, /boletin/i);
+  assert.match(payload.message, /bolet[ií]n/i);
 });

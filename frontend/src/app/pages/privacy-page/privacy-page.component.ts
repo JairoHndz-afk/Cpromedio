@@ -141,7 +141,7 @@ export class PrivacyPageComponent {
   constructor() {
     this.seo.setHome({
       title: "Privacidad y cookies | Colombiano Promedio",
-      description: "Aviso tecnico de privacidad, cookies, boletin, sesiones, comunicados temporales y manejo de datos en Colombiano Promedio."
+      description: "Aviso técnico de privacidad, cookies, boletín, sesiones, comunicados temporales y manejo de datos en Colombiano Promedio."
     });
   }
 

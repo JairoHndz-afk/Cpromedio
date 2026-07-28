@@ -849,7 +849,7 @@ test("audita que borrar una nota la envie a papelera editorial y no haga borrado
   assert.equal(response.statusCode, 200);
   assert.equal(hardDeleteCalled, false);
   assert.ok(article.deletedAt instanceof Date);
-  assert.equal(response.payload?.message, "Articulo enviado a papelera editorial.");
+  assert.equal(response.payload?.message, "Artículo enviado a papelera editorial.");
 });
 
 test("audita que limpiar el destacado no intente crear otro registro main cuando la portada apunta a otra nota", async (t) => {

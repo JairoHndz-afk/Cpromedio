@@ -16,7 +16,7 @@ export const authRateLimit = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: {
-    message: "Demasiados intentos de acceso. Intenta de nuevo mas tarde."
+    message: "Demasiados intentos de acceso. Intenta de nuevo más tarde."
   }
 });
 
@@ -26,7 +26,7 @@ export const subscriptionCreateRateLimit = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: {
-    message: "Demasiados intentos de suscripcion. Intenta de nuevo en unos minutos."
+    message: "Demasiados intentos de suscripción. Intenta de nuevo en unos minutos."
   }
 });
 
@@ -36,7 +36,7 @@ export const subscriptionTokenRateLimit = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: {
-    message: "Demasiados intentos sobre enlaces del boletin. Intenta de nuevo en unos minutos."
+    message: "Demasiados intentos sobre enlaces del boletín. Intenta de nuevo en unos minutos."
   }
 });
 

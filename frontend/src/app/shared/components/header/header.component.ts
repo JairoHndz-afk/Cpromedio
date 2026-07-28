@@ -26,7 +26,7 @@ import { BrandMarkComponent } from "../brand-mark/brand-mark.component";
             *ngIf="isCompactViewport"
             class="site-nav-toggle"
             type="button"
-            [attr.aria-label]="menuOpen ? 'Cerrar menu principal' : 'Abrir menu principal'"
+            [attr.aria-label]="menuOpen ? 'Cerrar menú principal' : 'Abrir menú principal'"
             aria-controls="site-nav-panel"
             [attr.aria-expanded]="menuOpen"
             (click)="toggleMenu()"
@@ -96,7 +96,7 @@ import { BrandMarkComponent } from "../brand-mark/brand-mark.component";
         class="site-nav-backdrop"
         type="button"
         *ngIf="isCompactViewport && menuOpen"
-        aria-label="Cerrar menu"
+        aria-label="Cerrar menú"
         (click)="closeMenu()"
       ></button>
     </header>

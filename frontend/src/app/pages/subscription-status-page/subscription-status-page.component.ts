@@ -43,12 +43,12 @@ type SubscriptionState = "idle" | "processing" | "success" | "error";
 
         <div class="subscription-status-steps">
           <div class="feature-note">
-            <p class="eyebrow">1. Validacion</p>
+            <p class="eyebrow">1. Validación</p>
             <h3>El enlace se revisa antes de activar cambios reales.</h3>
           </div>
           <div class="feature-note">
-            <p class="eyebrow">2. Confirmacion</p>
-            <h3>La salida del boletin solo se completa si el lector la aprueba.</h3>
+            <p class="eyebrow">2. Confirmación</p>
+            <h3>La salida del boletín solo se completa si el lector la aprueba.</h3>
           </div>
         </div>
       </aside>
@@ -66,14 +66,14 @@ export class SubscriptionStatusPageComponent {
   private token = "";
 
   state: SubscriptionState = "processing";
-  eyebrow = "Boletin";
+  eyebrow = "Boletín";
   title = "Procesando solicitud";
   message = "Validando tu solicitud editorial.";
   showRetry = false;
   showConfirmExit = false;
 
   constructor() {
-    this.seo.setNoIndex("Estado del boletin | Colombiano Promedio", "Pantalla transaccional para confirmar, reactivar o cancelar una suscripcion.");
+    this.seo.setNoIndex("Estado del boletín | Colombiano Promedio", "Pantalla transaccional para confirmar, reactivar o cancelar una suscripción.");
 
     this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe(() => {
       void this.prepare();
@@ -86,21 +86,21 @@ export class SubscriptionStatusPageComponent {
     }
 
     if (this.state === "error") {
-      return "Accion pendiente";
+      return "Acción pendiente";
     }
 
     if (this.state === "idle") {
-      return "Confirmacion requerida";
+      return "Confirmación requerida";
     }
 
-    return "Proteccion activa";
+    return "Protección activa";
   }
 
   get sideTitle(): string {
     if (this.state === "success") {
       return this.action === "salir"
-        ? "La baja quedo lista y el boletin dejo de usar este correo."
-        : "Tu correo ya quedo dentro del circuito editorial.";
+        ? "La baja quedó lista y el boletín dejó de usar este correo."
+        : "Tu correo ya quedó dentro del circuito editorial.";
     }
 
     if (this.state === "error") {
@@ -108,7 +108,7 @@ export class SubscriptionStatusPageComponent {
     }
 
     if (this.state === "idle") {
-      return "Todavia no se hizo ningun cambio sobre tu suscripcion.";
+      return "Todavía no se hizo ningún cambio sobre tu suscripción.";
     }
 
     return "Estamos verificando el enlace antes de activar cambios.";
@@ -117,23 +117,23 @@ export class SubscriptionStatusPageComponent {
   get sideMessage(): string {
     if (this.state === "success") {
       return this.action === "salir"
-        ? "Tambien deberias recibir un correo de despedida con una opcion para volver cuando quieras."
-        : "A partir de ahora el boletin puede avisarte de nuevas publicaciones sin obligarte a registrarte otra vez.";
+        ? "También deberías recibir un correo de despedida con una opción para volver cuando quieras."
+        : "A partir de ahora el boletín puede avisarte de nuevas publicaciones sin obligarte a registrarte otra vez.";
     }
 
     if (this.state === "error") {
-      return "Si vuelve a fallar, revisa si el enlace vencio o solicita una nueva suscripcion desde la portada.";
+      return "Si vuelve a fallar, revisa si el enlace venció o solicita una nueva suscripción desde la portada.";
     }
 
     if (this.state === "idle") {
-      return "Solo cuando confirmes la salida cancelaremos el boletin y emitiremos el correo de despedida.";
+      return "Solo cuando confirmes la salida cancelaremos el boletín y emitiremos el correo de despedida.";
     }
 
-    return "Este paso evita cambios accidentales y mantiene limpia la lista de lectores del boletin.";
+    return "Este paso evita cambios accidentales y mantiene limpia la lista de lectores del boletín.";
   }
 
   get homeLabel(): string {
-    return this.state === "idle" && this.action === "salir" ? "Conservar suscripcion" : "Volver a portada";
+    return this.state === "idle" && this.action === "salir" ? "Conservar suscripción" : "Volver a portada";
   }
 
   private readError(error: unknown, fallback: string): string {
@@ -163,27 +163,27 @@ export class SubscriptionStatusPageComponent {
 
     if (!token) {
       this.state = "error";
-      this.eyebrow = "Boletin";
+      this.eyebrow = "Boletín";
       this.title = "Enlace incompleto";
-      this.message = "El enlace recibido no incluye un token valido.";
+      this.message = "El enlace recibido no incluye un token válido.";
       this.cdr.markForCheck();
       return;
     }
 
     if (action !== "confirmar" && action !== "reactivar" && action !== "salir") {
       this.state = "error";
-      this.eyebrow = "Boletin";
-      this.title = "Accion no disponible";
-      this.message = "La accion solicitada no existe.";
+      this.eyebrow = "Boletín";
+      this.title = "Acción no disponible";
+      this.message = "La acción solicitada no existe.";
       this.cdr.markForCheck();
       return;
     }
 
     if (action === "salir") {
       this.state = "idle";
-      this.eyebrow = "Confirmacion";
-      this.title = "Quieres cancelar tu suscripcion";
-      this.message = "Todavia no cancelamos nada. Revisa la solicitud y confirma la salida solo si realmente quieres dejar el boletin.";
+      this.eyebrow = "Confirmación";
+      this.title = "¿Quieres cancelar tu suscripción?";
+      this.message = "Todavía no cancelamos nada. Revisa la solicitud y confirma la salida solo si realmente quieres dejar el boletín.";
       this.showConfirmExit = true;
       this.cdr.markForCheck();
       return;
@@ -218,17 +218,17 @@ export class SubscriptionStatusPageComponent {
     this.showConfirmExit = false;
 
     if (this.action === "confirmar") {
-      this.eyebrow = "Confirmacion";
+      this.eyebrow = "Confirmación";
       this.title = "Confirmando tu correo";
-      this.message = "Estamos activando tu boletin editorial.";
+      this.message = "Estamos activando tu boletín editorial.";
     } else if (this.action === "reactivar") {
-      this.eyebrow = "Reactivacion";
-      this.title = "Recuperando tu suscripcion";
-      this.message = "Estamos devolviendo este correo al boletin editorial.";
+      this.eyebrow = "Reactivación";
+      this.title = "Recuperando tu suscripción";
+      this.message = "Estamos devolviendo este correo al boletín editorial.";
     } else {
-      this.eyebrow = "Suscripcion";
-      this.title = "Cancelando tu suscripcion";
-      this.message = "Estamos procesando la salida del boletin.";
+      this.eyebrow = "Suscripción";
+      this.title = "Cancelando tu suscripción";
+      this.message = "Estamos procesando la salida del boletín.";
     }
 
     this.cdr.markForCheck();
@@ -244,20 +244,20 @@ export class SubscriptionStatusPageComponent {
       this.state = "success";
       this.eyebrow =
         this.action === "confirmar"
-          ? "Suscripcion activa"
+          ? "Suscripción activa"
           : this.action === "reactivar"
-            ? "Suscripcion recuperada"
-            : "Suscripcion cancelada";
+            ? "Suscripción recuperada"
+            : "Suscripción cancelada";
       this.title =
         this.action === "confirmar"
           ? "Todo listo"
           : this.action === "reactivar"
-            ? "Boletin reactivado"
+            ? "Boletín reactivado"
             : "Salida completada";
       this.message = response.message;
     } catch (error) {
       this.state = "error";
-      this.eyebrow = this.action === "reactivar" ? "Reactivacion" : this.action === "confirmar" ? "Confirmacion" : "Suscripcion";
+      this.eyebrow = this.action === "reactivar" ? "Reactivación" : this.action === "confirmar" ? "Confirmación" : "Suscripción";
       this.title =
         this.action === "confirmar"
           ? "No fue posible confirmar"
@@ -267,10 +267,10 @@ export class SubscriptionStatusPageComponent {
       this.message = this.readError(
         error,
         this.action === "confirmar"
-          ? "No pudimos activar tu suscripcion en este momento."
+          ? "No pudimos activar tu suscripción en este momento."
           : this.action === "reactivar"
-            ? "No pudimos reactivar tu suscripcion en este momento."
-            : "No pudimos cancelar tu suscripcion en este momento."
+            ? "No pudimos reactivar tu suscripción en este momento."
+            : "No pudimos cancelar tu suscripción en este momento."
       );
       this.showRetry = true;
       this.showConfirmExit = this.action === "salir";

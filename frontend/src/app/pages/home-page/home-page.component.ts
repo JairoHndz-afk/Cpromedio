@@ -21,12 +21,12 @@ import { NewsCardComponent } from "../../shared/components/news-card/news-card.c
           type="text"
           [(ngModel)]="searchTerm"
           name="searchTerm"
-          placeholder="Buscar articulos"
-          aria-label="Buscar articulos"
+          placeholder="Buscar artículos"
+          aria-label="Buscar artículos"
         />
         <button class="button button--secondary" type="submit">Buscar</button>
       </form>
-      <p class="helper-text">Busca por texto o explora por etiquetas y categorias creadas por administracion.</p>
+      <p class="helper-text">Busca por texto o explora por etiquetas y categorías creadas por administración.</p>
       <p class="helper-text helper-text--cold-start" *ngIf="coldStartHintVisible">
         Si es tu primera visita, la carga inicial puede tardar unos segundos mientras despertamos el servidor.
       </p>
@@ -41,7 +41,7 @@ import { NewsCardComponent } from "../../shared/components/news-card/news-card.c
               <p class="eyebrow">{{ homeFeatured.featured ? "Tema del d&iacute;a" : "Lo &uacute;ltimo" }}</p>
               <h1>{{ homeFeatured.title }}</h1>
               <p class="hero-copy">{{ homeFeatured.subtitle || homeFeatured.excerpt }}</p>
-              <a class="button home-focus__cta" [routerLink]="['/articulo', homeFeatured.slug]">Leer articulo completo</a>
+              <a class="button home-focus__cta" [routerLink]="['/articulo', homeFeatured.slug]">Leer artículo completo</a>
             </div>
 
             <ng-container *ngIf="hasVisualCover(homeFeatured); else homeFocusFallback">
@@ -71,8 +71,8 @@ import { NewsCardComponent } from "../../shared/components/news-card/news-card.c
         <ng-template #featuredFallback>
           <div class="home-focus__empty">
             <p class="eyebrow">Portada</p>
-            <h1>La portada estara lista en unos segundos.</h1>
-            <p class="hero-copy">Cuando carguen los articulos publicados, aqui aparecera la historia principal del medio.</p>
+            <h1>La portada estará lista en unos segundos.</h1>
+            <p class="hero-copy">Cuando carguen los artículos publicados, aquí aparecerá la historia principal del medio.</p>
           </div>
         </ng-template>
       </section>
@@ -81,8 +81,8 @@ import { NewsCardComponent } from "../../shared/components/news-card/news-card.c
         <section class="home-rail-card" *ngIf="homeTimeline.length > 0">
           <div class="section-heading section-heading--compact">
             <div>
-              <p class="eyebrow">Ultimas</p>
-              <h3>Lectura rapida</h3>
+              <p class="eyebrow">Últimas</p>
+              <h3>Lectura rápida</h3>
             </div>
           </div>
 
@@ -97,7 +97,7 @@ import { NewsCardComponent } from "../../shared/components/news-card/news-card.c
             <a class="button button--secondary" *ngIf="homeMostRead" [routerLink]="['/articulo', homeMostRead.slug]">
               Mostrar el m&aacute;s le&iacute;do
             </a>
-            <button class="button button--ghost" type="button" (click)="jumpToRecentArticles()">Ver mas noticias</button>
+            <button class="button button--ghost" type="button" (click)="jumpToRecentArticles()">Ver más noticias</button>
           </div>
         </section>
       </aside>
@@ -138,7 +138,7 @@ import { NewsCardComponent } from "../../shared/components/news-card/news-card.c
 
         <section class="feature-strip">
           <article class="feature-note">
-            <p class="eyebrow">Verdad publica</p>
+            <p class="eyebrow">Verdad pública</p>
             <h3 class="feature-note__quote">Estamos aca contra todo pronostico, contra los de siempre.</h3>
             <p class="feature-note__author">Gustavo Petro</p>
           </article>
@@ -160,7 +160,7 @@ import { NewsCardComponent } from "../../shared/components/news-card/news-card.c
           <div class="section-heading">
             <div>
               <p class="eyebrow">Portada reciente</p>
-              <h2>Mas lecturas del archivo cercano</h2>
+              <h2>Más lecturas del archivo cercano</h2>
             </div>
           </div>
 
@@ -168,7 +168,7 @@ import { NewsCardComponent } from "../../shared/components/news-card/news-card.c
             <app-news-card *ngFor="let article of homeRecent" [article]="article" variant="compact"></app-news-card>
           </div>
           <p class="empty-state" *ngIf="loading">Cargando portada...</p>
-          <p class="empty-state" *ngIf="!loading && homeRecent.length === 0">Todavia no hay mas articulos para mostrar.</p>
+          <p class="empty-state" *ngIf="!loading && homeRecent.length === 0">Todavía no hay más artículos para mostrar.</p>
         </section>
       </section>
     </section>
@@ -179,13 +179,13 @@ import { NewsCardComponent } from "../../shared/components/news-card/news-card.c
           type="text"
           [(ngModel)]="searchTerm"
           name="searchTerm"
-          placeholder="Buscar articulos"
-          aria-label="Buscar articulos"
+          placeholder="Buscar artículos"
+          aria-label="Buscar artículos"
         />
         <button class="button button--secondary" type="submit">Buscar</button>
         <button class="button button--ghost" type="button" (click)="clearSearch()">Limpiar</button>
       </form>
-      <p class="helper-text">Busca por texto o explora por etiquetas y categorias creadas por administracion.</p>
+      <p class="helper-text">Busca por texto o explora por etiquetas y categorías creadas por administración.</p>
       <p class="error-text" *ngIf="errorMessage">{{ errorMessage }}</p>
     </section>
 
@@ -200,16 +200,16 @@ import { NewsCardComponent } from "../../shared/components/news-card/news-card.c
       </div>
 
       <div class="tag-row" *ngIf="searchTerm || activeTag || activeCategory">
-        <span class="tag" *ngIf="searchTerm">Busqueda: {{ searchTerm }}</span>
+        <span class="tag" *ngIf="searchTerm">Búsqueda: {{ searchTerm }}</span>
         <span class="tag tag--interactive" *ngIf="activeTag">Etiqueta: {{ humanize(activeTag) }}</span>
-        <span class="tag tag--category" *ngIf="activeCategory">Categoria: {{ humanize(activeCategory) }}</span>
+        <span class="tag tag--category" *ngIf="activeCategory">Categoría: {{ humanize(activeCategory) }}</span>
       </div>
 
       <div class="cards-grid">
         <app-news-card *ngFor="let article of searchResults" [article]="article"></app-news-card>
       </div>
       <p class="empty-state" *ngIf="loading">Actualizando seleccion editorial...</p>
-      <p class="empty-state" *ngIf="searchResults.length === 0 && !loading">No hay articulos publicados para este filtro.</p>
+      <p class="empty-state" *ngIf="searchResults.length === 0 && !loading">No hay artículos publicados para este filtro.</p>
     </section>
   `,
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -243,7 +243,7 @@ export class HomePageComponent {
   activeTag = "";
   activeCategory = "";
   activeResultsTitle = "Selecciones editoriales";
-  activeResultsDescription = "Explora articulos relacionados con el tema actual.";
+  activeResultsDescription = "Explora artículos relacionados con el tema actual.";
   loading = false;
   coldStartHintVisible = false;
   errorMessage = "";
@@ -386,7 +386,7 @@ export class HomePageComponent {
       this.site = site;
       this.searchResults = [];
       this.activeResultsTitle = "Selecciones editoriales";
-      this.activeResultsDescription = "Explora articulos relacionados con el tema actual.";
+      this.activeResultsDescription = "Explora artículos relacionados con el tema actual.";
       this.syncHomeCollections();
       this.seo.setHome({
         description: site.featured?.excerpt || "Lecturas, archivo editorial y nuevas publicaciones en Colombiano Promedio.",
@@ -541,7 +541,7 @@ export class HomePageComponent {
 
   buildResultsTitle(search: string, tag: string, category: string): string {
     if (category) {
-      return `Categoria: ${this.humanize(category)}`;
+      return `Categoría: ${this.humanize(category)}`;
     }
 
     if (tag) {
@@ -557,7 +557,7 @@ export class HomePageComponent {
 
   buildResultsDescription(search: string, tag: string, category: string): string {
     if (category) {
-      return "Mostrando todas las publicaciones asociadas a esta categoria editorial.";
+      return "Mostrando todas las publicaciones asociadas a esta categoría editorial.";
     }
 
     if (tag) {
@@ -565,10 +565,10 @@ export class HomePageComponent {
     }
 
     if (search) {
-      return "Mostrando resultados por coincidencia de titulo, cuerpo y etiquetas.";
+      return "Mostrando resultados por coincidencia de título, cuerpo y etiquetas.";
     }
 
-    return "Explora articulos relacionados con el tema actual.";
+    return "Explora artículos relacionados con el tema actual.";
   }
 
   async subscribe(): Promise<void> {
@@ -592,7 +592,7 @@ export class HomePageComponent {
         plan: "newsletter"
       };
     } catch (error) {
-      this.toast.error(this.readError(error, "No fue posible registrar la suscripcion."));
+      this.toast.error(this.readError(error, "No fue posible registrar la suscripción."));
     } finally {
       this.submittingSubscription = false;
       this.cdr.markForCheck();

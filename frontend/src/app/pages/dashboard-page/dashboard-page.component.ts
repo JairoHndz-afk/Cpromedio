@@ -203,12 +203,12 @@ function createEditorialUploadAdapterPlugin(
       <header class="dashboard-header">
         <div>
           <p class="eyebrow">Panel editorial</p>
-          <h1>{{ currentUser.role === "admin" ? "Moderacion editorial" : "Espacio del periodista" }}</h1>
+          <h1>{{ currentUser.role === "admin" ? "Moderación editorial" : "Espacio del periodista" }}</h1>
           <p class="helper-text">{{ currentUser.name }} | {{ currentUser.email }}</p>
         </div>
 
         <div class="dashboard-header__actions">
-          <button class="button button--secondary" type="button" (click)="startNewArticle()">Nuevo articulo</button>
+          <button class="button button--secondary" type="button" (click)="startNewArticle()">Nuevo artículo</button>
           <button class="button button--ghost" type="button" (click)="selectSection('profile')">Mi perfil</button>
         </div>
       </header>
@@ -216,11 +216,11 @@ function createEditorialUploadAdapterPlugin(
       <div class="dashboard-metrics" *ngIf="overview">
         <div class="metric-tile">
           <strong>{{ overview.metrics.articleCount }}</strong>
-          <span>Articulos</span>
+          <span>Artículos</span>
         </div>
         <div class="metric-tile">
           <strong>{{ overview.metrics.reviewCount }}</strong>
-          <span>En revision</span>
+          <span>En revisión</span>
         </div>
         <div class="metric-tile">
           <strong>{{ overview.metrics.publishedCount }}</strong>
@@ -244,8 +244,8 @@ function createEditorialUploadAdapterPlugin(
       <section class="dashboard-overview dashboard-overview--focused" *ngIf="activeSection === 'overview'">
         <section class="dashboard-panel dashboard-panel--accent dashboard-overview__hero">
           <div class="dashboard-overview__hero-copy">
-            <p class="eyebrow">Vista rapida</p>
-            <h2>Menos ruido, mas foco editorial.</h2>
+            <p class="eyebrow">Vista rápida</p>
+            <h2>Menos ruido, más foco editorial.</h2>
             <p class="panel-subtitle">Consulta el pulso del medio y abre solo el bloque que necesitas en cada momento.</p>
           </div>
 
@@ -256,7 +256,7 @@ function createEditorialUploadAdapterPlugin(
           </div>
 
           <div class="button-row">
-            <button class="button button--secondary" type="button" (click)="selectSection('articles')">Ir a articulos</button>
+            <button class="button button--secondary" type="button" (click)="selectSection('articles')">Ir a artículos</button>
             <button class="button button--ghost" type="button" (click)="selectSection('profile')">Abrir perfil</button>
             <button class="button button--ghost" type="button" *ngIf="currentUser.role === 'admin'" (click)="selectSection('team')">
               Gestionar equipo
@@ -271,7 +271,7 @@ function createEditorialUploadAdapterPlugin(
               <p class="panel-subtitle">{{ overviewPanelSubtitle() }}</p>
             </div>
 
-            <div class="dashboard-overview__switcher" aria-label="Cambiar vista rapida">
+            <div class="dashboard-overview__switcher" aria-label="Cambiar vista rápida">
               <button
                 type="button"
                 class="dashboard-overview__switch"
@@ -286,7 +286,7 @@ function createEditorialUploadAdapterPlugin(
                 [ngClass]="{ 'is-active': activeOverviewPanel === 'top' }"
                 (click)="setActiveOverviewPanel('top')"
               >
-                Mas vistos
+                Más vistos
               </button>
               <button
                 type="button"
@@ -307,18 +307,18 @@ function createEditorialUploadAdapterPlugin(
               (click)="openArticleEditor(article)"
             >
               <strong>{{ article.title }}</strong>
-              <span>{{ formatArticleStatus(article.status) }} | {{ article.author?.name || "Redaccion" }}</span>
+              <span>{{ formatArticleStatus(article.status) }} | {{ article.author?.name || "Redacción" }}</span>
             </button>
-            <p class="empty-state" *ngIf="overviewRecentArticles().length === 0">Todavia no hay actividad editorial.</p>
+            <p class="empty-state" *ngIf="overviewRecentArticles().length === 0">Todavía no hay actividad editorial.</p>
           </div>
 
           <div class="dashboard-list dashboard-overview__list" *ngIf="activeOverviewPanel === 'top'">
             <div class="history-row" *ngFor="let article of overviewTopViewedArticles()">
               <strong>{{ article.title }}</strong>
               <span>{{ article.metrics.views }} vistas | {{ formatArticleStatus(article.status) }}</span>
-              <p>{{ article.author?.name || "Redaccion" }}</p>
+              <p>{{ article.author?.name || "Redacción" }}</p>
             </div>
-            <p class="empty-state" *ngIf="overviewTopViewedArticles().length === 0">Aun no hay suficientes vistas para mostrar tendencia.</p>
+            <p class="empty-state" *ngIf="overviewTopViewedArticles().length === 0">Aún no hay suficientes vistas para mostrar tendencia.</p>
           </div>
 
           <div class="dashboard-overview__account" *ngIf="activeOverviewPanel === 'account'">
@@ -334,7 +334,7 @@ function createEditorialUploadAdapterPlugin(
 
               <div class="dashboard-overview__account-cards">
                 <article class="dashboard-overview__mini">
-                  <strong>Ultimo acceso</strong>
+                  <strong>Último acceso</strong>
                   <span>{{ currentUser.lastLoginAt ? (currentUser.lastLoginAt | date: "short") : "Sin registros" }}</span>
                 </article>
                 <article class="dashboard-overview__mini">
@@ -356,18 +356,18 @@ function createEditorialUploadAdapterPlugin(
         <aside class="dashboard-panel">
           <div class="panel-heading">
             <div>
-              <h2>Articulos</h2>
+              <h2>Artículos</h2>
               <p class="panel-subtitle">Selecciona una pieza o arranca una nueva.</p>
             </div>
             <span class="count-pill">{{ articlePagination.total }}</span>
           </div>
 
           <div class="filter-row">
-            <input type="text" [(ngModel)]="articleSearch" name="articleSearch" placeholder="Buscar por titulo" />
+            <input type="text" [(ngModel)]="articleSearch" name="articleSearch" placeholder="Buscar por título" />
             <select [(ngModel)]="articleStatusFilter" name="articleStatusFilter">
               <option value="">Todos</option>
               <option value="draft">Borrador</option>
-              <option value="review">En revision</option>
+              <option value="review">En revisión</option>
               <option value="changes_requested">Cambios solicitados</option>
               <option value="approved">Aprobado</option>
               <option value="published">Publicado</option>
@@ -386,15 +386,15 @@ function createEditorialUploadAdapterPlugin(
               [class.article-row--active]="selectedArticleId === article.id"
             >
               <strong>{{ article.title }}</strong>
-              <span>{{ formatArticleStatus(article.status) }} | {{ article.author?.name || "Redaccion" }} | {{ article.metrics.views }} vistas</span>
+              <span>{{ formatArticleStatus(article.status) }} | {{ article.author?.name || "Redacción" }} | {{ article.metrics.views }} vistas</span>
             </button>
-            <p class="empty-state" *ngIf="articles.length === 0">No hay articulos para esos filtros.</p>
+            <p class="empty-state" *ngIf="articles.length === 0">No hay artículos para esos filtros.</p>
           </div>
 
           <div class="panel-heading" *ngIf="articlePagination.total > 0">
             <div>
               <p class="helper-text">
-                Pagina {{ articlePagination.page }} de {{ articlePagination.totalPages }} | {{ articlePagination.total }} articulos en total
+                Página {{ articlePagination.page }} de {{ articlePagination.totalPages }} | {{ articlePagination.total }} artículos en total
               </p>
             </div>
             <div class="button-row" *ngIf="articlePagination.totalPages > 1">
@@ -421,7 +421,7 @@ function createEditorialUploadAdapterPlugin(
         <section class="dashboard-panel">
           <div class="panel-heading">
             <div>
-              <h2>{{ selectedArticleId ? "Editar articulo" : "Redactar articulo" }}</h2>
+              <h2>{{ selectedArticleId ? "Editar artículo" : "Redactar artículo" }}</h2>
               <p class="panel-subtitle">Texto, portada, etiquetas y flujo editorial.</p>
             </div>
             <div class="button-row">
@@ -455,7 +455,7 @@ function createEditorialUploadAdapterPlugin(
             <div class="doc-editor__toolbar" role="toolbar" aria-label="Estado del editor">
               <div class="doc-editor__toolbar-group">
                 <span class="helper-text">
-                  Escribe el cuerpo en un solo flujo. El editor admite encabezados, negritas, cursivas, enlaces, citas, imagenes y videos embebidos.
+                  Escribe el cuerpo en un solo flujo. El editor admite encabezados, negritas, cursivas, enlaces, citas, imágenes y videos embebidos.
                 </span>
               </div>
 
@@ -483,7 +483,7 @@ function createEditorialUploadAdapterPlugin(
                     type="text"
                     [(ngModel)]="articleForm.title"
                     name="title"
-                    placeholder="Titulo del articulo"
+                    placeholder="Título del artículo"
                     required
                   />
 
@@ -492,7 +492,7 @@ function createEditorialUploadAdapterPlugin(
                     [(ngModel)]="articleForm.subtitle"
                     name="subtitle"
                     rows="3"
-                    placeholder="Bajada o subtitulo"
+                    placeholder="Bajada o subtítulo"
                   ></textarea>
                 </section>
 
@@ -501,7 +501,7 @@ function createEditorialUploadAdapterPlugin(
                     <div class="doc-cover__header">
                       <div>
                         <p class="eyebrow">Portada principal</p>
-                        <strong>{{ articleForm.coverUrl ? "Portada cargada" : "Carga la imagen principal del articulo" }}</strong>
+                        <strong>{{ articleForm.coverUrl ? "Portada cargada" : "Carga la imagen principal del artículo" }}</strong>
                       </div>
                       <span class="count-pill" *ngIf="articleForm.coverUrl">{{ articleCoverToneLabel() }}</span>
                     </div>
@@ -513,7 +513,7 @@ function createEditorialUploadAdapterPlugin(
                           <option value="image">Imagen</option>
                           <option value="video">Video</option>
                           <option value="audio">Audio</option>
-                          <option value="infographic">Infografia</option>
+                          <option value="infographic">Infografía</option>
                         </select>
                       </label>
 
@@ -566,7 +566,7 @@ function createEditorialUploadAdapterPlugin(
                       <div>
                         <p class="eyebrow">Cuerpo de la noticia</p>
                         <h3>Editor principal</h3>
-                        <p class="panel-subtitle">Redacta como en un procesador de texto y agrega multimedia desde la misma posicion del cursor.</p>
+                        <p class="panel-subtitle">Redacta como en un procesador de texto y agrega multimedia desde la misma posición del cursor.</p>
                       </div>
                     </div>
 
@@ -582,7 +582,7 @@ function createEditorialUploadAdapterPlugin(
 
                     <div class="doc-body-editor__notes">
                       <p class="helper-text">
-                        Usa “Encabezado 2” para intertitulos, “Encabezado 3” para subtitulos internos, “Cita” para destacar frases y “Insertar imagen” o
+                        Usa “Encabezado 2” para intertítulos, “Encabezado 3” para subtítulos internos, “Cita” para destacar frases y “Insertar imagen” o
                         “Insertar contenido multimedia” desde la barra del editor.
                       </p>
                       <button class="button button--ghost" type="button" (click)="applySuggestedPreview()">Generar resumen sugerido</button>
@@ -595,7 +595,7 @@ function createEditorialUploadAdapterPlugin(
                     <div>
                       <p class="eyebrow">Vista previa</p>
                       <h3>Lectura editorial</h3>
-                      <p class="panel-subtitle">Aqui validas la portada, el titular y el ritmo de la lectura antes de publicar.</p>
+                      <p class="panel-subtitle">Aquí validas la portada, el titular y el ritmo de la lectura antes de publicar.</p>
                     </div>
                   </div>
 
@@ -617,7 +617,7 @@ function createEditorialUploadAdapterPlugin(
                       <div>
                         <p class="eyebrow">Cuerpo renderizado</p>
                         <h3>Asi se vera la lectura</h3>
-                        <p class="panel-subtitle">Previsualizacion editorial antes de guardar o enviar a revision.</p>
+                        <p class="panel-subtitle">Previsualización editorial antes de guardar o enviar a revisión.</p>
                       </div>
                     </div>
 
@@ -680,8 +680,8 @@ function createEditorialUploadAdapterPlugin(
                   </section>
                   <ng-template #emptyEditorialPreview>
                     <div class="editor-preview-placeholder">
-                      <strong>La vista previa aparecera cuando empieces a redactar.</strong>
-                      <p>Agrega texto, imagenes o embeds editoriales en Redaccion para revisar aqui el resultado final.</p>
+                      <strong>La vista previa aparecerá cuando empieces a redactar.</strong>
+                      <p>Agrega texto, imágenes o embeds editoriales en Redacción para revisar aquí el resultado final.</p>
                     </div>
                   </ng-template>
                 </section>
@@ -689,21 +689,21 @@ function createEditorialUploadAdapterPlugin(
                 <section class="doc-editor__settings" *ngIf="activeArticleWorkspaceTab === 'publish'">
                   <div class="panel-heading panel-heading--compact">
                     <div>
-                      <h3>Publicacion</h3>
-                      <p class="panel-subtitle">Resumen, etiquetas, categoria y salida editorial.</p>
+                      <h3>Publicación</h3>
+                      <p class="panel-subtitle">Resumen, etiquetas, categoría y salida editorial.</p>
                     </div>
                   </div>
 
                   <div class="doc-editor__settings-grid">
                     <label>
-                      <span>Previsualizacion corta</span>
+                      <span>Previsualización corta</span>
                       <textarea [(ngModel)]="articleForm.excerpt" name="excerpt" rows="4" placeholder="Resumen corto para portada, SEO y compartidos"></textarea>
                     </label>
 
                     <div class="doc-editor__field-group doc-editor__field-group--tags">
                       <label>
                         <span>Etiquetas</span>
-                        <input type="text" [(ngModel)]="articleForm.tags" name="tags" placeholder="actualidad, politica, justicia" />
+                        <input type="text" [(ngModel)]="articleForm.tags" name="tags" placeholder="actualidad, política, justicia" />
                       </label>
                       <div class="doc-editor__tag-suggestions" aria-label="Etiquetas sugeridas para noticias en Colombia">
                         <button
@@ -722,15 +722,15 @@ function createEditorialUploadAdapterPlugin(
                     </div>
 
                     <label>
-                      <span>Categoria opcional</span>
+                      <span>Categoría opcional</span>
                       <select [(ngModel)]="articleForm.categoryId" name="categoryId">
-                        <option value="">Sin categoria</option>
+                        <option value="">Sin categoría</option>
                         <option *ngFor="let category of categories" [value]="category.id">{{ category.name }}</option>
                       </select>
                     </label>
 
                     <div class="doc-editor__field-group doc-editor__field-group--category" *ngIf="suggestedSelectableCategories().length">
-                      <span>Categorias sugeridas</span>
+                      <span>Categorías sugeridas</span>
                       <div class="doc-editor__tag-suggestions">
                         <button
                           type="button"
@@ -748,7 +748,7 @@ function createEditorialUploadAdapterPlugin(
                       <span>Estado</span>
                       <select [(ngModel)]="articleForm.status" name="status">
                         <option value="draft">Borrador</option>
-                        <option value="review">En revision</option>
+                        <option value="review">En revisión</option>
                         <option value="changes_requested">Correcciones</option>
                         <option value="approved">Aprobado</option>
                         <option value="published">Publicado</option>
@@ -769,13 +769,13 @@ function createEditorialUploadAdapterPlugin(
                   </div>
 
                   <div class="editor-note editor-note--warm" *ngIf="currentUser.role !== 'admin' && reviewConfirmationOpen">
-                    <strong>Confirmacion editorial</strong>
-                    <p>La nota se guardara y se enviara a revision final.</p>
+                    <strong>Confirmación editorial</strong>
+                    <p>La nota se guardará y se enviará a revisión final.</p>
                   </div>
 
                   <div class="doc-editor__actions" *ngIf="currentUser.role === 'admin'; else journalistDocActions">
                     <button class="button" type="button" (click)="saveArticle()" [disabled]="savingArticle || uploadingCover || hasUploadingContentBlocks()">
-                      {{ savingArticle ? "Guardando..." : selectedArticleId ? "Guardar cambios" : "Crear articulo" }}
+                      {{ savingArticle ? "Guardando..." : selectedArticleId ? "Guardar cambios" : "Crear artículo" }}
                     </button>
                   </div>
 
@@ -785,7 +785,7 @@ function createEditorialUploadAdapterPlugin(
                         {{ savingArticle ? "Guardando..." : selectedArticleId ? "Guardar borrador" : "Crear borrador" }}
                       </button>
                       <button class="button" type="button" (click)="openReviewConfirmation()" [disabled]="savingArticle || uploadingCover || hasUploadingContentBlocks()">
-                        Enviar a revision
+                        Enviar a revisión
                       </button>
                     </div>
 
@@ -804,7 +804,7 @@ function createEditorialUploadAdapterPlugin(
           </div>
 
           <section class="moderation-panel" *ngIf="currentUser.role === 'admin' && selectedArticleId">
-            <h3>Moderacion</h3>
+            <h3>Moderación</h3>
             <textarea [(ngModel)]="moderationNote" name="moderationNote" rows="3" placeholder="Nota editorial"></textarea>
             <div class="button-row">
               <button class="button button--secondary" type="button" (click)="moderate('approve')">Aprobar</button>
@@ -833,7 +833,7 @@ function createEditorialUploadAdapterPlugin(
           <div class="panel-heading">
             <div>
               <h2>Equipo editorial</h2>
-              <p class="panel-subtitle">Usuarios, roles, accesos y ultimo ingreso.</p>
+              <p class="panel-subtitle">Usuarios, roles, accesos y último ingreso.</p>
             </div>
             <span class="count-pill">{{ usersPagination.total }}</span>
           </div>
@@ -863,16 +863,16 @@ function createEditorialUploadAdapterPlugin(
                 <strong>{{ user.name }}</strong>
                 <span>{{ formatRole(user.role) }} | {{ formatUserStatus(user.status) }}</span>
                 <p>{{ user.email }}</p>
-                <small>Ultimo acceso: {{ user.lastLoginAt ? (user.lastLoginAt | date: "short") : "Sin registros" }}</small>
+                <small>Último acceso: {{ user.lastLoginAt ? (user.lastLoginAt | date: "short") : "Sin registros" }}</small>
               </span>
             </button>
-            <p class="empty-state" *ngIf="users.length === 0">No hay usuarios que coincidan con la busqueda.</p>
+            <p class="empty-state" *ngIf="users.length === 0">No hay usuarios que coincidan con la búsqueda.</p>
           </div>
 
           <div class="panel-heading" *ngIf="usersPagination.total > 0">
             <div>
               <p class="helper-text">
-                Pagina {{ usersPagination.page }} de {{ usersPagination.totalPages }} | {{ usersPagination.total }} usuarios en total
+                Página {{ usersPagination.page }} de {{ usersPagination.totalPages }} | {{ usersPagination.total }} usuarios en total
               </p>
             </div>
             <div class="button-row" *ngIf="usersPagination.totalPages > 1">
@@ -900,7 +900,7 @@ function createEditorialUploadAdapterPlugin(
           <div class="panel-heading">
             <div>
               <h2>{{ userForm.id ? "Editar usuario" : "Crear usuario" }}</h2>
-              <p class="panel-subtitle">La contrasena debe tener 10+ caracteres, mayuscula, minuscula, numero y simbolo.</p>
+              <p class="panel-subtitle">La contraseña debe tener 10+ caracteres, mayúscula, minúscula, número y símbolo.</p>
             </div>
             <button class="button button--ghost" type="button" (click)="resetUserForm()">
               {{ userForm.id ? "Nuevo usuario" : "Limpiar" }}
@@ -915,14 +915,14 @@ function createEditorialUploadAdapterPlugin(
                 [type]="passwordVisibility.user ? 'text' : 'password'"
                 [(ngModel)]="userForm.password"
                 name="userPassword"
-                placeholder="{{ userForm.id ? 'Nueva contrasena opcional' : 'Contrasena segura' }}"
+                placeholder="{{ userForm.id ? 'Nueva contraseña opcional' : 'Contraseña segura' }}"
                 [required]="!userForm.id"
               />
               <button
                 class="password-toggle"
                 [class.is-active]="passwordVisibility.user"
                 type="button"
-                [attr.aria-label]="passwordVisibility.user ? 'Ocultar contrasena' : 'Mostrar contrasena'"
+                [attr.aria-label]="passwordVisibility.user ? 'Ocultar contraseña' : 'Mostrar contraseña'"
                 [attr.aria-pressed]="passwordVisibility.user"
                 (click)="togglePasswordVisibility('user')"
               >
@@ -970,10 +970,10 @@ function createEditorialUploadAdapterPlugin(
         <section class="dashboard-panel">
           <div class="panel-heading">
             <div>
-              <h2>Categorias opcionales</h2>
-              <p class="panel-subtitle">No son obligatorias en la portada, pero el admin puede ordenarlas aqui.</p>
+              <h2>Categorías opcionales</h2>
+              <p class="panel-subtitle">No son obligatorias en la portada, pero el admin puede ordenarlas aquí.</p>
             </div>
-            <button class="button button--ghost" type="button" (click)="resetCategoryForm()">Nueva categoria</button>
+            <button class="button button--ghost" type="button" (click)="resetCategoryForm()">Nueva categoría</button>
           </div>
 
           <form class="stack-form" (ngSubmit)="saveCategory()">
@@ -981,7 +981,7 @@ function createEditorialUploadAdapterPlugin(
             <textarea [(ngModel)]="categoryForm.description" name="categoryDescription" rows="3" placeholder="Descripcion"></textarea>
             <label><input type="checkbox" [(ngModel)]="categoryForm.isActive" name="categoryIsActive" /> Activa</label>
             <div class="doc-editor__field-group">
-              <span>Categorias sugeridas para prensa colombiana</span>
+              <span>Categorías sugeridas para prensa colombiana</span>
               <div class="doc-editor__tag-suggestions">
                 <button
                   type="button"
@@ -1006,7 +1006,7 @@ function createEditorialUploadAdapterPlugin(
           <div class="panel-heading">
             <div>
               <h2>Listado</h2>
-              <p class="panel-subtitle">Categorias disponibles para el flujo editorial.</p>
+              <p class="panel-subtitle">Categorías disponibles para el flujo editorial.</p>
             </div>
             <span class="count-pill">{{ categories.length }}</span>
           </div>
@@ -1016,7 +1016,7 @@ function createEditorialUploadAdapterPlugin(
               <strong>{{ category.name }}</strong>
               <span>{{ category.isActive ? "Activa" : "Inactiva" }}</span>
             </button>
-            <p class="empty-state" *ngIf="categories.length === 0">No hay categorias creadas.</p>
+            <p class="empty-state" *ngIf="categories.length === 0">No hay categorías creadas.</p>
           </div>
         </section>
       </section>
@@ -1026,7 +1026,7 @@ function createEditorialUploadAdapterPlugin(
           <div class="panel-heading">
             <div>
               <h2>Suscripciones</h2>
-              <p class="panel-subtitle">Lectores registrados, confirmaciones y estado editorial del boletin.</p>
+              <p class="panel-subtitle">Lectores registrados, confirmaciones y estado editorial del boletín.</p>
             </div>
             <span class="count-pill">{{ subscriptionsPagination.total }}</span>
           </div>
@@ -1061,7 +1061,7 @@ function createEditorialUploadAdapterPlugin(
           <div class="panel-heading" *ngIf="subscriptionsPagination.total > 0">
             <div>
               <p class="helper-text">
-                Pagina {{ subscriptionsPagination.page }} de {{ subscriptionsPagination.totalPages }} | {{ subscriptionsPagination.total }} suscripciones en total
+                Página {{ subscriptionsPagination.page }} de {{ subscriptionsPagination.totalPages }} | {{ subscriptionsPagination.total }} suscripciones en total
               </p>
             </div>
             <div class="button-row" *ngIf="subscriptionsPagination.totalPages > 1">
@@ -1088,7 +1088,7 @@ function createEditorialUploadAdapterPlugin(
         <section class="dashboard-panel">
           <div class="panel-heading">
             <div>
-              <h2>{{ selectedSubscriptionId ? "Moderar suscripcion" : "Moderacion de audiencia" }}</h2>
+              <h2>{{ selectedSubscriptionId ? "Moderar suscripción" : "Moderación de audiencia" }}</h2>
               <p class="panel-subtitle">Activa, pausa, cancela o elimina registros sin perder visibilidad del historial.</p>
             </div>
             <span class="count-pill">{{ auditEntries.length }}</span>
@@ -1120,17 +1120,17 @@ function createEditorialUploadAdapterPlugin(
 
             <div class="button-row">
               <button class="button" type="button" (click)="saveSubscription()">Guardar estado</button>
-              <button class="button button--ghost" type="button" (click)="deleteSubscription()">Eliminar suscripcion</button>
+              <button class="button button--ghost" type="button" (click)="deleteSubscription()">Eliminar suscripción</button>
             </div>
           </div>
 
           <ng-template #subscriptionPlaceholder>
-            <p class="empty-state">Selecciona una suscripcion para moderarla.</p>
+            <p class="empty-state">Selecciona una suscripción para moderarla.</p>
           </ng-template>
 
           <div class="panel-heading">
             <div>
-              <h2>Registro de auditoria</h2>
+              <h2>Registro de auditoría</h2>
               <p class="panel-subtitle">Trazabilidad de acciones sensibles.</p>
             </div>
           </div>
@@ -1212,12 +1212,12 @@ function createEditorialUploadAdapterPlugin(
 
             <div class="form-grid">
               <label>
-                <span>Texto del boton</span>
+                <span>Texto del botón</span>
                 <input type="text" [(ngModel)]="communicationForm.ctaLabel" name="communicationCtaLabel" placeholder="Leer ahora" />
               </label>
 
               <label>
-                <span>Enlace del boton</span>
+                <span>Enlace del botón</span>
                 <input type="text" [(ngModel)]="communicationForm.ctaUrl" name="communicationCtaUrl" placeholder="/articulo/slug o https://..." />
               </label>
             </div>
@@ -1302,7 +1302,7 @@ function createEditorialUploadAdapterPlugin(
           <div class="panel-heading">
             <div>
               <h2>Tu perfil</h2>
-              <p class="panel-subtitle">Informacion de cuenta, rol y seguridad.</p>
+              <p class="panel-subtitle">Información de cuenta, rol y seguridad.</p>
             </div>
           </div>
 
@@ -1316,7 +1316,7 @@ function createEditorialUploadAdapterPlugin(
           </div>
 
           <div class="history-row">
-            <strong>Ultimo acceso</strong>
+            <strong>Último acceso</strong>
             <span>{{ currentUser.lastLoginAt ? (currentUser.lastLoginAt | date: "short") : "Sin registros" }}</span>
           </div>
         </section>
@@ -1338,8 +1338,8 @@ function createEditorialUploadAdapterPlugin(
         <section class="dashboard-panel">
           <div class="panel-heading">
             <div>
-              <h2>Cambiar contrasena</h2>
-              <p class="panel-subtitle">Usa una clave nueva y mas segura.</p>
+              <h2>Cambiar contraseña</h2>
+              <p class="panel-subtitle">Usa una clave nueva y más segura.</p>
             </div>
             <button class="button button--ghost" type="button" (click)="generateProfilePassword()">Generar segura</button>
           </div>
@@ -1350,14 +1350,14 @@ function createEditorialUploadAdapterPlugin(
                 [type]="passwordVisibility.current ? 'text' : 'password'"
                 [(ngModel)]="passwordForm.currentPassword"
                 name="currentPassword"
-                placeholder="Contrasena actual"
+                placeholder="Contraseña actual"
                 required
               />
               <button
                 class="password-toggle"
                 [class.is-active]="passwordVisibility.current"
                 type="button"
-                [attr.aria-label]="passwordVisibility.current ? 'Ocultar contrasena actual' : 'Mostrar contrasena actual'"
+                [attr.aria-label]="passwordVisibility.current ? 'Ocultar contraseña actual' : 'Mostrar contraseña actual'"
                 [attr.aria-pressed]="passwordVisibility.current"
                 (click)="togglePasswordVisibility('current')"
               >
@@ -1380,14 +1380,14 @@ function createEditorialUploadAdapterPlugin(
                 [type]="passwordVisibility.next ? 'text' : 'password'"
                 [(ngModel)]="passwordForm.nextPassword"
                 name="nextPassword"
-                placeholder="Nueva contrasena"
+                placeholder="Nueva contraseña"
                 required
               />
               <button
                 class="password-toggle"
                 [class.is-active]="passwordVisibility.next"
                 type="button"
-                [attr.aria-label]="passwordVisibility.next ? 'Ocultar nueva contrasena' : 'Mostrar nueva contrasena'"
+                [attr.aria-label]="passwordVisibility.next ? 'Ocultar nueva contraseña' : 'Mostrar nueva contraseña'"
                 [attr.aria-pressed]="passwordVisibility.next"
                 (click)="togglePasswordVisibility('next')"
               >
@@ -1410,14 +1410,14 @@ function createEditorialUploadAdapterPlugin(
                 [type]="passwordVisibility.confirm ? 'text' : 'password'"
                 [(ngModel)]="passwordForm.confirmPassword"
                 name="confirmPassword"
-                placeholder="Confirmar nueva contrasena"
+                placeholder="Confirmar nueva contraseña"
                 required
               />
               <button
                 class="password-toggle"
                 [class.is-active]="passwordVisibility.confirm"
                 type="button"
-                [attr.aria-label]="passwordVisibility.confirm ? 'Ocultar confirmacion de contrasena' : 'Mostrar confirmacion de contrasena'"
+                [attr.aria-label]="passwordVisibility.confirm ? 'Ocultar confirmación de contraseña' : 'Mostrar confirmación de contraseña'"
                 [attr.aria-pressed]="passwordVisibility.confirm"
                 (click)="togglePasswordVisibility('confirm')"
               >
@@ -1435,7 +1435,7 @@ function createEditorialUploadAdapterPlugin(
                 </ng-template>
               </button>
             </div>
-            <button class="button" type="submit">Actualizar contrasena</button>
+            <button class="button" type="submit">Actualizar contraseña</button>
           </form>
         </section>
       </section>
@@ -1449,9 +1449,9 @@ function createEditorialUploadAdapterPlugin(
         (click)="resolveConfirmation(false)"
       >
         <div class="dashboard-confirm__card" (click)="$event.stopPropagation()" (keydown.escape)="resolveConfirmation(false)" tabindex="0">
-          <span class="count-pill count-pill--danger" *ngIf="confirmDialog.tone === 'danger'; else neutralConfirmBadge">Confirmacion</span>
+          <span class="count-pill count-pill--danger" *ngIf="confirmDialog.tone === 'danger'; else neutralConfirmBadge">Confirmación</span>
           <ng-template #neutralConfirmBadge>
-            <span class="count-pill">Confirmacion</span>
+            <span class="count-pill">Confirmación</span>
           </ng-template>
 
           <h2 id="dashboard-confirm-title">{{ confirmDialog.title }}</h2>
@@ -3028,17 +3028,17 @@ export class DashboardPageComponent {
   private readonly sanitizer = inject(DomSanitizer);
 
   private readonly sections: SectionConfig[] = [
-    { id: "overview", label: "Resumen", description: "KPI, actividad y accesos rapidos." },
-    { id: "articles", label: "Articulos", description: "Redaccion, revision y moderacion." },
-    { id: "team", label: "Equipo", description: "Usuarios, roles y contrasenas.", adminOnly: true },
-    { id: "categories", label: "Categorias", description: "Taxonomia opcional del sitio.", adminOnly: true },
-    { id: "audience", label: "Audiencia", description: "Suscripciones y auditoria.", adminOnly: true },
+    { id: "overview", label: "Resumen", description: "KPI, actividad y accesos rápidos." },
+    { id: "articles", label: "Artículos", description: "Redacción, revisión y moderación." },
+    { id: "team", label: "Equipo", description: "Usuarios, roles y contraseñas.", adminOnly: true },
+    { id: "categories", label: "Categorías", description: "Taxonomía opcional del sitio.", adminOnly: true },
+    { id: "audience", label: "Audiencia", description: "Suscripciones y auditoría.", adminOnly: true },
     { id: "communications", label: "Comunicaciones", description: "Avisos modales y ventanas temporales.", adminOnly: true },
     { id: "profile", label: "Perfil", description: "Datos personales y seguridad." }
   ];
   private readonly articleStatusLabels: Record<DashboardArticle["status"], string> = {
     draft: "Borrador",
-    review: "En revision",
+    review: "En revisión",
     changes_requested: "Cambios solicitados",
     approved: "Aprobado",
     published: "Publicado",
@@ -3057,13 +3057,13 @@ export class DashboardPageComponent {
     cancelled: "Cancelada"
   };
   private readonly subscriptionPlanLabels: Record<SubscriptionEntry["plan"], string> = {
-    newsletter: "Boletin",
+    newsletter: "Boletín",
     premium: "Acceso premium"
   };
   private readonly moderationActionLabels: Record<string, string> = {
     created: "Creado",
     updated: "Actualizado",
-    submitted: "Enviado a revision",
+    submitted: "Enviado a revisión",
     approved: "Aprobado",
     changes_requested: "Cambios solicitados",
     published: "Publicado",
@@ -3074,100 +3074,100 @@ export class DashboardPageComponent {
     deleted: "Enviado a papelera"
   };
   private readonly auditActionLabels: Record<string, string> = {
-    "article.created": "Articulo creado",
-    "article.updated": "Articulo actualizado",
-    "article.submitted": "Articulo enviado a revision",
-    "article.deleted": "Articulo eliminado",
-    "article.approve": "Articulo aprobado",
-    "article.request_changes": "Cambios solicitados al articulo",
-    "article.publish": "Articulo publicado",
-    "article.archive": "Articulo archivado",
-    "article.reject": "Articulo rechazado",
-    "article.feature": "Articulo destacado",
-    "article.unfeature": "Destacado retirado del articulo",
-    "category.created": "Categoria creada",
-    "category.updated": "Categoria actualizada",
+    "article.created": "Artículo creado",
+    "article.updated": "Artículo actualizado",
+    "article.submitted": "Artículo enviado a revisión",
+    "article.deleted": "Artículo eliminado",
+    "article.approve": "Artículo aprobado",
+    "article.request_changes": "Cambios solicitados al artículo",
+    "article.publish": "Artículo publicado",
+    "article.archive": "Artículo archivado",
+    "article.reject": "Artículo rechazado",
+    "article.feature": "Artículo destacado",
+    "article.unfeature": "Destacado retirado del artículo",
+    "category.created": "Categoría creada",
+    "category.updated": "Categoría actualizada",
     "user.created": "Usuario creado",
     "user.updated": "Usuario actualizado",
     "user.deleted": "Usuario eliminado",
     "profile.updated": "Perfil actualizado",
-    "profile.password_changed": "Contrasena actualizada",
-    "subscription.updated": "Suscripcion actualizada",
-    "subscription.confirmation_requested": "Correo de confirmacion enviado",
-    "subscription.activated": "Suscripcion activada",
-    "subscription.confirmed": "Suscripcion confirmada",
-    "subscription.reactivated": "Suscripcion reactivada",
-    "subscription.cancelled": "Suscripcion cancelada",
-    "subscription.deleted": "Suscripcion eliminada",
-    "site.communication.updated": "Comunicacion editorial publicada",
-    "site.communication.deleted": "Comunicacion editorial retirada"
+    "profile.password_changed": "Contraseña actualizada",
+    "subscription.updated": "Suscripción actualizada",
+    "subscription.confirmation_requested": "Correo de confirmación enviado",
+    "subscription.activated": "Suscripción activada",
+    "subscription.confirmed": "Suscripción confirmada",
+    "subscription.reactivated": "Suscripción reactivada",
+    "subscription.cancelled": "Suscripción cancelada",
+    "subscription.deleted": "Suscripción eliminada",
+    "site.communication.updated": "Comunicación editorial publicada",
+    "site.communication.deleted": "Comunicación editorial retirada"
   };
   private readonly auditTargetTypeLabels: Record<string, string> = {
-    article: "Articulo",
-    category: "Categoria",
+    article: "Artículo",
+    category: "Categoría",
     user: "Usuario",
-    subscription: "Suscripcion",
+    subscription: "Suscripción",
     site: "Sitio"
   };
   readonly articleSteps: ArticleEditorStepConfig[] = [
-    { id: "body", order: 1, label: "Cuerpo", description: "Parrafos, fotos y videos dentro de la noticia." },
-    { id: "preview", order: 2, label: "Previsualizacion", description: "Resumen corto y portada principal." },
-    { id: "subtitle", order: 3, label: "Subtitulo", description: "Contexto adicional para la lectura." },
-    { id: "title", order: 4, label: "Titulo", description: "Titular final con jerarquia editorial." },
-    { id: "settings", order: 5, label: "Detalle editorial", description: "Etiquetas, categoria y estado." },
-    { id: "review", order: 6, label: "Revision final", description: "Confirmacion antes de publicar o enviar." }
+    { id: "body", order: 1, label: "Cuerpo", description: "Párrafos, fotos y videos dentro de la noticia." },
+    { id: "preview", order: 2, label: "Previsualización", description: "Resumen corto y portada principal." },
+    { id: "subtitle", order: 3, label: "Subtítulo", description: "Contexto adicional para la lectura." },
+    { id: "title", order: 4, label: "Título", description: "Titular final con jerarquía editorial." },
+    { id: "settings", order: 5, label: "Detalle editorial", description: "Etiquetas, categoría y estado." },
+    { id: "review", order: 6, label: "Revisión final", description: "Confirmación antes de publicar o enviar." }
   ];
   readonly articleWorkspaceTabs: ArticleWorkspaceTabConfig[] = [
-    { id: "redaction", label: "Redaccion", description: "Cuerpo principal de la noticia." },
-    { id: "format", label: "Formato", description: "Titulo y bajada editorial." },
+    { id: "redaction", label: "Redacción", description: "Cuerpo principal de la noticia." },
+    { id: "format", label: "Formato", description: "Título y bajada editorial." },
     { id: "media", label: "Multimedia", description: "Portada, carga y enfoque." },
     { id: "preview", label: "Vista previa", description: "Lectura antes de publicar." },
-    { id: "publish", label: "Publicacion", description: "Resumen, etiquetas y salida." }
+    { id: "publish", label: "Publicación", description: "Resumen, etiquetas y salida." }
   ];
   readonly suggestedNewsTags: SuggestedNewsTag[] = [
     { value: "actualidad", label: "Actualidad" },
-    { value: "politica", label: "Politica" },
+    { value: "politica", label: "Política" },
     { value: "gobierno", label: "Gobierno" },
     { value: "congreso", label: "Congreso" },
     { value: "justicia", label: "Justicia" },
-    { value: "economia", label: "Economia" },
+    { value: "economia", label: "Economía" },
     { value: "seguridad", label: "Seguridad" },
     { value: "regiones", label: "Regiones" },
     { value: "deportes", label: "Deportes" },
-    { value: "tecnologia", label: "Tecnologia" }
+    { value: "tecnologia", label: "Tecnología" }
   ];
   readonly suggestedNewsCategories: SuggestedNewsCategory[] = [
     {
       name: "Actualidad",
-      description: "Cobertura inmediata de los hechos que marcan la conversacion publica del dia."
+      description: "Cobertura inmediata de los hechos que marcan la conversación pública del día."
     },
     {
-      name: "Politica",
-      description: "Partidos, liderazgos, debates electorales y decisiones del poder politico."
+      name: "Política",
+      description: "Partidos, liderazgos, debates electorales y decisiones del poder político."
     },
     {
       name: "Gobierno",
-      description: "Acciones del Ejecutivo, ministerios, decretos y gestion institucional."
+      description: "Acciones del Ejecutivo, ministerios, decretos y gestión institucional."
     },
     {
       name: "Justicia",
-      description: "Cortes, fiscalia, procesos judiciales y control de legalidad."
+      description: "Cortes, fiscalía, procesos judiciales y control de legalidad."
     },
     {
-      name: "Economia",
-      description: "Finanzas publicas, empresas, empleo, industria y bolsillo ciudadano."
+      name: "Economía",
+      description: "Finanzas públicas, empresas, empleo, industria y bolsillo ciudadano."
     },
     {
       name: "Regiones",
-      description: "Historias, conflictos y transformaciones fuera del centro politico nacional."
+      description: "Historias, conflictos y transformaciones fuera del centro político nacional."
     },
     {
       name: "Seguridad",
-      description: "Orden publico, conflicto, crimen organizado y proteccion ciudadana."
+      description: "Orden público, conflicto, crimen organizado y protección ciudadana."
     },
     {
       name: "Deportes",
-      description: "Cobertura deportiva nacional e internacional con foco en interes publico."
+      description: "Cobertura deportiva nacional e internacional con foco en interés público."
     },
     {
       name: "Cultura",
@@ -3294,7 +3294,7 @@ export class DashboardPageComponent {
             return [
               "<div class=\"ck-embed-preview ck-embed-preview--tweet\">",
               "<strong>Tweet incrustado</strong>",
-              "<p>Se publicara dentro del articulo como una tarjeta de X/Twitter.</p>",
+              "<p>Se publicará dentro del artículo como una tarjeta de X/Twitter.</p>",
               `<a href="${safeUrl}" target="_blank" rel="noopener noreferrer">${safeUrl}</a>`,
               "</div>"
             ].join("");
@@ -3311,7 +3311,7 @@ export class DashboardPageComponent {
             return [
               "<div class=\"ck-embed-preview ck-embed-preview--instagram\">",
               "<strong>Post de Instagram</strong>",
-              "<p>Se publicara dentro del articulo como una tarjeta incrustada de Instagram.</p>",
+              "<p>Se publicará dentro del artículo como una tarjeta incrustada de Instagram.</p>",
               `<a href="${safeUrl}" target="_blank" rel="noopener noreferrer">${safeUrl}</a>`,
               "</div>"
             ].join("");
@@ -3322,7 +3322,7 @@ export class DashboardPageComponent {
     extraPlugins: [
       createEditorialUploadAdapterPlugin((file) => this.handleEditorImageUpload(file))
     ],
-    placeholder: "Redacta aqui la noticia. Puedes insertar intertitulos, citas, enlaces, imagenes, videos y publicaciones sociales dentro del mismo flujo."
+    placeholder: "Redacta aquí la noticia. Puedes insertar intertítulos, citas, enlaces, imágenes, videos y publicaciones sociales dentro del mismo flujo."
   };
   articleBodyHtml = "<p></p>";
   articleBodyPreviewBlocks: ArticleContentBlock[] = [];
@@ -3418,7 +3418,7 @@ export class DashboardPageComponent {
       return {
         label: "X / Twitter",
         title: "Tweet incrustado",
-        description: "Se mostrara dentro del articulo como una tarjeta editorial de X/Twitter.",
+        description: "Se mostrará dentro del artículo como una tarjeta editorial de X/Twitter.",
         url: tweetUrl
       };
     }
@@ -3429,7 +3429,7 @@ export class DashboardPageComponent {
       return {
         label: "Instagram",
         title: "Post de Instagram",
-        description: "Se mostrara dentro del articulo como una tarjeta incrustada de Instagram.",
+        description: "Se mostrará dentro del artículo como una tarjeta incrustada de Instagram.",
         url: instagramUrl
       };
     }
@@ -3453,7 +3453,7 @@ export class DashboardPageComponent {
 
   overviewPanelTitle(): string {
     if (this.activeOverviewPanel === "top") {
-      return "Mas vistos";
+      return "Más vistos";
     }
 
     if (this.activeOverviewPanel === "account") {
@@ -3465,7 +3465,7 @@ export class DashboardPageComponent {
 
   overviewPanelSubtitle(): string {
     if (this.activeOverviewPanel === "top") {
-      return "Lecturas, traccion y piezas que hoy estan ganando visibilidad.";
+      return "Lecturas, tracción y piezas que hoy están ganando visibilidad.";
     }
 
     if (this.activeOverviewPanel === "account") {
@@ -3624,7 +3624,7 @@ export class DashboardPageComponent {
 
   contentBlockLabel(type: EditorContentBlock["type"]): string {
     if (type === "heading") {
-      return "Titulo";
+      return "Título";
     }
 
     if (type === "quote") {
@@ -3639,7 +3639,7 @@ export class DashboardPageComponent {
       return "Embed";
     }
 
-    return "Parrafo";
+    return "Párrafo";
   }
 
   isVisualCoverType(type: ArticleFormState["coverType"]): boolean {
@@ -3798,7 +3798,7 @@ export class DashboardPageComponent {
     const prefix = `${index + 1}. ${this.contentBlockLabel(block.type)}`;
 
     if (block.type === "heading") {
-      return `${prefix} · ${block.headingText.trim() || "Sin titulo interno"}`;
+      return `${prefix} · ${block.headingText.trim() || "Sin título interno"}`;
     }
 
     if (block.type === "quote") {
@@ -3813,7 +3813,7 @@ export class DashboardPageComponent {
       return `${prefix} · ${block.embedTitle.trim() || this.embedFallbackLabel(block.embedUrl)}`;
     }
 
-    return `${prefix} · ${block.text.trim() || "Parrafo vacio"}`;
+    return `${prefix} · ${block.text.trim() || "Párrafo vacío"}`;
   }
 
   previewBlocks(limit = 5): EditorContentBlock[] {
@@ -3842,7 +3842,7 @@ export class DashboardPageComponent {
     }
 
     const firstHeading = this.articleBodyPreviewBlocks.find((block) => block.type === "heading" && this.extractTextContent(block.heading.text));
-    return firstHeading?.type === "heading" ? this.extractTextContent(firstHeading.heading.text) : "Sin titular todavia";
+    return firstHeading?.type === "heading" ? this.extractTextContent(firstHeading.heading.text) : "Sin titular todavía";
   }
 
   articleDisplaySubtitle(): string {
@@ -3863,7 +3863,7 @@ export class DashboardPageComponent {
     }
 
     const fallback = this.articlePreviewText().trim();
-    return fallback || "La bajada, el resumen corto y la promesa de lectura apareceran aqui.";
+    return fallback || "La bajada, el resumen corto y la promesa de lectura aparecerán aquí.";
   }
 
   articleDisplayCoverUrl(): string {
@@ -3946,7 +3946,7 @@ export class DashboardPageComponent {
       return this.humanizeToken(firstTag);
     }
 
-    return this.selectedArticleId ? "Edicion en curso" : "Borrador nuevo";
+    return this.selectedArticleId ? "Edición en curso" : "Borrador nuevo";
   }
 
   articleCoverToneLabel(): string {
@@ -3963,7 +3963,7 @@ export class DashboardPageComponent {
     }
 
     if (this.articleForm.coverType === "infographic") {
-      return "Portada tipo infografia";
+      return "Portada tipo infografía";
     }
 
     return "Portada en imagen";
@@ -5097,19 +5097,19 @@ export class DashboardPageComponent {
     contentBlocks: Array<Record<string, unknown>>;
   }): string | null {
     if (this.uploadingCover || this.hasUploadingContentBlocks()) {
-      return "Espera a que terminen de subir todas las imagenes antes de guardar el articulo.";
+      return "Espera a que terminen de subir todas las imágenes antes de guardar el artículo.";
     }
 
     if (payload.title.trim().length < 6) {
-      return "El titulo debe tener al menos 6 caracteres.";
+      return "El título debe tener al menos 6 caracteres.";
     }
 
     if (payload.contentBlocks.length === 0) {
-      return "Agrega al menos un parrafo, una cita, una foto o un embed editorial al cuerpo del articulo.";
+      return "Agrega al menos un párrafo, una cita, una foto o un embed editorial al cuerpo del artículo.";
     }
 
     if (payload.excerpt.trim().length < 20) {
-      return "La previsualizacion corta debe tener al menos 20 caracteres o suficiente contexto en el cuerpo para generarla.";
+      return "La previsualización corta debe tener al menos 20 caracteres o suficiente contexto en el cuerpo para generarla.";
     }
 
     return null;
@@ -5146,15 +5146,15 @@ export class DashboardPageComponent {
 
         switch (normalized) {
           case "article":
-            return index === 0 ? "Articulo" : "articulo";
+            return index === 0 ? "Artículo" : "artículo";
           case "profile":
             return index === 0 ? "Perfil" : "perfil";
           case "user":
             return index === 0 ? "Usuario" : "usuario";
           case "subscription":
-            return index === 0 ? "Suscripcion" : "suscripcion";
+            return index === 0 ? "Suscripción" : "suscripción";
           case "category":
-            return index === 0 ? "Categoria" : "categoria";
+            return index === 0 ? "Categoría" : "categoría";
           case "created":
             return "creado";
           case "updated":
@@ -5181,9 +5181,9 @@ export class DashboardPageComponent {
           case "changes":
             return "cambios";
           case "confirmation":
-            return "confirmacion";
+            return "confirmación";
           case "password":
-            return "contrasena";
+            return "contraseña";
           case "changed":
             return "actualizada";
           default:
@@ -5196,11 +5196,11 @@ export class DashboardPageComponent {
   private validateActiveArticleStep(): string | null {
     if (this.activeArticleStep === "body") {
       if (this.hasUploadingContentBlocks()) {
-        return "Espera a que terminen de subir las imagenes del cuerpo antes de continuar.";
+        return "Espera a que terminen de subir las imágenes del cuerpo antes de continuar.";
       }
 
       if (this.buildContentPayload().length === 0) {
-        return "Agrega al menos un parrafo, una cita, una foto o un embed editorial para empezar la noticia.";
+        return "Agrega al menos un párrafo, una cita, una foto o un embed editorial para empezar la noticia.";
       }
 
       return null;
@@ -5214,7 +5214,7 @@ export class DashboardPageComponent {
       const previewText = this.articlePreviewText();
 
       if (previewText.trim().length < 20) {
-        return "La previsualizacion corta aun no tiene suficiente contexto. Ajusta el resumen o agrega mas contenido.";
+        return "La previsualización corta aún no tiene suficiente contexto. Ajusta el resumen o agrega más contenido.";
       }
 
       this.articleForm.excerpt = previewText;
@@ -5223,12 +5223,12 @@ export class DashboardPageComponent {
 
     if (this.activeArticleStep === "title") {
       if (this.articleForm.title.trim().length < 6) {
-        return "Antes de continuar, escribe un titulo con al menos 6 caracteres.";
+        return "Antes de continuar, escribe un título con al menos 6 caracteres.";
       }
     }
 
     if (this.activeArticleStep === "settings" && this.uploadingCover) {
-      return "Espera a que termine de subir la portada antes de ir a la revision final.";
+      return "Espera a que termine de subir la portada antes de ir a la revisión final.";
     }
 
     return null;
@@ -5286,7 +5286,7 @@ export class DashboardPageComponent {
     const allowedTypes = new Set(["image/png", "image/jpeg", "image/webp", "image/gif", "image/avif"]);
 
     if (!allowedTypes.has(file.type)) {
-      throw new Error("Solo puedes cargar imagenes PNG, JPG, WEBP, GIF o AVIF.");
+      throw new Error("Solo puedes cargar imágenes PNG, JPG, WEBP, GIF o AVIF.");
     }
 
     if (file.size > 5 * 1024 * 1024) {
@@ -5425,7 +5425,7 @@ export class DashboardPageComponent {
 
   generateUserPassword(): void {
     this.userForm.password = this.buildStrongPassword();
-    this.notifySuccess("Contrasena segura generada para el formulario de usuario.");
+    this.notifySuccess("Contraseña segura generada para el formulario de usuario.");
     this.cdr.markForCheck();
   }
 
@@ -5433,7 +5433,7 @@ export class DashboardPageComponent {
     const password = this.buildStrongPassword();
     this.passwordForm.nextPassword = password;
     this.passwordForm.confirmPassword = password;
-    this.notifySuccess("Contrasena segura generada para tu perfil. Revisa la actual antes de guardar.");
+    this.notifySuccess("Contraseña segura generada para tu perfil. Revisa la actual antes de guardar.");
     this.cdr.markForCheck();
   }
 
@@ -5563,7 +5563,7 @@ export class DashboardPageComponent {
         this.selectedArticle = current ?? this.selectedArticle;
       }
     } catch (error) {
-      this.notifyError(error, "No fue posible cargar los articulos.");
+      this.notifyError(error, "No fue posible cargar los artículos.");
     } finally {
       this.cdr.markForCheck();
     }
@@ -5836,14 +5836,14 @@ export class DashboardPageComponent {
       this.reviewConfirmationOpen = false;
       this.notifySuccess(
         options.submitForReview && !this.authService.isAdmin()
-          ? (this.selectedArticleId ? "Articulo actualizado y enviado a revision final." : "Articulo creado y enviado a revision final.")
-          : (this.selectedArticleId ? "Articulo actualizado." : "Articulo creado.")
+          ? (this.selectedArticleId ? "Artículo actualizado y enviado a revisión final." : "Artículo creado y enviado a revisión final.")
+          : (this.selectedArticleId ? "Artículo actualizado." : "Artículo creado.")
       );
       await this.loadDashboard();
       const refreshed = this.articles.find((item) => item.id === article.id);
       this.editArticle(refreshed ?? article);
     } catch (error) {
-      this.notifyError(error, "No fue posible guardar el articulo.");
+      this.notifyError(error, "No fue posible guardar el artículo.");
     }
     finally {
       this.savingArticle = false;
@@ -5858,10 +5858,10 @@ export class DashboardPageComponent {
 
     try {
       await this.dashboardApi.submitArticle(this.selectedArticleId);
-      this.notifySuccess("Articulo enviado a revision.");
+      this.notifySuccess("Artículo enviado a revisión.");
       await this.loadDashboard();
     } catch (error) {
-      this.notifyError(error, "No fue posible enviar el articulo a revision.");
+      this.notifyError(error, "No fue posible enviar el artículo a revisión.");
       this.cdr.markForCheck();
     }
   }
@@ -5873,11 +5873,11 @@ export class DashboardPageComponent {
 
     try {
       const updated = await this.dashboardApi.moderateArticle(this.selectedArticleId, action, this.moderationNote);
-      this.notifySuccess(`Accion aplicada: ${action}.`);
+      this.notifySuccess(`Acción aplicada: ${action}.`);
       await this.loadDashboard();
       this.editArticle(updated);
     } catch (error) {
-      this.notifyError(error, "No fue posible aplicar la moderacion.");
+      this.notifyError(error, "No fue posible aplicar la moderación.");
       this.cdr.markForCheck();
     }
   }
@@ -5888,8 +5888,8 @@ export class DashboardPageComponent {
     }
 
     const confirmed = await this.requestConfirmation({
-      title: "Enviar articulo a papelera",
-      message: `El articulo "${this.selectedArticle.title}" se enviara a la papelera editorial y dejara de mostrarse al publico.`,
+      title: "Enviar artículo a papelera",
+      message: `El artículo "${this.selectedArticle.title}" se enviará a la papelera editorial y dejará de mostrarse al público.`,
       confirmLabel: "Enviar a papelera",
       cancelLabel: "Seguir editando",
       tone: "danger"
@@ -5908,7 +5908,7 @@ export class DashboardPageComponent {
       await this.loadDashboard();
       this.notifySuccess(response.message);
     } catch (error) {
-      this.notifyError(error, "No fue posible eliminar el articulo.");
+      this.notifyError(error, "No fue posible eliminar el artículo.");
     } finally {
       this.deletingArticle = false;
       this.cdr.markForCheck();
@@ -5959,7 +5959,7 @@ export class DashboardPageComponent {
     const missingCategories = this.suggestedNewsCategories.filter((category) => !this.isSuggestedCategoryExisting(category.name));
 
     if (missingCategories.length === 0) {
-      this.notifySuccess("Ya tienes cargadas todas las categorias sugeridas.");
+      this.notifySuccess("Ya tienes cargadas todas las categorías sugeridas.");
       return;
     }
 
@@ -5974,9 +5974,9 @@ export class DashboardPageComponent {
 
       this.categories = await this.dashboardApi.getCategories();
       this.overview = await this.dashboardApi.getOverview();
-      this.notifySuccess(`Se crearon ${missingCategories.length} categorias sugeridas.`);
+      this.notifySuccess(`Se crearon ${missingCategories.length} categorías sugeridas.`);
     } catch (error) {
-      this.notifyError(error, "No fue posible crear las categorias sugeridas.");
+      this.notifyError(error, "No fue posible crear las categorías sugeridas.");
     } finally {
       this.cdr.markForCheck();
     }
@@ -5993,9 +5993,9 @@ export class DashboardPageComponent {
       this.resetCategoryForm();
       this.categories = await this.dashboardApi.getCategories();
       this.overview = await this.dashboardApi.getOverview();
-      this.notifySuccess("Categoria guardada.");
+      this.notifySuccess("Categoría guardada.");
     } catch (error) {
-      this.notifyError(error, "No fue posible guardar la categoria.");
+      this.notifyError(error, "No fue posible guardar la categoría.");
     } finally {
       this.cdr.markForCheck();
     }
@@ -6067,7 +6067,7 @@ export class DashboardPageComponent {
 
     const confirmed = await this.requestConfirmation({
       title: "Eliminar usuario editorial",
-      message: `Se eliminara el usuario ${this.userForm.email}. Esta accion no se puede deshacer.`,
+      message: `Se eliminará el usuario ${this.userForm.email}. Esta acción no se puede deshacer.`,
       confirmLabel: "Eliminar usuario",
       cancelLabel: "Cancelar",
       tone: "danger"
@@ -6102,11 +6102,11 @@ export class DashboardPageComponent {
         status: this.subscriptionForm.status
       });
 
-      this.notifySuccess("Suscripcion actualizada.");
+      this.notifySuccess("Suscripción actualizada.");
       await this.loadDashboard();
       this.editSubscription(updated);
     } catch (error) {
-      this.notifyError(error, "No fue posible actualizar la suscripcion.");
+      this.notifyError(error, "No fue posible actualizar la suscripción.");
     } finally {
       this.cdr.markForCheck();
     }
@@ -6118,9 +6118,9 @@ export class DashboardPageComponent {
     }
 
     const confirmed = await this.requestConfirmation({
-      title: "Eliminar suscripcion",
-      message: `Se eliminara la suscripcion de ${this.subscriptionForm.email}. Esta accion no se puede deshacer.`,
-      confirmLabel: "Eliminar suscripcion",
+      title: "Eliminar suscripción",
+      message: `Se eliminará la suscripción de ${this.subscriptionForm.email}. Esta acción no se puede deshacer.`,
+      confirmLabel: "Eliminar suscripción",
       cancelLabel: "Cancelar",
       tone: "danger"
     });
@@ -6136,7 +6136,7 @@ export class DashboardPageComponent {
       await this.loadDashboard();
       this.notifySuccess(response.message);
     } catch (error) {
-      this.notifyError(error, "No fue posible eliminar la suscripcion.");
+      this.notifyError(error, "No fue posible eliminar la suscripción.");
     } finally {
       this.cdr.markForCheck();
     }
@@ -6165,7 +6165,7 @@ export class DashboardPageComponent {
       this.resetPasswordForm();
       this.notifySuccess(response.message);
     } catch (error) {
-      this.notifyError(error, "No fue posible actualizar la contrasena.");
+      this.notifyError(error, "No fue posible actualizar la contraseña.");
     } finally {
       this.cdr.markForCheck();
     }

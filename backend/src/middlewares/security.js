@@ -54,13 +54,13 @@ export function requireTrustedMutation(req, res, next) {
 
   if (fetchSite && !TRUSTED_FETCH_SITES.has(fetchSite)) {
     return res.status(403).json({
-      message: "Solicitud bloqueada por contexto de navegacion no confiable."
+      message: "Solicitud bloqueada por contexto de navegación no confiable."
     });
   }
 
   if (req.get("x-requested-with") !== "XMLHttpRequest") {
     return res.status(403).json({
-      message: "Solicitud bloqueada por proteccion de sesion."
+      message: "Solicitud bloqueada por protección de sesión."
     });
   }
 

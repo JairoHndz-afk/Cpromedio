@@ -68,7 +68,7 @@ async function repairLegacyArticles() {
   }
 
   if (repaired > 0) {
-    console.log(`Articulos reparados: ${repaired}`);
+    console.log(`Artículos reparados: ${repaired}`);
   }
 }
 
@@ -103,15 +103,15 @@ export async function ensureBootstrapUsers(options = {}) {
   }
 
   const starterParagraphs = [
-    "Colombiano Promedio arranca con una edicion base para que portada, detalle y busqueda tengan contenido real desde el primer arranque.",
-    "Desde aqui, el admin puede moderar y publicar nuevas piezas, mientras los periodistas redactan y envian articulos a revision con la consigna de que la dignidad se haga costumbre."
+    "Colombiano Promedio arranca con una edición base para que portada, detalle y búsqueda tengan contenido real desde el primer arranque.",
+    "Desde aquí, el admin puede moderar y publicar nuevas piezas, mientras los periodistas redactan y envían artículos a revisión con la consigna de que la dignidad se haga costumbre."
   ];
 
   await Article.create({
-    title: "Edicion inicial de Colombiano Promedio",
+    title: "Edición inicial de Colombiano Promedio",
     slug: "edicion-inicial-de-colombiano-promedio",
-    subtitle: "Base editorial protegida, identidad renovada y panel listo para produccion.",
-    excerpt: "Esta publicacion de arranque permite validar portada, lectura publica y moderacion bajo la nueva identidad del medio.",
+    subtitle: "Base editorial protegida, identidad renovada y panel listo para producción.",
+    excerpt: "Esta publicación de arranque permite validar portada, lectura pública y moderación bajo la nueva identidad del medio.",
     body: starterParagraphs,
     contentBlocks: starterParagraphs.map((text) => ({
       type: "paragraph",
@@ -124,8 +124,8 @@ export async function ensureBootstrapUsers(options = {}) {
     readingTime: 1,
     publishedAt: new Date(),
     seo: {
-      title: "Edicion inicial de Colombiano Promedio",
-      description: "Articulo de arranque para validar portada, identidad y flujo editorial."
+      title: "Edición inicial de Colombiano Promedio",
+      description: "Artículo de arranque para validar portada, identidad y flujo editorial."
     },
     moderationHistory: [
       {
