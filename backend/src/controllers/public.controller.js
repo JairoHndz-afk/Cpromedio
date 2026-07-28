@@ -6,7 +6,7 @@ import { ArticleView } from "../models/ArticleView.js";
 import { Category } from "../models/Category.js";
 import { writeAuditLog } from "../lib/audit.js";
 import { env } from "../config/env.js";
-import { getMainSiteSetting } from "../lib/site-settings.js";
+import { getActiveSiteCommunication, getMainSiteSetting } from "../lib/site-settings.js";
 import {
   sendNewsletterArticlePublishedEmail,
   sendNewsletterConfirmationEmail,
@@ -579,6 +579,7 @@ async function findNextArticle(currentArticle) {
 export async function getPublicSite(_req, res, next) {
   try {
     const siteSetting = await getMainSiteSetting();
+    const communication = await getActiveSiteCommunication(siteSetting);
 
     const [featured, mostRead, latest] = await Promise.all([
       siteSetting.featuredArticle
@@ -596,7 +597,19 @@ export async function getPublicSite(_req, res, next) {
     res.json({
       featured: featured ? serializeArticle(featured) : latest[0] ? serializeArticle(latest[0]) : null,
       mostRead: mostRead ? serializeArticle(mostRead) : null,
-      latest: latest.map(serializeArticle)
+      latest: latest.map(serializeArticle),
+      communication
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function getPublicCommunication(_req, res, next) {
+  try {
+    const communication = await getActiveSiteCommunication();
+    res.json({
+      communication
     });
   } catch (error) {
     next(error);

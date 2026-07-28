@@ -7,6 +7,7 @@ import {
   PublicArticleDetailPayload,
   PublicAuthorProfilePayload,
   PublicArticleFilters,
+  SiteCommunication,
   SitePayload,
   SubscriptionActionPayload
 } from "../types/api.types";
@@ -18,6 +19,10 @@ export class PublicApiService {
 
   getSite(): Promise<SitePayload> {
     return firstValueFrom(this.http.get<SitePayload>(`${API_BASE_URL}/public/site`));
+  }
+
+  getCommunication(): Promise<{ communication: SiteCommunication | null }> {
+    return firstValueFrom(this.http.get<{ communication: SiteCommunication | null }>(`${API_BASE_URL}/public/communication`));
   }
 
   getArticle(slug: string): Promise<PublicArticleDetailPayload> {

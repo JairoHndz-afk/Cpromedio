@@ -15,6 +15,24 @@ import { NewsCardComponent } from "../../shared/components/news-card/news-card.c
   standalone: true,
   imports: [NgFor, NgIf, RouterLink, NewsCardComponent, FormsModule],
   template: `
+    <section class="search-block home-search-block home-search-block--top" id="archivo-editorial" *ngIf="!filterActive">
+      <form class="search-form" (ngSubmit)="runSearch()">
+        <input
+          type="text"
+          [(ngModel)]="searchTerm"
+          name="searchTerm"
+          placeholder="Buscar articulos"
+          aria-label="Buscar articulos"
+        />
+        <button class="button button--secondary" type="submit">Buscar</button>
+      </form>
+      <p class="helper-text">Busca por texto o explora por etiquetas y categorias creadas por administracion.</p>
+      <p class="helper-text helper-text--cold-start" *ngIf="coldStartHintVisible">
+        Si es tu primera visita, la carga inicial puede tardar unos segundos mientras despertamos el servidor.
+      </p>
+      <p class="error-text" *ngIf="errorMessage">{{ errorMessage }}</p>
+    </section>
+
     <section class="home-stage" *ngIf="!filterActive">
       <section class="home-focus">
         <ng-container *ngIf="homeFeatured; else featuredFallback">
@@ -114,26 +132,6 @@ import { NewsCardComponent } from "../../shared/components/news-card/news-card.c
             </button>
             <p class="helper-text home-newsletter-strip__message" *ngIf="subscriptionMessage">{{ subscriptionMessage }}</p>
           </form>
-        </section>
-
-        <div class="home-stage__stream-divider" aria-hidden="true"></div>
-
-        <section class="search-block home-search-block" id="archivo-editorial">
-          <form class="search-form" (ngSubmit)="runSearch()">
-            <input
-              type="text"
-              [(ngModel)]="searchTerm"
-              name="searchTerm"
-              placeholder="Buscar articulos"
-              aria-label="Buscar articulos"
-            />
-            <button class="button button--secondary" type="submit">Buscar</button>
-          </form>
-          <p class="helper-text">Busca por texto o explora por etiquetas y categorias creadas por administracion.</p>
-          <p class="helper-text helper-text--cold-start" *ngIf="coldStartHintVisible">
-            Si es tu primera visita, la carga inicial puede tardar unos segundos mientras despertamos el servidor.
-          </p>
-          <p class="error-text" *ngIf="errorMessage">{{ errorMessage }}</p>
         </section>
 
         <div class="home-stage__stream-divider" aria-hidden="true"></div>

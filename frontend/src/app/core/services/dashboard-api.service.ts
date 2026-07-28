@@ -10,6 +10,7 @@ import {
   DashboardOverview,
   PaginatedSubscriptions,
   PaginatedUsers,
+  SiteCommunication,
   SubscriptionEntry,
   UploadedImagePayload,
   UserSession
@@ -22,6 +23,26 @@ export class DashboardApiService {
 
   getOverview(): Promise<DashboardOverview> {
     return firstValueFrom(this.http.get<DashboardOverview>(`${API_BASE_URL}/dashboard/overview`));
+  }
+
+  getCommunication(): Promise<{ communication: SiteCommunication | null }> {
+    return firstValueFrom(this.http.get<{ communication: SiteCommunication | null }>(`${API_BASE_URL}/dashboard/communication`));
+  }
+
+  saveCommunication(payload: {
+    eyebrow: string;
+    title: string;
+    message: string;
+    ctaLabel: string;
+    ctaUrl: string;
+    durationPreset: "hours" | "week" | "month";
+    durationHours: number;
+  }): Promise<{ communication: SiteCommunication | null }> {
+    return firstValueFrom(this.http.put<{ communication: SiteCommunication | null }>(`${API_BASE_URL}/dashboard/communication`, payload));
+  }
+
+  deleteCommunication(): Promise<{ message: string }> {
+    return firstValueFrom(this.http.delete<{ message: string }>(`${API_BASE_URL}/dashboard/communication`));
   }
 
   updateProfile(payload: { name: string }): Promise<{ user: UserSession }> {

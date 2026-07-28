@@ -13,6 +13,7 @@ import {
   Category,
   DashboardArticle,
   DashboardOverview,
+  SiteCommunication,
   SubscriptionEntry,
   UserSession
 } from "../../core/types/api.types";
@@ -42,7 +43,7 @@ import {
 } from "ckeditor5";
 import esTranslations from "ckeditor5/translations/es.js";
 
-type DashboardSection = "overview" | "articles" | "team" | "categories" | "audience" | "profile";
+type DashboardSection = "overview" | "articles" | "team" | "categories" | "audience" | "communications" | "profile";
 type OverviewPanel = "recent" | "top" | "account";
 type ArticleWorkspaceTab = "redaction" | "format" | "media" | "preview" | "publish";
 type ArticleEditorStep = "body" | "preview" | "subtitle" | "title" | "settings" | "review";
@@ -50,6 +51,7 @@ type EditorPreviewMode = "article" | "home" | "mobile" | "share";
 type EditorSidebarTab = "document" | "block";
 type BlockTextField = "headingText" | "text" | "quoteText";
 type PasswordFieldKey = "user" | "current" | "next" | "confirm";
+type CommunicationDurationPreset = "hours" | "week" | "month";
 
 interface SectionConfig {
   id: DashboardSection;
@@ -86,6 +88,16 @@ interface ArticleFormState {
   featured: boolean;
   status: "draft" | "review" | "changes_requested" | "approved" | "published" | "archived" | "rejected";
   contentBlocks: EditorContentBlock[];
+}
+
+interface CommunicationFormState {
+  eyebrow: string;
+  title: string;
+  message: string;
+  ctaLabel: string;
+  ctaUrl: string;
+  durationPreset: CommunicationDurationPreset;
+  durationHours: number;
 }
 
 interface EditorContentBlock {
@@ -1072,6 +1084,157 @@ function createEditorialUploadAdapterPlugin(
             </div>
             <p class="empty-state" *ngIf="auditEntries.length === 0">No hay eventos para mostrar.</p>
           </div>
+        </section>
+      </section>
+
+      <section class="dashboard-columns" *ngIf="activeSection === 'communications' && currentUser.role === 'admin'">
+        <section class="dashboard-panel">
+          <div class="panel-heading">
+            <div>
+              <h2>Comunicaciones del sitio</h2>
+              <p class="panel-subtitle">Publica avisos editoriales temporales que se muestren una sola vez por lector y se retiren solos al expirar.</p>
+            </div>
+            <span class="count-pill">{{ communication ? "Activa" : "Sin aviso" }}</span>
+          </div>
+
+          <form class="stack-form" (ngSubmit)="saveCommunication()">
+            <div class="form-grid">
+              <label>
+                <span>R&oacute;tulo</span>
+                <input type="text" [(ngModel)]="communicationForm.eyebrow" name="communicationEyebrow" placeholder="Comunicado editorial" />
+              </label>
+
+              <label>
+                <span>Duraci&oacute;n</span>
+                <select [(ngModel)]="communicationForm.durationPreset" name="communicationDurationPreset">
+                  <option value="hours">Horas personalizadas</option>
+                  <option value="week">Una semana</option>
+                  <option value="month">Un mes</option>
+                </select>
+              </label>
+            </div>
+
+            <label>
+              <span>T&iacute;tulo</span>
+              <input type="text" [(ngModel)]="communicationForm.title" name="communicationTitle" placeholder="Titular del aviso" required />
+            </label>
+
+            <label>
+              <span>Mensaje</span>
+              <textarea
+                [(ngModel)]="communicationForm.message"
+                name="communicationMessage"
+                rows="6"
+                placeholder="Escribe la informaci&oacute;n que quieres mostrar al entrar al sitio."
+                required
+              ></textarea>
+            </label>
+
+            <div class="form-grid" *ngIf="communicationForm.durationPreset === 'hours'">
+              <label>
+                <span>Horas visibles</span>
+                <input type="number" min="1" max="744" [(ngModel)]="communicationForm.durationHours" name="communicationDurationHours" />
+              </label>
+
+              <div class="history-row communication-panel__note">
+                <strong>Caducidad autom&aacute;tica</strong>
+                <span>{{ communicationDurationLabel() }}</span>
+                <p>Al vencer este plazo, el aviso desaparecer&aacute; solo del sitio y del panel.</p>
+              </div>
+            </div>
+
+            <div class="form-grid" *ngIf="communicationForm.durationPreset !== 'hours'">
+              <div class="history-row communication-panel__note communication-panel__note--full">
+                <strong>Caducidad autom&aacute;tica</strong>
+                <span>{{ communicationDurationLabel() }}</span>
+                <p>La redacci&oacute;n puede renovar el aviso; al hacerlo, volver&aacute; a mostrarse una sola vez por lector.</p>
+              </div>
+            </div>
+
+            <div class="form-grid">
+              <label>
+                <span>Texto del boton</span>
+                <input type="text" [(ngModel)]="communicationForm.ctaLabel" name="communicationCtaLabel" placeholder="Leer ahora" />
+              </label>
+
+              <label>
+                <span>Enlace del boton</span>
+                <input type="text" [(ngModel)]="communicationForm.ctaUrl" name="communicationCtaUrl" placeholder="/articulo/slug o https://..." />
+              </label>
+            </div>
+
+            <p class="helper-text">
+              Este aviso se controla con una cookie esencial. Si el lector lo cierra, no vuelve a verlo hasta que publiques una nueva versi&oacute;n.
+            </p>
+
+            <div class="button-row">
+              <button class="button" type="submit" [disabled]="savingCommunication">
+                {{ savingCommunication ? "Guardando..." : (communication ? "Renovar comunicaci&oacute;n" : "Publicar comunicaci&oacute;n") }}
+              </button>
+              <button class="button button--secondary" type="button" (click)="resetCommunicationForm()">Limpiar</button>
+              <button class="button button--ghost" type="button" *ngIf="communication" [disabled]="deletingCommunication" (click)="deleteCommunication()">
+                {{ deletingCommunication ? "Retirando..." : "Retirar del sitio" }}
+              </button>
+            </div>
+          </form>
+        </section>
+
+        <section class="dashboard-panel dashboard-panel--accent">
+          <div class="panel-heading">
+            <div>
+              <h2>Vista previa</h2>
+              <p class="panel-subtitle">As&iacute; se ver&aacute; la ventana editorial al entrar por primera vez o cuando renueves el comunicado.</p>
+            </div>
+          </div>
+
+          <article class="communication-preview-card">
+            <div class="communication-preview-card__topbar">
+              <div class="communication-preview-card__brand">
+                <span class="communication-preview-card__brand-mark" aria-hidden="true"></span>
+                <div>
+                  <p class="eyebrow">{{ communicationForm.eyebrow || "Comunicado editorial" }}</p>
+                  <strong>Comunicaci&oacute;n de portada</strong>
+                </div>
+              </div>
+
+              <span class="count-pill">Preview</span>
+            </div>
+
+            <div class="communication-preview-card__surface">
+              <div class="communication-preview-card__content">
+                <span class="communication-preview-card__label">Se muestra al entrar</span>
+                <h3>{{ communicationPreviewTitle() }}</h3>
+                <p class="communication-preview-card__copy">{{ communicationPreviewMessage() }}</p>
+              </div>
+
+              <aside class="communication-preview-card__rail">
+                <span class="count-pill">1 sola vez</span>
+                <span class="count-pill count-pill--warm">{{ communicationDurationLabel() }}</span>
+              </aside>
+            </div>
+
+            <div class="button-row communication-preview-card__actions">
+              <span class="button" *ngIf="communicationForm.ctaUrl || communicationForm.ctaLabel">{{ communicationForm.ctaLabel || "Leer ahora" }}</span>
+              <span class="button button--ghost">Cerrar</span>
+            </div>
+
+            <p class="helper-text communication-preview-card__helper">
+              Vigencia prevista: {{ communicationExpiryPreview() }}. Este cierre quedar&aacute; recordado en la cookie esencial del sitio.
+            </p>
+          </article>
+
+          <div class="history-row" *ngIf="communication">
+            <strong>Comunicaci&oacute;n activa</strong>
+            <span>{{ communication.title }}</span>
+            <p>
+              Publicada {{ communication.publishedAt ? (communication.publishedAt | date: "short") : "ahora" }} |
+              vence {{ communication.expiresAt | date: "short" }}
+            </p>
+          </div>
+
+          <p class="empty-state" *ngIf="!communication">
+            Cuando publiques una comunicaci&oacute;n, quedar&aacute; activa aqu&iacute; y el sitio la servir&aacute; hasta su fecha de vencimiento.
+          </p>
         </section>
       </section>
 
@@ -2728,6 +2891,7 @@ export class DashboardPageComponent {
     { id: "team", label: "Equipo", description: "Usuarios, roles y contrasenas.", adminOnly: true },
     { id: "categories", label: "Categorias", description: "Taxonomia opcional del sitio.", adminOnly: true },
     { id: "audience", label: "Audiencia", description: "Suscripciones y auditoria.", adminOnly: true },
+    { id: "communications", label: "Comunicaciones", description: "Avisos modales y ventanas temporales.", adminOnly: true },
     { id: "profile", label: "Perfil", description: "Datos personales y seguridad." }
   ];
   private readonly articleStatusLabels: Record<DashboardArticle["status"], string> = {
@@ -2792,13 +2956,16 @@ export class DashboardPageComponent {
     "subscription.confirmed": "Suscripcion confirmada",
     "subscription.reactivated": "Suscripcion reactivada",
     "subscription.cancelled": "Suscripcion cancelada",
-    "subscription.deleted": "Suscripcion eliminada"
+    "subscription.deleted": "Suscripcion eliminada",
+    "site.communication.updated": "Comunicacion editorial publicada",
+    "site.communication.deleted": "Comunicacion editorial retirada"
   };
   private readonly auditTargetTypeLabels: Record<string, string> = {
     article: "Articulo",
     category: "Categoria",
     user: "Usuario",
-    subscription: "Suscripcion"
+    subscription: "Suscripcion",
+    site: "Sitio"
   };
   readonly articleSteps: ArticleEditorStepConfig[] = [
     { id: "body", order: 1, label: "Cuerpo", description: "Parrafos, fotos y videos dentro de la noticia." },
@@ -2835,6 +3002,7 @@ export class DashboardPageComponent {
     totalPages: 1
   };
   categories: Category[] = [];
+  communication: SiteCommunication | null = null;
   users: UserSession[] = [];
   usersPagination = {
     page: 1,
@@ -2860,6 +3028,8 @@ export class DashboardPageComponent {
   subscriptionsSearch = "";
   uploadingCover = false;
   savingArticle = false;
+  savingCommunication = false;
+  deletingCommunication = false;
   reviewConfirmationOpen = false;
   editorPreviewMode: EditorPreviewMode = "article";
   editorSidebarTab: EditorSidebarTab = "document";
@@ -2963,6 +3133,7 @@ export class DashboardPageComponent {
   articleBodyPlainText = "";
 
   articleForm: ArticleFormState = this.emptyArticleForm();
+  communicationForm: CommunicationFormState = this.emptyCommunicationForm();
   categoryForm = {
     id: "",
     name: "",
@@ -3114,6 +3285,45 @@ export class DashboardPageComponent {
 
   overviewTopViewedArticles(): DashboardArticle[] {
     return (this.overview?.topViewedArticles ?? []).slice(0, 4);
+  }
+
+  communicationPreviewTitle(): string {
+    return this.communicationForm.title.trim() || "Titular del comunicado";
+  }
+
+  communicationPreviewMessage(): string {
+    return this.communicationForm.message.trim() || "Aqu\u00ed aparecer\u00e1 el resumen o la noticia breve que quieras destacar al entrar al sitio.";
+  }
+
+  communicationDurationLabel(): string {
+    if (this.communicationForm.durationPreset === "week") {
+      return "Se retirar\u00e1 autom\u00e1ticamente despu\u00e9s de una semana.";
+    }
+
+    if (this.communicationForm.durationPreset === "month") {
+      return "Se retirar\u00e1 autom\u00e1ticamente despu\u00e9s de un mes.";
+    }
+
+    const hours = Math.max(1, Number(this.communicationForm.durationHours || 24));
+    return `Se retirar\u00e1 autom\u00e1ticamente despu\u00e9s de ${hours} hora${hours === 1 ? "" : "s"}.`;
+  }
+
+  communicationExpiryPreview(): string {
+    const durationHours =
+      this.communicationForm.durationPreset === "week"
+        ? 24 * 7
+        : this.communicationForm.durationPreset === "month"
+          ? 24 * 30
+          : Math.max(1, Number(this.communicationForm.durationHours || 24));
+
+    const expiresAt = new Date(Date.now() + durationHours * 60 * 60 * 1000);
+
+    return new Intl.DateTimeFormat("es-CO", {
+      day: "2-digit",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit"
+    }).format(expiresAt);
   }
 
   filteredUsers(): UserSession[] {
@@ -4895,6 +5105,35 @@ export class DashboardPageComponent {
     };
   }
 
+  private emptyCommunicationForm(): CommunicationFormState {
+    return {
+      eyebrow: "Comunicado editorial",
+      title: "",
+      message: "",
+      ctaLabel: "",
+      ctaUrl: "",
+      durationPreset: "hours",
+      durationHours: 24
+    };
+  }
+
+  private mapCommunicationToForm(communication: SiteCommunication): CommunicationFormState {
+    return {
+      eyebrow: communication.eyebrow || "Comunicado editorial",
+      title: communication.title,
+      message: communication.message,
+      ctaLabel: communication.ctaLabel,
+      ctaUrl: communication.ctaUrl,
+      durationPreset:
+        communication.durationHours === 24 * 7
+          ? "week"
+          : communication.durationHours === 24 * 30
+            ? "month"
+            : "hours",
+      durationHours: Math.max(1, Number(communication.durationHours || 24))
+    };
+  }
+
   private resetSubscriptionForm(): void {
     this.selectedSubscriptionId = null;
     this.subscriptionForm = {
@@ -5027,7 +5266,8 @@ export class DashboardPageComponent {
         const [auditEntries] = await Promise.all([
           this.dashboardApi.getAuditLogs(),
           this.loadUsersPage(this.usersPagination.page),
-          this.loadSubscriptionsPage(this.subscriptionsPagination.page)
+          this.loadSubscriptionsPage(this.subscriptionsPagination.page),
+          this.loadCommunication()
         ]);
 
         this.auditEntries = auditEntries;
@@ -5193,6 +5433,87 @@ export class DashboardPageComponent {
     } catch (error) {
       this.notifyError(error, "No fue posible cargar las suscripciones.");
     } finally {
+      this.cdr.markForCheck();
+    }
+  }
+
+  async loadCommunication(): Promise<void> {
+    try {
+      const response = await this.dashboardApi.getCommunication();
+      this.communication = response.communication;
+
+      if (this.communication) {
+        this.communicationForm = this.mapCommunicationToForm(this.communication);
+      } else {
+        this.communicationForm = this.emptyCommunicationForm();
+      }
+    } catch (error) {
+      this.notifyError(error, "No fue posible cargar las comunicaciones del sitio.");
+    } finally {
+      this.cdr.markForCheck();
+    }
+  }
+
+  resetCommunicationForm(): void {
+    this.communicationForm = this.communication ? this.mapCommunicationToForm(this.communication) : this.emptyCommunicationForm();
+    this.cdr.markForCheck();
+  }
+
+  async saveCommunication(): Promise<void> {
+    this.clearStatus();
+    this.savingCommunication = true;
+
+    try {
+      const response = await this.dashboardApi.saveCommunication({
+        eyebrow: this.communicationForm.eyebrow,
+        title: this.communicationForm.title,
+        message: this.communicationForm.message,
+        ctaLabel: this.communicationForm.ctaLabel,
+        ctaUrl: this.communicationForm.ctaUrl,
+        durationPreset: this.communicationForm.durationPreset,
+        durationHours: this.communicationForm.durationHours
+      });
+
+      this.communication = response.communication;
+      this.communicationForm = this.communication ? this.mapCommunicationToForm(this.communication) : this.emptyCommunicationForm();
+      this.notifySuccess("Comunicaci\u00f3n editorial publicada y programada.");
+    } catch (error) {
+      this.notifyError(error, "No fue posible guardar la comunicaci\u00f3n editorial.");
+    } finally {
+      this.savingCommunication = false;
+      this.cdr.markForCheck();
+    }
+  }
+
+  async deleteCommunication(): Promise<void> {
+    if (!this.communication || this.deletingCommunication) {
+      return;
+    }
+
+    const confirmed = await this.requestConfirmation({
+      title: "Retirar comunicaci\u00f3n del sitio",
+      message: `La comunicaci\u00f3n "${this.communication.title}" dejar\u00e1 de mostrarse de inmediato y se eliminar\u00e1 su vigencia actual.`,
+      confirmLabel: "Retirar aviso",
+      cancelLabel: "Mantener activo",
+      tone: "danger"
+    });
+
+    if (!confirmed) {
+      return;
+    }
+
+    this.deletingCommunication = true;
+    this.clearStatus();
+
+    try {
+      const response = await this.dashboardApi.deleteCommunication();
+      this.communication = null;
+      this.communicationForm = this.emptyCommunicationForm();
+      this.notifySuccess(response.message);
+    } catch (error) {
+      this.notifyError(error, "No fue posible retirar la comunicaci\u00f3n editorial.");
+    } finally {
+      this.deletingCommunication = false;
       this.cdr.markForCheck();
     }
   }

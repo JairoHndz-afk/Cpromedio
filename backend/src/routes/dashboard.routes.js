@@ -5,8 +5,10 @@ import {
   createDashboardArticle,
   createUser,
   changeOwnPassword,
+  deleteDashboardCommunication,
   deleteDashboardArticle,
   getDashboardArticle,
+  getDashboardCommunication,
   getDashboardOverview,
   listAuditLogs,
   listDashboardArticles,
@@ -18,6 +20,7 @@ import {
   deleteUser,
   submitArticleForReview,
   updateOwnProfile,
+  updateDashboardCommunication,
   updateCategory,
   updateDashboardArticle,
   updateSubscription,
@@ -32,6 +35,9 @@ const router = Router();
 router.use(attachCurrentUser, requireAuth);
 
 router.get("/overview", getDashboardOverview);
+router.get("/communication", requireRole("admin"), getDashboardCommunication);
+router.put("/communication", requireRole("admin"), updateDashboardCommunication);
+router.delete("/communication", requireRole("admin"), deleteDashboardCommunication);
 router.put("/profile", updateOwnProfile);
 router.put("/profile/password", changeOwnPassword);
 router.post("/uploads/images", uploadImageRateLimit, uploadArticleImage);

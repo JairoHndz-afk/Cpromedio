@@ -6,6 +6,7 @@ import {
   createPublicSubscription,
   getPublicArticle,
   getPublicAuthor,
+  getPublicCommunication,
   getRobotsTxt,
   getSitemapXml,
   getPublicSite,
@@ -17,6 +18,7 @@ import {
 const router = Router();
 
 router.get("/site", getPublicSite);
+router.get("/communication", getPublicCommunication);
 router.get("/articles", listPublicArticles);
 router.get("/articles/:slug", getPublicArticle);
 router.get("/authors/:authorId", getPublicAuthor);

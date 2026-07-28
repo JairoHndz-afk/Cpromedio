@@ -15,9 +15,9 @@ import { ThemeService } from "../../core/services/theme.service";
       <div class="section-heading">
         <div>
           <p class="eyebrow">Privacidad y datos</p>
-          <h1>Cómo tratamos cookies, sesiones, boletines y registros editoriales</h1>
+          <h1>C&oacute;mo tratamos cookies, sesiones, boletines y registros editoriales</h1>
           <p class="hero-copy">
-            Este texto describe el funcionamiento técnico actual de Colombiano Promedio al 26 de julio de 2026. Debe pasar por revisión legal antes de publicarse como política definitiva.
+            Este texto describe el funcionamiento t&eacute;cnico actual de Colombiano Promedio al 28 de julio de 2026. Debe pasar por revisi&oacute;n legal antes de publicarse como pol&iacute;tica definitiva.
           </p>
         </div>
         <div class="button-row">
@@ -28,30 +28,32 @@ import { ThemeService } from "../../core/services/theme.service";
       <section class="policy-card">
         <p class="eyebrow">Resumen operativo</p>
         <div class="policy-list">
-          <p>Tratamos datos de navegación técnica para seguridad, inicio de sesión, boletín y moderación editorial.</p>
+          <p>Tratamos datos de navegaci&oacute;n t&eacute;cnica para seguridad, inicio de sesi&oacute;n, bolet&iacute;n y moderaci&oacute;n editorial.</p>
           <p>No cargamos redes publicitarias ni cookies de terceros para publicidad comportamental.</p>
-          <p>La medición de lecturas con cookie propia solo se activa si autorizas esa categoría.</p>
-          <p>La preferencia de tema claro/oscuro solo se recuerda si autorizas almacenamiento de preferencias.</p>
+          <p>La medici&oacute;n de lecturas con cookie propia solo se activa si autorizas esa categor&iacute;a.</p>
+          <p>La preferencia de tema claro u oscuro solo se recuerda si autorizas almacenamiento de preferencias.</p>
+          <p>Los comunicados editoriales pueden recordar si ya cerraste una ventana activa usando una cookie esencial renovable por versi&oacute;n.</p>
         </div>
       </section>
 
       <div class="policy-grid">
         <section class="policy-card">
-          <p class="eyebrow">Datos que sí usamos</p>
+          <p class="eyebrow">Datos que s&iacute; usamos</p>
           <div class="policy-list">
-            <p><strong>Navegación pública:</strong> IP, agente del navegador, idioma, origen y referencia para proteger formularios, limitar abuso y servir el sitio.</p>
-            <p><strong>Sesión editorial:</strong> correo, nombre, rol, estado, último acceso y auditoría de acciones dentro del panel.</p>
-            <p><strong>Boletín:</strong> nombre, correo, estado de suscripción y tokens temporales de confirmación o salida.</p>
-            <p><strong>Moderación y seguridad:</strong> registros de auditoría, intentos de acceso y cambios editoriales asociados a usuarios autenticados.</p>
+            <p><strong>Navegaci&oacute;n p&uacute;blica:</strong> IP, agente del navegador, idioma, origen y referencia para proteger formularios, limitar abuso y servir el sitio.</p>
+            <p><strong>Sesi&oacute;n editorial:</strong> correo, nombre, rol, estado, &uacute;ltimo acceso y auditor&iacute;a de acciones dentro del panel.</p>
+            <p><strong>Bolet&iacute;n:</strong> nombre, correo, estado de suscripci&oacute;n y tokens temporales de confirmaci&oacute;n o salida.</p>
+            <p><strong>Moderaci&oacute;n y seguridad:</strong> registros de auditor&iacute;a, intentos de acceso y cambios editoriales asociados a usuarios autenticados.</p>
           </div>
         </section>
 
         <section class="policy-card">
           <p class="eyebrow">Cookies y almacenamiento</p>
           <div class="policy-list">
-            <p><strong><code>periodico_session</code>:</strong> cookie HttpOnly de autenticación editorial. Es esencial y no se expone a JavaScript. Su nombre puede variar por configuración de producción.</p>
-            <p><strong><code>cp_cookie_preferences</code>:</strong> guarda tu elección de privacidad por 180 días para no volver a preguntarte lo mismo en cada visita.</p>
-            <p><strong><code>cp_recent_views</code>:</strong> cookie propia de medición. Solo se usa si aceptas medición editorial y evita contar varias veces la misma lectura en una ventana aproximada de 45 minutos.</p>
+            <p><strong><code>periodico_session</code>:</strong> cookie HttpOnly de autenticaci&oacute;n editorial. Es esencial y no se expone a JavaScript. Su nombre puede variar por configuraci&oacute;n de producci&oacute;n.</p>
+            <p><strong><code>cp_cookie_preferences</code>:</strong> guarda tu elecci&oacute;n de privacidad por 180 d&iacute;as para no volver a preguntarte lo mismo en cada visita.</p>
+            <p><strong><code>cp_recent_views</code>:</strong> cookie propia de medici&oacute;n. Solo se usa si aceptas medici&oacute;n editorial y evita contar varias veces la misma lectura en una ventana aproximada de 45 minutos.</p>
+            <p><strong><code>cp_editorial_notice</code>:</strong> cookie esencial que recuerda si ya cerraste un comunicado editorial activo. Solo vuelve a mostrarse si la redacci&oacute;n publica una nueva versi&oacute;n o renueva la comunicaci&oacute;n.</p>
             <p><strong><code>periodico-theme</code>:</strong> almacenamiento local opcional para recordar si prefieres modo claro u oscuro.</p>
           </div>
         </section>
@@ -60,20 +62,22 @@ import { ThemeService } from "../../core/services/theme.service";
           <p class="eyebrow">Finalidades reales</p>
           <div class="policy-list">
             <p>Autenticar administradores y periodistas.</p>
-            <p>Proteger formularios y mutaciones contra abuso, origen no permitido y automatización agresiva.</p>
-            <p>Enviar y confirmar suscripciones al boletín.</p>
+            <p>Proteger formularios y mutaciones contra abuso, origen no permitido y automatizaci&oacute;n agresiva.</p>
+            <p>Enviar y confirmar suscripciones al bolet&iacute;n.</p>
             <p>Medir lecturas de manera propia sin inflar vistas, solo cuando hay consentimiento para ello.</p>
+            <p>Mostrar comunicaciones editoriales temporales y recordar si ya fueron cerradas por el lector.</p>
             <p>Conservar trazabilidad editorial y de seguridad dentro del dashboard.</p>
           </div>
         </section>
 
         <section class="policy-card">
-          <p class="eyebrow">Conservación y control</p>
+          <p class="eyebrow">Conservaci&oacute;n y control</p>
           <div class="policy-list">
-            <p>La cookie de sesión expira según la configuración del backend y se elimina al cerrar sesión.</p>
-            <p>La preferencia de privacidad permanece por 180 días o hasta que vuelvas a cambiarla.</p>
-            <p>Puedes salir del boletín desde el enlace incluido en cada correo.</p>
-            <p>Las estadísticas editoriales y registros de auditoría se conservan para operación, seguridad y revisión interna del medio.</p>
+            <p>La cookie de sesi&oacute;n expira seg&uacute;n la configuraci&oacute;n del backend y se elimina al cerrar sesi&oacute;n.</p>
+            <p>La preferencia de privacidad permanece por 180 d&iacute;as o hasta que vuelvas a cambiarla.</p>
+            <p>La memoria del comunicado editorial dura hasta que expire la pieza activa o sea reemplazada por una nueva versi&oacute;n.</p>
+            <p>Puedes salir del bolet&iacute;n desde el enlace incluido en cada correo.</p>
+            <p>Las estad&iacute;sticas editoriales y registros de auditor&iacute;a se conservan para operaci&oacute;n, seguridad y revisi&oacute;n interna del medio.</p>
           </div>
         </section>
       </div>
@@ -85,7 +89,7 @@ import { ThemeService } from "../../core/services/theme.service";
             <input type="checkbox" [checked]="true" disabled />
             <span>
               <strong>Esenciales</strong>
-              <small>Seguridad, sesión, cierre de sesión y preferencia de privacidad.</small>
+              <small>Seguridad, sesi&oacute;n, cierre de sesi&oacute;n, preferencia de privacidad y memoria de comunicados editoriales.</small>
             </span>
           </label>
 
@@ -100,7 +104,7 @@ import { ThemeService } from "../../core/services/theme.service";
           <label class="cookie-toggle">
             <input type="checkbox" [(ngModel)]="measurementAllowed" name="policyMeasurementAllowed" />
             <span>
-              <strong>Medición editorial</strong>
+              <strong>Medici&oacute;n editorial</strong>
               <small>Permite contar lecturas con cookie propia y sin terceros de publicidad.</small>
             </span>
           </label>
@@ -108,18 +112,18 @@ import { ThemeService } from "../../core/services/theme.service";
 
         <div class="button-row">
           <button class="button" type="button" (click)="acceptAll()">Aceptar todo</button>
-          <button class="button button--secondary" type="button" (click)="saveCustom()">Guardar selección</button>
+          <button class="button button--secondary" type="button" (click)="saveCustom()">Guardar selecci&oacute;n</button>
           <button class="button button--ghost" type="button" (click)="acceptEssentialOnly()">Solo esenciales</button>
         </div>
       </section>
 
       <section class="policy-card">
-        <p class="eyebrow">Referencias oficiales para revisión</p>
+        <p class="eyebrow">Referencias oficiales para revisi&oacute;n</p>
         <div class="policy-list">
-          <p>Ley 1581 de 2012, régimen general de protección de datos personales en Colombia.</p>
-          <p>Decreto 1377 de 2013 y compilación reglamentaria en el Decreto 1074 de 2015.</p>
+          <p>Ley 1581 de 2012, r&eacute;gimen general de protecci&oacute;n de datos personales en Colombia.</p>
+          <p>Decreto 1377 de 2013 y compilaci&oacute;n reglamentaria en el Decreto 1074 de 2015.</p>
           <p>Lineamientos y conceptos de la Superintendencia de Industria y Comercio sobre finalidad, aviso de privacidad y tratamiento de datos personales.</p>
-          <p>Este aviso cubre boletín, cuentas editoriales, seguridad, auditoría y navegación técnica del sitio; no reemplaza revisión jurídica formal antes de producción.</p>
+          <p>Este aviso cubre bolet&iacute;n, cuentas editoriales, seguridad, auditor&iacute;a, navegaci&oacute;n t&eacute;cnica y comunicados temporales del sitio; no reemplaza revisi&oacute;n jur&iacute;dica formal antes de producci&oacute;n.</p>
         </div>
       </section>
     </section>
@@ -137,7 +141,7 @@ export class PrivacyPageComponent {
   constructor() {
     this.seo.setHome({
       title: "Privacidad y cookies | Colombiano Promedio",
-      description: "Aviso técnico de privacidad, cookies, boletín, sesiones y manejo de datos en Colombiano Promedio."
+      description: "Aviso tecnico de privacidad, cookies, boletin, sesiones, comunicados temporales y manejo de datos en Colombiano Promedio."
     });
   }
 

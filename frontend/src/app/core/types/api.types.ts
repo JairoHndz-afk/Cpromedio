@@ -133,10 +133,23 @@ export interface DashboardArticle extends PublicArticle {
   }>;
 }
 
+export interface SiteCommunication {
+  eyebrow: string;
+  title: string;
+  message: string;
+  ctaLabel: string;
+  ctaUrl: string;
+  durationHours: number;
+  publishedAt: string | null;
+  expiresAt: string;
+  version: string;
+}
+
 export interface SitePayload {
   featured: PublicArticle | null;
   mostRead: PublicArticle | null;
   latest: PublicArticle[];
+  communication: SiteCommunication | null;
 }
 
 export interface PaginationMeta {

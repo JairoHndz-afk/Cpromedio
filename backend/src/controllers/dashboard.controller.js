@@ -4,7 +4,14 @@ import mongoose from "mongoose";
 import { buildCookieOptions, signAuthToken } from "../lib/auth.js";
 import { writeAuditLog } from "../lib/audit.js";
 import { dispatchPublishedArticleBulletin } from "./public.controller.js";
-import { clearFeaturedArticleSelection, setFeaturedArticleSelection } from "../lib/site-settings.js";
+import {
+  clearFeaturedArticleSelection,
+  clearSiteCommunication,
+  getActiveSiteCommunication,
+  saveSiteCommunication,
+  serializeSiteCommunication,
+  setFeaturedArticleSelection
+} from "../lib/site-settings.js";
 import { Article } from "../models/Article.js";
 import { AuditLog } from "../models/AuditLog.js";
 import { Category } from "../models/Category.js";
@@ -14,6 +21,7 @@ import { calculateReadingTime, isValidUrl, paragraphBlocksFromBody, sanitizeCont
 import { readBoundedPositiveInt } from "../utils/request.js";
 import { articleInputSchema, moderationSchema } from "../validators/article.validator.js";
 import { categoryInputSchema } from "../validators/category.validator.js";
+import { communicationInputSchema } from "../validators/site-setting.validator.js";
 import { passwordChangeSchema, profileUpdateSchema, subscriptionUpdateSchema, userCreateSchema, userUpdateSchema } from "../validators/user.validator.js";
 
 function clampCoverPosition(value, fallback = 50) {
@@ -227,6 +235,38 @@ function escapeRegexLiteral(value) {
   return String(value ?? "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+function buildCommunicationDurationHours(preset, hours) {
+  if (preset === "week") {
+    return 24 * 7;
+  }
+
+  if (preset === "month") {
+    return 24 * 30;
+  }
+
+  return Math.min(24 * 31, Math.max(1, Number(hours ?? 24)));
+}
+
+function normalizeCommunicationPayload(input) {
+  const parsed = communicationInputSchema.parse(input);
+  const publishedAt = new Date();
+  const durationHours = buildCommunicationDurationHours(parsed.durationPreset, parsed.durationHours);
+  const expiresAt = new Date(publishedAt.getTime() + durationHours * 60 * 60 * 1000);
+  const ctaUrl = sanitizeText(parsed.ctaUrl ?? "", 500);
+
+  return {
+    eyebrow: sanitizeText(parsed.eyebrow ?? "", 60) || "Comunicado editorial",
+    title: sanitizeText(parsed.title, 140),
+    message: sanitizeText(parsed.message, 1200),
+    ctaLabel: sanitizeText(parsed.ctaLabel ?? "", 40) || (ctaUrl ? "Leer ahora" : ""),
+    ctaUrl,
+    durationHours,
+    publishedAt,
+    expiresAt,
+    version: `comm-${publishedAt.getTime()}`
+  };
+}
+
 async function sendPublishedArticleBulletinSafely(article) {
   try {
     await dispatchPublishedArticleBulletin(article);
@@ -274,6 +314,62 @@ export async function getDashboardOverview(req, res, next) {
       },
       recentArticles: recentArticles.map(serializeArticle),
       topViewedArticles: topViewedArticles.map(serializeArticle)
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function getDashboardCommunication(_req, res, next) {
+  try {
+    const communication = await getActiveSiteCommunication();
+    res.json({
+      communication
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function updateDashboardCommunication(req, res, next) {
+  try {
+    const communication = normalizeCommunicationPayload(req.body);
+    const siteSetting = await saveSiteCommunication(communication);
+
+    await writeAuditLog(req, {
+      actor: req.user,
+      action: "site.communication.updated",
+      targetType: "site",
+      targetId: siteSetting._id.toString(),
+      details: {
+        title: communication.title,
+        expiresAt: communication.expiresAt.toISOString(),
+        durationHours: communication.durationHours
+      }
+    });
+
+    res.json({
+      communication: serializeSiteCommunication(siteSetting.communication)
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function deleteDashboardCommunication(req, res, next) {
+  try {
+    const siteSetting = await clearSiteCommunication();
+
+    await writeAuditLog(req, {
+      actor: req.user,
+      action: "site.communication.deleted",
+      targetType: "site",
+      targetId: siteSetting._id.toString(),
+      details: {}
+    });
+
+    res.json({
+      message: "La comunicación editorial fue retirada."
     });
   } catch (error) {
     next(error);

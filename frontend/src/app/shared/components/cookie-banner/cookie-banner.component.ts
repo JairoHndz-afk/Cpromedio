@@ -14,9 +14,9 @@ import { ThemeService } from "../../../core/services/theme.service";
     <section class="cookie-banner" *ngIf="isVisible()">
       <div class="cookie-banner__content">
         <p class="eyebrow">Privacidad y cookies</p>
-        <h2>Usamos solo lo necesario para operar el medio y medir lecturas si tú lo autorizas.</h2>
+        <h2>Usamos solo lo necesario para operar el medio y medir lecturas si t&uacute; lo autorizas.</h2>
         <p class="helper-text">
-          Este sitio usa una cookie de sesión editorial, una preferencia de privacidad y, si la aceptas, medición propia de lecturas y memoria del tema visual.
+          Este sitio usa una cookie de sesi&oacute;n editorial, una preferencia de privacidad, una memoria esencial para no repetirte comunicados ya cerrados y, si la aceptas, medici&oacute;n propia de lecturas y memoria del tema visual.
         </p>
 
         <div class="cookie-banner__toggles" *ngIf="showSettings">
@@ -24,7 +24,7 @@ import { ThemeService } from "../../../core/services/theme.service";
             <input type="checkbox" [checked]="true" disabled />
             <span>
               <strong>Esenciales</strong>
-              <small>Inicio de sesión, seguridad, cierre de sesión y tu elección de privacidad.</small>
+              <small>Inicio de sesi&oacute;n, seguridad, cierre de sesi&oacute;n, tu elecci&oacute;n de privacidad y memoria de comunicados editoriales cerrados.</small>
             </span>
           </label>
 
@@ -39,8 +39,8 @@ import { ThemeService } from "../../../core/services/theme.service";
           <label class="cookie-toggle">
             <input type="checkbox" [(ngModel)]="measurementAllowed" name="measurementAllowed" />
             <span>
-              <strong>Medición editorial</strong>
-              <small>Permite contar vistas únicas con una cookie propia para no inflar estadísticas.</small>
+              <strong>Medici&oacute;n editorial</strong>
+              <small>Permite contar vistas &uacute;nicas con una cookie propia para no inflar estad&iacute;sticas.</small>
             </span>
           </label>
         </div>
@@ -49,8 +49,8 @@ import { ThemeService } from "../../../core/services/theme.service";
           <button class="button" type="button" (click)="acceptAll()">Aceptar todo</button>
           <button class="button button--secondary" type="button" (click)="acceptEssentialOnly()">Solo esenciales</button>
           <button class="button button--ghost" type="button" *ngIf="!showSettings" (click)="openSettings()">Configurar</button>
-          <button class="button button--ghost" type="button" *ngIf="showSettings" (click)="saveCustom()">Guardar selección</button>
-          <a class="button button--ghost" routerLink="/privacidad">Ver política</a>
+          <button class="button button--ghost" type="button" *ngIf="showSettings" (click)="saveCustom()">Guardar selecci&oacute;n</button>
+          <a class="button button--ghost" routerLink="/privacidad">Ver pol&iacute;tica</a>
         </div>
       </div>
     </section>
