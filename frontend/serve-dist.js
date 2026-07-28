@@ -52,9 +52,10 @@ const server = createServer((request, response) => {
   }
 
   const extension = extname(filePath).toLowerCase();
+  const isStaticCodeAsset = extension === ".css" || extension === ".js";
 
   response.writeHead(200, {
-    "Cache-Control": extension === ".html" ? "no-cache" : "public, max-age=600",
+    "Cache-Control": extension === ".html" || isStaticCodeAsset ? "no-store, no-cache, must-revalidate" : "public, max-age=600",
     "Content-Type": contentTypes[extension] ?? "application/octet-stream",
     "Cross-Origin-Opener-Policy": "same-origin",
     "Referrer-Policy": "strict-origin-when-cross-origin",

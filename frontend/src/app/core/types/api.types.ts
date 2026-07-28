@@ -135,6 +135,7 @@ export interface DashboardArticle extends PublicArticle {
 
 export interface SitePayload {
   featured: PublicArticle | null;
+  mostRead: PublicArticle | null;
   latest: PublicArticle[];
 }
 

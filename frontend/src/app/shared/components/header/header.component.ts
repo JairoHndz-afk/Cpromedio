@@ -1,5 +1,5 @@
 import { NgIf } from "@angular/common";
-import { ChangeDetectionStrategy, Component, HostListener, inject } from "@angular/core";
+import { ChangeDetectionStrategy, Component, HostListener, inject, input } from "@angular/core";
 import { Router, RouterLink, RouterLinkActive } from "@angular/router";
 
 import { AuthService } from "../../../core/services/auth.service";
@@ -11,8 +11,8 @@ import { BrandMarkComponent } from "../brand-mark/brand-mark.component";
   standalone: true,
   imports: [RouterLink, RouterLinkActive, NgIf, BrandMarkComponent],
   template: `
-    <header class="site-header">
-      <div class="site-header__inner">
+    <header class="site-header" [class.site-header--wide]="wide()">
+      <div class="site-header__inner" [class.site-header__inner--wide]="wide()">
         <a class="brand" routerLink="/" aria-label="Colombiano Promedio">
           <app-brand-mark class="brand__mark" aria-hidden="true"></app-brand-mark>
           <span class="brand__copy">
@@ -104,6 +104,7 @@ import { BrandMarkComponent } from "../brand-mark/brand-mark.component";
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class HeaderComponent {
+  readonly wide = input(false);
   readonly authService = inject(AuthService);
   readonly themeService = inject(ThemeService);
   private readonly router = inject(Router);

@@ -580,10 +580,13 @@ export async function getPublicSite(_req, res, next) {
   try {
     const siteSetting = await getMainSiteSetting();
 
-    const [featured, latest] = await Promise.all([
+    const [featured, mostRead, latest] = await Promise.all([
       siteSetting.featuredArticle
         ? Article.findOne(publishedVisibleArticleFilter({ _id: siteSetting.featuredArticle })).populate(articlePopulate())
         : Promise.resolve(null),
+      Article.findOne(publishedVisibleArticleFilter())
+        .populate(articlePopulate())
+        .sort({ "metrics.views": -1, "metrics.shares": -1, "metrics.reactions": -1, publishedAt: -1, _id: -1 }),
       Article.find(publishedVisibleArticleFilter())
         .populate(articlePopulate())
         .sort({ publishedAt: -1 })
@@ -592,6 +595,7 @@ export async function getPublicSite(_req, res, next) {
 
     res.json({
       featured: featured ? serializeArticle(featured) : latest[0] ? serializeArticle(latest[0]) : null,
+      mostRead: mostRead ? serializeArticle(mostRead) : null,
       latest: latest.map(serializeArticle)
     });
   } catch (error) {
