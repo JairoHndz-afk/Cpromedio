@@ -100,6 +100,16 @@ interface CommunicationFormState {
   durationHours: number;
 }
 
+interface SuggestedNewsTag {
+  value: string;
+  label: string;
+}
+
+interface SuggestedNewsCategory {
+  name: string;
+  description: string;
+}
+
 interface EditorContentBlock {
   type: ArticleContentBlock["type"];
   headingText: string;
@@ -690,10 +700,26 @@ function createEditorialUploadAdapterPlugin(
                       <textarea [(ngModel)]="articleForm.excerpt" name="excerpt" rows="4" placeholder="Resumen corto para portada, SEO y compartidos"></textarea>
                     </label>
 
-                    <label>
-                      <span>Etiquetas</span>
-                      <input type="text" [(ngModel)]="articleForm.tags" name="tags" placeholder="memoria, politica, cultura" />
-                    </label>
+                    <div class="doc-editor__field-group doc-editor__field-group--tags">
+                      <label>
+                        <span>Etiquetas</span>
+                        <input type="text" [(ngModel)]="articleForm.tags" name="tags" placeholder="actualidad, politica, justicia" />
+                      </label>
+                      <div class="doc-editor__tag-suggestions" aria-label="Etiquetas sugeridas para noticias en Colombia">
+                        <button
+                          type="button"
+                          class="doc-editor__tag-chip"
+                          *ngFor="let tag of suggestedNewsTags"
+                          [ngClass]="{ 'is-active': isSuggestedNewsTagSelected(tag.value) }"
+                          (click)="toggleSuggestedNewsTag(tag.value)"
+                        >
+                          {{ tag.label }}
+                        </button>
+                      </div>
+                      <small class="helper-text">
+                        {{ articleTagList().length }}/10 etiquetas. Puedes elegir sugeridas o escribir las tuyas separadas por comas.
+                      </small>
+                    </div>
 
                     <label>
                       <span>Categoria opcional</span>
@@ -702,6 +728,21 @@ function createEditorialUploadAdapterPlugin(
                         <option *ngFor="let category of categories" [value]="category.id">{{ category.name }}</option>
                       </select>
                     </label>
+
+                    <div class="doc-editor__field-group doc-editor__field-group--category" *ngIf="suggestedSelectableCategories().length">
+                      <span>Categorias sugeridas</span>
+                      <div class="doc-editor__tag-suggestions">
+                        <button
+                          type="button"
+                          class="doc-editor__tag-chip"
+                          *ngFor="let category of suggestedSelectableCategories()"
+                          [ngClass]="{ 'is-active': articleForm.categoryId === category.id }"
+                          (click)="toggleArticleCategory(category.id)"
+                        >
+                          {{ category.name }}
+                        </button>
+                      </div>
+                    </div>
 
                     <label *ngIf="currentUser.role === 'admin'">
                       <span>Estado</span>
@@ -939,7 +980,25 @@ function createEditorialUploadAdapterPlugin(
             <input type="text" [(ngModel)]="categoryForm.name" name="categoryName" placeholder="Nombre" required />
             <textarea [(ngModel)]="categoryForm.description" name="categoryDescription" rows="3" placeholder="Descripcion"></textarea>
             <label><input type="checkbox" [(ngModel)]="categoryForm.isActive" name="categoryIsActive" /> Activa</label>
-            <button class="button" type="submit">{{ categoryForm.id ? "Actualizar" : "Crear" }}</button>
+            <div class="doc-editor__field-group">
+              <span>Categorias sugeridas para prensa colombiana</span>
+              <div class="doc-editor__tag-suggestions">
+                <button
+                  type="button"
+                  class="doc-editor__tag-chip"
+                  *ngFor="let category of suggestedNewsCategories"
+                  [ngClass]="{ 'is-active': isSuggestedCategoryCurrent(category.name), 'is-muted': isSuggestedCategoryExisting(category.name) && !isSuggestedCategoryCurrent(category.name) }"
+                  (click)="applySuggestedCategory(category)"
+                >
+                  {{ category.name }}
+                </button>
+              </div>
+              <small class="helper-text">Haz clic para cargar una sugerencia al formulario o crear primero las faltantes de una vez.</small>
+            </div>
+            <div class="button-row">
+              <button class="button" type="submit">{{ categoryForm.id ? "Actualizar" : "Crear" }}</button>
+              <button class="button button--secondary" type="button" (click)="createMissingSuggestedCategories()">Crear sugeridas faltantes</button>
+            </div>
           </form>
         </section>
 
@@ -1995,6 +2054,66 @@ function createEditorialUploadAdapterPlugin(
       gap: 14px;
     }
 
+    .doc-editor__field-group {
+      display: grid;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .doc-editor__field-group > span {
+      color: #52637d;
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .doc-editor__field-group .helper-text {
+      margin: 0;
+      color: #52637d;
+      font-size: 0.88rem;
+      line-height: 1.5;
+    }
+
+    .doc-editor__tag-suggestions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .doc-editor__tag-chip {
+      padding: 0.58rem 0.9rem;
+      border-radius: 999px;
+      border: 1px solid rgba(21, 72, 167, 0.12);
+      background: rgba(245, 247, 251, 0.92);
+      color: #28467a;
+      font-size: 0.88rem;
+      font-weight: 700;
+      line-height: 1;
+      box-shadow: none;
+      transition: transform 160ms ease, border-color 160ms ease, color 160ms ease, background 160ms ease, box-shadow 160ms ease;
+    }
+
+    .doc-editor__tag-chip:hover,
+    .doc-editor__tag-chip:focus-visible {
+      transform: translateY(-1px);
+      border-color: rgba(21, 72, 167, 0.24);
+      color: #183766;
+      background: rgba(233, 239, 248, 0.98);
+      box-shadow: 0 10px 22px rgba(21, 72, 167, 0.08);
+    }
+
+    .doc-editor__tag-chip.is-active {
+      border-color: rgba(255, 208, 77, 0.34);
+      background: linear-gradient(135deg, rgba(255, 208, 77, 0.18), rgba(21, 72, 167, 0.12), rgba(201, 53, 53, 0.12));
+      color: #142544;
+      box-shadow: 0 12px 24px rgba(16, 24, 38, 0.12);
+    }
+
+    .doc-editor__tag-chip.is-muted {
+      opacity: 0.72;
+    }
+
     .doc-cover label,
     .doc-block label,
     .doc-editor__settings label {
@@ -2314,11 +2433,34 @@ function createEditorialUploadAdapterPlugin(
     :host-context(:root[data-theme="dark"]) .doc-cover label span,
     :host-context(:root[data-theme="dark"]) .doc-block label span,
     :host-context(:root[data-theme="dark"]) .doc-editor__settings label span,
+    :host-context(:root[data-theme="dark"]) .doc-editor__field-group > span,
     :host-context(:root[data-theme="dark"]) .editor-checkbox span,
+    :host-context(:root[data-theme="dark"]) .doc-editor__field-group .helper-text,
     :host-context(:root[data-theme="dark"]) .doc-editor__settings .panel-subtitle,
     :host-context(:root[data-theme="dark"]) .doc-editor__settings .helper-text,
     :host-context(:root[data-theme="dark"]) .doc-cover .helper-text {
       color: #9db2d8;
+    }
+
+    :host-context(:root[data-theme="dark"]) .doc-editor__tag-chip {
+      border-color: rgba(154, 187, 255, 0.14);
+      background: rgba(15, 22, 34, 0.96);
+      color: #d7e3ff;
+    }
+
+    :host-context(:root[data-theme="dark"]) .doc-editor__tag-chip:hover,
+    :host-context(:root[data-theme="dark"]) .doc-editor__tag-chip:focus-visible {
+      border-color: rgba(154, 187, 255, 0.24);
+      background: rgba(19, 29, 46, 0.98);
+      color: #f5f8ff;
+      box-shadow: 0 12px 24px rgba(0, 0, 0, 0.24);
+    }
+
+    :host-context(:root[data-theme="dark"]) .doc-editor__tag-chip.is-active {
+      border-color: rgba(255, 208, 77, 0.28);
+      background: linear-gradient(135deg, rgba(255, 208, 77, 0.2), rgba(132, 169, 255, 0.12), rgba(255, 122, 104, 0.14));
+      color: #f7fbff;
+      box-shadow: 0 14px 28px rgba(0, 0, 0, 0.28);
     }
 
     :host-context(:root[data-theme="dark"]) .doc-editor__settings textarea,
@@ -2981,6 +3123,60 @@ export class DashboardPageComponent {
     { id: "media", label: "Multimedia", description: "Portada, carga y enfoque." },
     { id: "preview", label: "Vista previa", description: "Lectura antes de publicar." },
     { id: "publish", label: "Publicacion", description: "Resumen, etiquetas y salida." }
+  ];
+  readonly suggestedNewsTags: SuggestedNewsTag[] = [
+    { value: "actualidad", label: "Actualidad" },
+    { value: "politica", label: "Politica" },
+    { value: "gobierno", label: "Gobierno" },
+    { value: "congreso", label: "Congreso" },
+    { value: "justicia", label: "Justicia" },
+    { value: "economia", label: "Economia" },
+    { value: "seguridad", label: "Seguridad" },
+    { value: "regiones", label: "Regiones" },
+    { value: "deportes", label: "Deportes" },
+    { value: "tecnologia", label: "Tecnologia" }
+  ];
+  readonly suggestedNewsCategories: SuggestedNewsCategory[] = [
+    {
+      name: "Actualidad",
+      description: "Cobertura inmediata de los hechos que marcan la conversacion publica del dia."
+    },
+    {
+      name: "Politica",
+      description: "Partidos, liderazgos, debates electorales y decisiones del poder politico."
+    },
+    {
+      name: "Gobierno",
+      description: "Acciones del Ejecutivo, ministerios, decretos y gestion institucional."
+    },
+    {
+      name: "Justicia",
+      description: "Cortes, fiscalia, procesos judiciales y control de legalidad."
+    },
+    {
+      name: "Economia",
+      description: "Finanzas publicas, empresas, empleo, industria y bolsillo ciudadano."
+    },
+    {
+      name: "Regiones",
+      description: "Historias, conflictos y transformaciones fuera del centro politico nacional."
+    },
+    {
+      name: "Seguridad",
+      description: "Orden publico, conflicto, crimen organizado y proteccion ciudadana."
+    },
+    {
+      name: "Deportes",
+      description: "Cobertura deportiva nacional e internacional con foco en interes publico."
+    },
+    {
+      name: "Cultura",
+      description: "Artes, memoria, identidad, patrimonio y expresiones culturales."
+    },
+    {
+      name: "Opinion",
+      description: "Columnas, analisis y puntos de vista sobre la coyuntura nacional."
+    }
   ];
 
   activeSection: DashboardSection = "overview";
@@ -3682,11 +3878,47 @@ export class DashboardPageComponent {
   }
 
   articleDisplayTags(): string[] {
-    return this.articleForm.tags
-      .split(",")
-      .map((tag) => tag.trim())
-      .filter(Boolean)
-      .slice(0, 4);
+    return this.articleTagList().slice(0, 4);
+  }
+
+  articleTagList(): string[] {
+    return this.parseArticleTags(this.articleForm.tags);
+  }
+
+  isSuggestedNewsTagSelected(tagValue: string): boolean {
+    return this.articleTagList().includes(tagValue);
+  }
+
+  suggestedSelectableCategories(): Category[] {
+    const availableCategories = this.categories.filter((category) => category.isActive);
+    const bySuggestion = this.suggestedNewsCategories
+      .map((suggested) => availableCategories.find((category) => this.normalizeCategoryKey(category.name) === this.normalizeCategoryKey(suggested.name)))
+      .filter((category): category is Category => Boolean(category));
+
+    return bySuggestion.slice(0, 10);
+  }
+
+  toggleArticleCategory(categoryId: string): void {
+    this.articleForm.categoryId = this.articleForm.categoryId === categoryId ? "" : categoryId;
+    this.cdr.markForCheck();
+  }
+
+  toggleSuggestedNewsTag(tagValue: string): void {
+    const currentTags = this.articleTagList();
+
+    if (currentTags.includes(tagValue)) {
+      this.articleForm.tags = currentTags.filter((tag) => tag !== tagValue).join(", ");
+      this.cdr.markForCheck();
+      return;
+    }
+
+    if (currentTags.length >= 10) {
+      this.toast.error("Solo puedes usar hasta 10 etiquetas por noticia.");
+      return;
+    }
+
+    this.articleForm.tags = [...currentTags, tagValue].join(", ");
+    this.cdr.markForCheck();
   }
 
   articlePreviewPath(): string {
@@ -4826,15 +5058,21 @@ export class DashboardPageComponent {
           type: this.articleForm.coverType
         },
         categoryId: this.articleForm.categoryId || null,
-        tags: this.articleForm.tags
-          .split(",")
-          .map((item) => item.trim())
-          .filter(Boolean),
+        tags: this.parseArticleTags(this.articleForm.tags),
         isPremium: false,
         featured: this.articleForm.featured,
         status: this.articleForm.status
       }
     };
+  }
+
+  private parseArticleTags(value: string): string[] {
+    return [...new Set(
+      value
+        .split(",")
+        .map((item) => item.trim().toLowerCase())
+        .filter(Boolean)
+    )].slice(0, 10);
   }
 
   private serializeContentBlocksForApi(contentBlocks: ArticleContentBlock[]): Array<Record<string, unknown>> {
@@ -5697,6 +5935,53 @@ export class DashboardPageComponent {
     this.cdr.markForCheck();
   }
 
+  applySuggestedCategory(category: SuggestedNewsCategory): void {
+    const existingCategory = this.categories.find((item) => this.normalizeCategoryKey(item.name) === this.normalizeCategoryKey(category.name));
+
+    this.categoryForm = {
+      id: existingCategory?.id ?? "",
+      name: existingCategory?.name ?? category.name,
+      description: existingCategory?.description || category.description,
+      isActive: existingCategory?.isActive ?? true
+    };
+    this.cdr.markForCheck();
+  }
+
+  isSuggestedCategoryExisting(name: string): boolean {
+    return this.categories.some((category) => this.normalizeCategoryKey(category.name) === this.normalizeCategoryKey(name));
+  }
+
+  isSuggestedCategoryCurrent(name: string): boolean {
+    return this.normalizeCategoryKey(this.categoryForm.name) === this.normalizeCategoryKey(name);
+  }
+
+  async createMissingSuggestedCategories(): Promise<void> {
+    const missingCategories = this.suggestedNewsCategories.filter((category) => !this.isSuggestedCategoryExisting(category.name));
+
+    if (missingCategories.length === 0) {
+      this.notifySuccess("Ya tienes cargadas todas las categorias sugeridas.");
+      return;
+    }
+
+    try {
+      for (const category of missingCategories) {
+        await this.dashboardApi.createCategory({
+          name: category.name,
+          description: category.description,
+          isActive: true
+        });
+      }
+
+      this.categories = await this.dashboardApi.getCategories();
+      this.overview = await this.dashboardApi.getOverview();
+      this.notifySuccess(`Se crearon ${missingCategories.length} categorias sugeridas.`);
+    } catch (error) {
+      this.notifyError(error, "No fue posible crear las categorias sugeridas.");
+    } finally {
+      this.cdr.markForCheck();
+    }
+  }
+
   async saveCategory(): Promise<void> {
     try {
       if (this.categoryForm.id) {
@@ -5714,6 +5999,14 @@ export class DashboardPageComponent {
     } finally {
       this.cdr.markForCheck();
     }
+  }
+
+  private normalizeCategoryKey(value: string): string {
+    return String(value ?? "")
+      .trim()
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "");
   }
 
   editUser(user: UserSession): void {
