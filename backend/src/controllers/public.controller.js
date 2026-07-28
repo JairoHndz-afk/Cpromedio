@@ -26,6 +26,30 @@ const recentArticleViewWindowMs = 1000 * 60 * 45;
 const recentArticleViewLimit = 24;
 const publicSubscriptionAcceptedMessage = "Si el correo es válido, revisa tu bandeja para continuar con el boletín.";
 const publicSubscriptionProcessedMessage = "Si el correo es válido, la suscripción fue procesada correctamente.";
+const searchablePublicArticleFields = [
+  "title",
+  "subtitle",
+  "excerpt",
+  "body",
+  "tags",
+  "seo.title",
+  "seo.description",
+  "contentBlocks.text",
+  "contentBlocks.heading.text",
+  "contentBlocks.quote.text",
+  "contentBlocks.quote.attribution",
+  "contentBlocks.embed.title"
+];
+const accentAwareCharacters = {
+  a: "aáàäâã",
+  e: "eéèëê",
+  i: "iíìïî",
+  o: "oóòöôõ",
+  u: "uúùüû",
+  n: "nñ",
+  c: "cç",
+  y: "yýÿ"
+};
 
 function clampCoverPosition(value, fallback = 50) {
   const numericValue = Number(value);
@@ -66,6 +90,57 @@ function publishedVisibleArticleFilter(filters = {}) {
     deletedAt: null,
     ...filters
   };
+}
+
+function escapeRegexLiteral(value) {
+  return String(value ?? "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function escapeRegexCharacterClass(value) {
+  return String(value ?? "").replace(/[-\\\]^]/g, "\\$&");
+}
+
+function buildAccentAwarePattern(value) {
+  return Array.from(String(value ?? "")).map((character) => {
+    if (/\s/.test(character)) {
+      return "\\s+";
+    }
+
+    const normalized = character.toLowerCase();
+    const variants = accentAwareCharacters[normalized];
+
+    if (variants) {
+      const characterSet = Array.from(new Set(`${variants}${variants.toUpperCase()}`)).join("");
+      return `[${escapeRegexCharacterClass(characterSet)}]`;
+    }
+
+    return escapeRegexLiteral(character);
+  }).join("");
+}
+
+function buildPublicSearchRegex(value) {
+  return new RegExp(buildAccentAwarePattern(value), "iu");
+}
+
+function buildPublicSearchFilters(search) {
+  const normalizedSearch = sanitizeText(search, 160);
+  const rawTokens = normalizedSearch.split(/\s+/).filter(Boolean);
+  const preferredTokens = rawTokens.filter((token) => token.length >= 2);
+  const searchTokens = Array.from(new Set((preferredTokens.length > 0 ? preferredTokens : rawTokens).map((token) => token.slice(0, 60))));
+
+  if (searchTokens.length === 0) {
+    return [];
+  }
+
+  return searchTokens.map((token) => {
+    const regex = buildPublicSearchRegex(token);
+
+    return {
+      $or: searchablePublicArticleFields.map((field) => ({
+        [field]: regex
+      }))
+    };
+  });
 }
 
 function articleViewCookieOptions() {
@@ -498,7 +573,11 @@ async function buildPublicFilters(query) {
     .toLowerCase();
 
   if (search) {
-    filters.$text = { $search: search };
+    const searchClauses = buildPublicSearchFilters(search);
+
+    if (searchClauses.length > 0) {
+      filters.$and = [...(filters.$and ?? []), ...searchClauses];
+    }
   }
 
   if (tag) {
@@ -622,7 +701,7 @@ export async function listPublicArticles(req, res, next) {
   try {
     const page = readBoundedPositiveInt(req.query.page, 1);
     const limit = readBoundedPositiveInt(req.query.limit, 12, { max: 24 });
-    const { filters, search } = await buildPublicFilters(req.query);
+    const { filters } = await buildPublicFilters(req.query);
 
     if (!filters) {
       return res.json({
@@ -639,7 +718,7 @@ export async function listPublicArticles(req, res, next) {
     const [items, total] = await Promise.all([
       Article.find(filters)
         .populate(articlePopulate())
-        .sort(search ? { score: { $meta: "textScore" }, publishedAt: -1 } : { publishedAt: -1 })
+        .sort({ publishedAt: -1, _id: -1 })
         .skip((page - 1) * limit)
         .limit(limit),
       Article.countDocuments(filters)

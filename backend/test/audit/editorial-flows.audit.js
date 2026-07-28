@@ -8,6 +8,7 @@ import {
   createPublicSubscription,
   dispatchPublishedArticleBulletin,
   getPublicArticle,
+  listPublicArticles,
   reactivatePublicSubscription,
   unsubscribePublicSubscription
 } from "../../src/controllers/public.controller.js";
@@ -570,6 +571,97 @@ test("audita que publicar una nota despache el boletin a suscriptores activos", 
     capturedLogs.some((entry) => entry.includes("Nueva publicaci")),
     "Publicar una nota deberia generar al menos una previsualizacion del correo editorial."
   );
+});
+
+test("audita que la busqueda publica use coincidencias parciales sin depender de indices de texto", async (t) => {
+  const originalFind = Article.find;
+  const originalCountDocuments = Article.countDocuments;
+
+  let capturedFilter = null;
+  let capturedSort = null;
+
+  const foundArticle = {
+    _id: createMockObjectId("article-search-1"),
+    slug: "nota-sobre-premios",
+    title: "El Gobierno premiará a los mejores colegios del país",
+    subtitle: "Reconocimiento especial",
+    excerpt: "La nueva política premiará resultados académicos destacados.",
+    body: ["La estrategia premiará a las instituciones con mayores avances."],
+    contentBlocks: [{ type: "paragraph", text: "La estrategia premiará a las instituciones con mayores avances." }],
+    cover: { url: "", alt: "", type: "image", positionX: 50, positionY: 50 },
+    author: {
+      _id: createMockObjectId("admin-search"),
+      name: "Administrador",
+      email: "admin@periodico.local",
+      role: "admin"
+    },
+    category: null,
+    tags: ["actualidad", "educacion"],
+    metrics: { views: 14, shares: 2, reactions: 3 },
+    status: "published",
+    featured: false,
+    isPremium: false,
+    readingTime: 2,
+    publishedAt: new Date("2026-07-28T08:00:00.000Z"),
+    updatedAt: new Date("2026-07-28T08:00:00.000Z"),
+    moderationNote: "",
+    moderationHistory: []
+  };
+
+  Article.find = (filter) => {
+    capturedFilter = filter;
+
+    return {
+      populate() {
+        return this;
+      },
+      sort(sort) {
+        capturedSort = sort;
+        return this;
+      },
+      skip() {
+        return this;
+      },
+      async limit() {
+        return [foundArticle];
+      }
+    };
+  };
+
+  Article.countDocuments = async () => 1;
+
+  t.after(() => {
+    Article.find = originalFind;
+    Article.countDocuments = originalCountDocuments;
+  });
+
+  const request = createMockRequest({
+    query: {
+      search: "premiar"
+    }
+  });
+  const response = createMockResponse();
+
+  await listPublicArticles(request, response, (error) => {
+    throw error;
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.payload?.items?.length, 1);
+  assert.equal(capturedFilter?.status, "published");
+  assert.equal(capturedFilter?.deletedAt, null);
+  assert.equal("$text" in capturedFilter, false);
+  assert.deepEqual(capturedSort, { publishedAt: -1, _id: -1 });
+  assert.ok(Array.isArray(capturedFilter?.$and));
+  assert.ok(capturedFilter.$and.length > 0);
+
+  const firstRegex = capturedFilter.$and
+    .flatMap((clause) => clause.$or ?? [])
+    .map((entry) => Object.values(entry)[0])
+    .find((value) => value instanceof RegExp);
+
+  assert.ok(firstRegex instanceof RegExp);
+  assert.equal(firstRegex.test("premiará"), true);
 });
 
 test("audita que destacar un articulo retire el destacado previo para mantener una unica portada activa", async (t) => {

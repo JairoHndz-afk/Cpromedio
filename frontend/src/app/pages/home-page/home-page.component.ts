@@ -192,7 +192,7 @@ import { NewsCardComponent } from "../../shared/components/news-card/news-card.c
     <section class="section-block" *ngIf="filterActive">
       <div class="section-heading">
         <div>
-          <p class="eyebrow">Exploracion</p>
+          <p class="eyebrow">Exploración</p>
           <h2>{{ activeResultsTitle }}</h2>
           <p class="helper-text">{{ activeResultsDescription }}</p>
         </div>
@@ -208,7 +208,7 @@ import { NewsCardComponent } from "../../shared/components/news-card/news-card.c
       <div class="cards-grid">
         <app-news-card *ngFor="let article of searchResults" [article]="article"></app-news-card>
       </div>
-      <p class="empty-state" *ngIf="loading">Actualizando seleccion editorial...</p>
+      <p class="empty-state" *ngIf="loading">Actualizando selección editorial...</p>
       <p class="empty-state" *ngIf="searchResults.length === 0 && !loading">No hay artículos publicados para este filtro.</p>
     </section>
   `,
@@ -398,7 +398,7 @@ export class HomePageComponent {
       }
 
       this.errorMessage = this.filterActive
-        ? "No fue posible cargar esta seleccion editorial."
+        ? "No fue posible cargar esta selección editorial."
         : "No fue posible cargar la portada.";
       this.clearColdStartHint();
       this.seo.setNoIndex("Portada no disponible | Colombiano Promedio", this.errorMessage);
