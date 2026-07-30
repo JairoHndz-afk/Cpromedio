@@ -209,6 +209,23 @@ export interface PaginatedArticles {
   pagination: PaginationMeta;
 }
 
+export type PublicArticleSort = "latest" | "oldest" | "popular";
+
+export interface PublicArchiveFilterCategory extends Category {
+  count: number;
+}
+
+export interface PublicArchiveFilterTag {
+  value: string;
+  label: string;
+  count: number;
+}
+
+export interface PublicArchiveFiltersPayload {
+  categories: PublicArchiveFilterCategory[];
+  tags: PublicArchiveFilterTag[];
+}
+
 export interface PublicArticleFilters {
   search?: string;
   page?: number;
@@ -216,6 +233,7 @@ export interface PublicArticleFilters {
   tag?: string;
   category?: string;
   excludeId?: string;
+  sort?: PublicArticleSort;
 }
 
 export interface SubscriptionActionPayload {

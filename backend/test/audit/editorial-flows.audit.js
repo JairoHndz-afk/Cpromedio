@@ -8,6 +8,7 @@ import {
   createPublicSubscription,
   dispatchPublishedArticleBulletin,
   getPublicArticle,
+  getPublicArchiveFilters,
   listPublicArticles,
   reactivatePublicSubscription,
   unsubscribePublicSubscription
@@ -16,6 +17,7 @@ import { clearFeaturedArticleSelection } from "../../src/lib/site-settings.js";
 import { AuditLog } from "../../src/models/AuditLog.js";
 import { Article } from "../../src/models/Article.js";
 import { ArticleView } from "../../src/models/ArticleView.js";
+import { Category } from "../../src/models/Category.js";
 import { SiteSetting } from "../../src/models/SiteSetting.js";
 import { Subscription } from "../../src/models/Subscription.js";
 import { User } from "../../src/models/User.js";
@@ -753,6 +755,141 @@ test("audita que el archivo publico permita excluir el articulo destacado de la 
   assert.equal(capturedLimit, 10);
   assert.equal(response.payload?.pagination?.total, 21);
   assert.equal(response.payload?.pagination?.totalPages, 3);
+});
+
+test("audita que el archivo publico permita ordenar por popularidad", async (t) => {
+  const originalFind = Article.find;
+  const originalCountDocuments = Article.countDocuments;
+
+  let capturedSort = null;
+
+  Article.find = () => ({
+    populate() {
+      return this;
+    },
+    sort(sort) {
+      capturedSort = sort;
+      return this;
+    },
+    skip() {
+      return this;
+    },
+    async limit() {
+      return [];
+    }
+  });
+
+  Article.countDocuments = async () => 0;
+
+  t.after(() => {
+    Article.find = originalFind;
+    Article.countDocuments = originalCountDocuments;
+  });
+
+  const request = createMockRequest({
+    query: {
+      sort: "popular"
+    }
+  });
+  const response = createMockResponse();
+
+  await listPublicArticles(request, response, (error) => {
+    throw error;
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(capturedSort, {
+    "metrics.views": -1,
+    "metrics.shares": -1,
+    "metrics.reactions": -1,
+    publishedAt: -1,
+    _id: -1
+  });
+});
+
+test("audita que el archivo publico exponga filtros avanzados con categorias y etiquetas activas", async (t) => {
+  const originalAggregate = Article.aggregate;
+  const originalCategoryFind = Category.find;
+
+  const aggregateCalls = [];
+  let capturedCategoryFilter = null;
+
+  Article.aggregate = async (pipeline) => {
+    aggregateCalls.push(pipeline);
+
+    if (aggregateCalls.length === 1) {
+      return [
+        {
+          _id: createMockObjectId("category-archive-1"),
+          count: 6
+        }
+      ];
+    }
+
+    return [
+      {
+        _id: "seguridad-publica",
+        count: 4
+      },
+      {
+        _id: "justicia",
+        count: 2
+      }
+    ];
+  };
+
+  Category.find = (filter) => {
+    capturedCategoryFilter = filter;
+
+    return {
+      async select() {
+        return [
+          {
+            _id: createMockObjectId("category-archive-1"),
+            name: "Seguridad",
+            slug: "seguridad",
+            description: "Cobertura judicial y de seguridad.",
+            isActive: true
+          }
+        ];
+      }
+    };
+  };
+
+  t.after(() => {
+    Article.aggregate = originalAggregate;
+    Category.find = originalCategoryFind;
+  });
+
+  const request = createMockRequest();
+  const response = createMockResponse();
+
+  await getPublicArchiveFilters(request, response, (error) => {
+    throw error;
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.ok(Array.isArray(capturedCategoryFilter?._id?.$in));
+  assert.equal(capturedCategoryFilter._id.$in.length, 1);
+  assert.equal(capturedCategoryFilter._id.$in[0]?.toString(), "category-archive-1");
+  assert.equal(response.payload?.categories?.length, 1);
+  assert.deepEqual(response.payload?.categories?.[0], {
+    id: "category-archive-1",
+    name: "Seguridad",
+    slug: "seguridad",
+    description: "Cobertura judicial y de seguridad.",
+    isActive: true,
+    count: 6
+  });
+  assert.equal(response.payload?.tags?.length, 2);
+  assert.deepEqual(response.payload?.tags?.[0], {
+    value: "seguridad-publica",
+    label: "Seguridad Publica",
+    count: 4
+  });
+  assert.equal(aggregateCalls.length, 2);
+  assert.equal(aggregateCalls[0][0].$match.status, "published");
+  assert.equal(aggregateCalls[1][1].$unwind, "$tags");
 });
 
 test("audita que destacar un articulo retire el destacado previo para mantener una unica portada activa", async (t) => {

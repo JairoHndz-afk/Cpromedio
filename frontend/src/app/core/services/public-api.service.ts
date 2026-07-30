@@ -5,6 +5,7 @@ import { firstValueFrom } from "rxjs";
 import {
   PaginatedArticles,
   PublicArticleDetailPayload,
+  PublicArchiveFiltersPayload,
   PublicAuthorProfilePayload,
   PublicArticleFilters,
   SiteCommunication,
@@ -41,6 +42,10 @@ export class PublicApiService {
     );
   }
 
+  getArchiveFilters(): Promise<PublicArchiveFiltersPayload> {
+    return firstValueFrom(this.http.get<PublicArchiveFiltersPayload>(`${API_BASE_URL}/public/archive-filters`));
+  }
+
   searchArticles(filters: PublicArticleFilters = {}): Promise<PaginatedArticles> {
     let params = new HttpParams().set("page", filters.page ?? 1);
 
@@ -62,6 +67,10 @@ export class PublicApiService {
 
     if (filters.excludeId?.trim()) {
       params = params.set("excludeId", filters.excludeId.trim());
+    }
+
+    if (filters.sort && filters.sort !== "latest") {
+      params = params.set("sort", filters.sort);
     }
 
     return firstValueFrom(

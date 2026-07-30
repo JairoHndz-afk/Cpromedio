@@ -25,6 +25,7 @@ const recentArticleViewsCookieName = "cp_recent_views";
 const publicConsentCookieName = "cp_cookie_preferences";
 const recentArticleViewWindowMs = 1000 * 60 * 45;
 const recentArticleViewLimit = 24;
+const publicArchiveTagLimit = 12;
 const publicSubscriptionAcceptedMessage = "Si el correo es válido, revisa tu bandeja para continuar con el boletín.";
 const publicSubscriptionProcessedMessage = "Si el correo es válido, la suscripción fue procesada correctamente.";
 const searchablePublicArticleFields = [
@@ -155,6 +156,40 @@ function buildPublicSearchFilters(search) {
       }))
     };
   });
+}
+
+function humanizeArchiveLabel(value) {
+  return String(value ?? "")
+    .split(/[-\s]+/)
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function readPublicArticleSort(value) {
+  const normalized = String(value ?? "")
+    .trim()
+    .toLowerCase();
+
+  if (normalized === "oldest") {
+    return {
+      key: "oldest",
+      sort: { publishedAt: 1, _id: 1 }
+    };
+  }
+
+  if (normalized === "popular") {
+    return {
+      key: "popular",
+      sort: { "metrics.views": -1, "metrics.shares": -1, "metrics.reactions": -1, publishedAt: -1, _id: -1 }
+    };
+  }
+
+  return {
+    key: "latest",
+    sort: { publishedAt: -1, _id: -1 }
+  };
 }
 
 function articleViewCookieOptions() {
@@ -729,12 +764,121 @@ export async function getPublicCommunication(_req, res, next) {
   }
 }
 
+export async function getPublicArchiveFilters(_req, res, next) {
+  try {
+    const baseFilter = publishedVisibleArticleFilter();
+    const [categoryCounts, rawTagCounts] = await Promise.all([
+      Article.aggregate([
+        {
+          $match: {
+            ...baseFilter,
+            category: { $ne: null }
+          }
+        },
+        {
+          $group: {
+            _id: "$category",
+            count: { $sum: 1 }
+          }
+        },
+        {
+          $sort: {
+            count: -1,
+            _id: 1
+          }
+        }
+      ]),
+      Article.aggregate([
+        {
+          $match: baseFilter
+        },
+        {
+          $unwind: "$tags"
+        },
+        {
+          $match: {
+            tags: { $type: "string", $ne: "" }
+          }
+        },
+        {
+          $group: {
+            _id: "$tags",
+            count: { $sum: 1 }
+          }
+        },
+        {
+          $sort: {
+            count: -1,
+            _id: 1
+          }
+        },
+        {
+          $limit: publicArchiveTagLimit
+        }
+      ])
+    ]);
+
+    const categoryIds = categoryCounts
+      .map((entry) => entry?._id)
+      .filter(Boolean);
+    const categories =
+      categoryIds.length > 0
+        ? await Category.find({
+            _id: { $in: categoryIds }
+          }).select("name slug description isActive")
+        : [];
+    const categoryMap = new Map(categories.map((category) => [category._id.toString(), category]));
+    const serializedCategories = categoryCounts.flatMap((entry) => {
+      const categoryId = entry?._id?.toString?.() ?? String(entry?._id ?? "");
+      const category = categoryMap.get(categoryId);
+
+      if (!category) {
+        return [];
+      }
+
+      return [
+        {
+          id: category._id.toString(),
+          name: category.name,
+          slug: category.slug,
+          description: category.description ?? "",
+          isActive: category.isActive !== false,
+          count: Number(entry?.count ?? 0)
+        }
+      ];
+    });
+    const tags = rawTagCounts
+      .map((entry) => {
+        const value = sanitizeTags([entry?._id])[0] ?? "";
+
+        if (!value) {
+          return null;
+        }
+
+        return {
+          value,
+          label: humanizeArchiveLabel(value),
+          count: Number(entry?.count ?? 0)
+        };
+      })
+      .filter(Boolean);
+
+    res.json({
+      categories: serializedCategories,
+      tags
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
 export { dispatchPublishedArticleBulletin };
 
 export async function listPublicArticles(req, res, next) {
   try {
     const page = readBoundedPositiveInt(req.query.page, 1);
     const limit = readBoundedPositiveInt(req.query.limit, 12, { max: 24 });
+    const sortDefinition = readPublicArticleSort(req.query.sort);
     const { filters } = await buildPublicFilters(req.query);
 
     if (!filters) {
@@ -752,7 +896,7 @@ export async function listPublicArticles(req, res, next) {
     const [items, total] = await Promise.all([
       Article.find(filters)
         .populate(articlePopulate())
-        .sort({ publishedAt: -1, _id: -1 })
+        .sort(sortDefinition.sort)
         .skip((page - 1) * limit)
         .limit(limit),
       Article.countDocuments(filters)
