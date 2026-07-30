@@ -3,6 +3,8 @@ import { Injectable, inject } from "@angular/core";
 import { firstValueFrom } from "rxjs";
 
 import {
+  AlliedFeedSource,
+  AlliedFeedSyncResult,
   AuditEntry,
   Category,
   DashboardArticle,
@@ -27,6 +29,26 @@ export class DashboardApiService {
 
   getCommunication(): Promise<{ communication: SiteCommunication | null }> {
     return firstValueFrom(this.http.get<{ communication: SiteCommunication | null }>(`${API_BASE_URL}/dashboard/communication`));
+  }
+
+  getAlliedFeeds(): Promise<{ items: AlliedFeedSource[] }> {
+    return firstValueFrom(this.http.get<{ items: AlliedFeedSource[] }>(`${API_BASE_URL}/dashboard/allied-feeds`));
+  }
+
+  createAlliedFeed(payload: Record<string, unknown>): Promise<{ source: AlliedFeedSource }> {
+    return firstValueFrom(this.http.post<{ source: AlliedFeedSource }>(`${API_BASE_URL}/dashboard/allied-feeds`, payload));
+  }
+
+  updateAlliedFeed(sourceId: string, payload: Record<string, unknown>): Promise<{ source: AlliedFeedSource }> {
+    return firstValueFrom(this.http.put<{ source: AlliedFeedSource }>(`${API_BASE_URL}/dashboard/allied-feeds/${sourceId}`, payload));
+  }
+
+  deleteAlliedFeed(sourceId: string): Promise<{ message: string }> {
+    return firstValueFrom(this.http.delete<{ message: string }>(`${API_BASE_URL}/dashboard/allied-feeds/${sourceId}`));
+  }
+
+  syncAlliedFeed(sourceId: string): Promise<{ message: string; result: AlliedFeedSyncResult }> {
+    return firstValueFrom(this.http.post<{ message: string; result: AlliedFeedSyncResult }>(`${API_BASE_URL}/dashboard/allied-feeds/${sourceId}/sync`, {}));
   }
 
   saveCommunication(payload: {

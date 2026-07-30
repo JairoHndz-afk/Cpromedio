@@ -76,6 +76,64 @@ const articleContentBlockSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const articleSyndicationSchema = new mongoose.Schema(
+  {
+    sourceType: {
+      type: String,
+      enum: ["original", "allied_rss"],
+      default: "original"
+    },
+    feedSource: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "AlliedFeedSource",
+      default: null
+    },
+    sourceName: {
+      type: String,
+      default: "",
+      trim: true
+    },
+    sourceUrl: {
+      type: String,
+      default: "",
+      trim: true
+    },
+    originalUrl: {
+      type: String,
+      default: "",
+      trim: true
+    },
+    originalGuid: {
+      type: String,
+      default: "",
+      trim: true
+    },
+    authorName: {
+      type: String,
+      default: "",
+      trim: true
+    },
+    attributionLabel: {
+      type: String,
+      default: "",
+      trim: true
+    },
+    allowExternalMedia: {
+      type: Boolean,
+      default: false
+    },
+    allowedMediaHosts: {
+      type: [String],
+      default: []
+    },
+    importedAt: {
+      type: Date,
+      default: null
+    }
+  },
+  { _id: false }
+);
+
 const articleSchema = new mongoose.Schema(
   {
     title: {
@@ -201,6 +259,22 @@ const articleSchema = new mongoose.Schema(
       type: [moderationEventSchema],
       default: []
     },
+    syndication: {
+      type: articleSyndicationSchema,
+      default: () => ({
+        sourceType: "original",
+        feedSource: null,
+        sourceName: "",
+        sourceUrl: "",
+        originalUrl: "",
+        originalGuid: "",
+        authorName: "",
+        attributionLabel: "",
+        allowExternalMedia: false,
+        allowedMediaHosts: [],
+        importedAt: null
+      })
+    },
     seo: {
       title: String,
       description: String
@@ -235,5 +309,7 @@ articleSchema.index({
 articleSchema.index({ status: 1, publishedAt: -1 });
 articleSchema.index({ author: 1, updatedAt: -1 });
 articleSchema.index({ deletedAt: 1, updatedAt: -1 });
+articleSchema.index({ "syndication.feedSource": 1, "syndication.originalGuid": 1 });
+articleSchema.index({ "syndication.feedSource": 1, "syndication.originalUrl": 1 });
 
 export const Article = mongoose.model("Article", articleSchema);

@@ -20,6 +20,10 @@ function getAllowedOwnedMediaOrigins() {
   );
 }
 
+function plainTextLength(value, maxLength = 4000) {
+  return sanitizeText(String(value ?? "").replace(/<[^>]+>/g, " "), maxLength).length;
+}
+
 export function sanitizeText(value, maxLength = 5000) {
   if (typeof value !== "string") {
     return "";
@@ -41,7 +45,66 @@ export function sanitizeParagraphs(input) {
     .slice(0, 80);
 }
 
-export function sanitizeContentBlocks(input) {
+function safeHostFromValue(value) {
+  const input = sanitizeText(value, 300);
+
+  if (!input) {
+    return "";
+  }
+
+  try {
+    return new URL(input).hostname.trim().toLowerCase();
+  } catch {
+    try {
+      return new URL(`https://${input}`).hostname.trim().toLowerCase();
+    } catch {
+      return "";
+    }
+  }
+}
+
+function getAllowedExternalHosts(allowedHosts = []) {
+  return new Set(
+    (Array.isArray(allowedHosts) ? allowedHosts : [])
+      .map((value) => safeHostFromValue(value))
+      .filter(Boolean)
+  );
+}
+
+export function sanitizeEditorialMediaUrl(value, options = {}) {
+  const ownedUrl = sanitizeOwnedMediaUrl(value);
+
+  if (ownedUrl) {
+    return ownedUrl;
+  }
+
+  const normalized = sanitizeText(value, 1200);
+  const allowedHosts = getAllowedExternalHosts(options.allowedExternalHosts);
+
+  if (!normalized || allowedHosts.size === 0) {
+    return "";
+  }
+
+  const url = safeUrl(normalized);
+
+  if (!url || !["http:", "https:"].includes(url.protocol)) {
+    return "";
+  }
+
+  const hostname = url.hostname.trim().toLowerCase();
+
+  if (!allowedHosts.has(hostname)) {
+    return "";
+  }
+
+  url.username = "";
+  url.password = "";
+  url.hash = "";
+
+  return url.toString();
+}
+
+export function sanitizeContentBlocks(input, options = {}) {
   const items = Array.isArray(input) ? input : [];
   const blocks = [];
   const paragraphs = [];
@@ -66,26 +129,33 @@ export function sanitizeContentBlocks(input) {
     }
 
     if (item.type === "heading") {
-      const text = sanitizeText(item.heading?.text ?? item.text ?? "", 220);
+      const text = sanitizeText(item.heading?.text ?? item.text ?? "", 4000);
 
       if (!text) {
         continue;
       }
 
-      blocks.push({
-        type: "heading",
-        heading: {
-          text,
-          align: ["left", "center", "right"].includes(item.heading?.align) ? item.heading.align : "left",
-          level: item.heading?.level === "h3" ? "h3" : "h2"
-        }
-      });
+      if (plainTextLength(text, 4000) > 220) {
+        blocks.push({
+          type: "paragraph",
+          text
+        });
+      } else {
+        blocks.push({
+          type: "heading",
+          heading: {
+            text,
+            align: ["left", "center", "right"].includes(item.heading?.align) ? item.heading.align : "left",
+            level: item.heading?.level === "h3" ? "h3" : "h2"
+          }
+        });
+      }
       paragraphs.push(text);
       continue;
     }
 
     if (item.type === "image") {
-      const url = sanitizeOwnedMediaUrl(item.image?.url ?? "");
+      const url = sanitizeEditorialMediaUrl(item.image?.url ?? "", options);
 
       if (!url) {
         continue;
@@ -381,6 +451,10 @@ export function sanitizeOwnedMediaUrl(value) {
 
 export function isOwnedMediaUrl(value) {
   return Boolean(sanitizeOwnedMediaUrl(value));
+}
+
+export function isEditorialMediaUrl(value, options = {}) {
+  return Boolean(sanitizeEditorialMediaUrl(value, options));
 }
 
 export function slugify(value) {

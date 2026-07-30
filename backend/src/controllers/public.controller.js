@@ -16,7 +16,8 @@ import {
 import { createExpiringToken, createOpaqueToken, hashOpaqueToken } from "../lib/newsletter-tokens.js";
 import { Subscription } from "../models/Subscription.js";
 import { User } from "../models/User.js";
-import { paragraphBlocksFromBody, sanitizeContentBlocks, sanitizeOwnedMediaUrl, sanitizeTags, sanitizeText } from "../utils/content.js";
+import { paragraphBlocksFromBody, sanitizeContentBlocks, sanitizeEditorialMediaUrl, sanitizeOwnedMediaUrl, sanitizeTags, sanitizeText } from "../utils/content.js";
+import { buildAllowedFeedHosts } from "../lib/allied-feeds.js";
 import { readBoundedPositiveInt } from "../utils/request.js";
 import { subscriptionInputSchema, subscriptionTokenSchema } from "../validators/subscription.validator.js";
 
@@ -68,6 +69,19 @@ function serializeCover(cover = {}) {
     type: cover?.type ?? "image",
     positionX: clampCoverPosition(cover?.positionX, 50),
     positionY: clampCoverPosition(cover?.positionY, 50)
+  };
+}
+
+function serializeSyndication(article) {
+  const sourceType = article?.syndication?.sourceType === "allied_rss" ? "allied_rss" : "original";
+
+  return {
+    sourceType,
+    sourceName: sourceType === "allied_rss" ? sanitizeText(article?.syndication?.sourceName ?? "", 80) : "",
+    sourceUrl: sourceType === "allied_rss" ? sanitizeText(article?.syndication?.sourceUrl ?? "", 500) : "",
+    originalUrl: sourceType === "allied_rss" ? sanitizeText(article?.syndication?.originalUrl ?? "", 500) : "",
+    authorName: sourceType === "allied_rss" ? sanitizeText(article?.syndication?.authorName ?? "", 120) : "",
+    attributionLabel: sourceType === "allied_rss" ? sanitizeText(article?.syndication?.attributionLabel ?? "", 80) : ""
   };
 }
 
@@ -312,7 +326,13 @@ function serializeArticle(article) {
     Array.isArray(article.contentBlocks) && article.contentBlocks.length > 0
       ? article.contentBlocks
       : paragraphBlocksFromBody(article.body ?? []);
-  const sanitizedContentBlocks = sanitizeContentBlocks(rawContentBlocks).blocks;
+  const allowedExternalHosts =
+    article?.syndication?.sourceType === "allied_rss" && article?.syndication?.allowExternalMedia
+      ? buildAllowedFeedHosts(article.syndication)
+      : [];
+  const sanitizedContentBlocks = sanitizeContentBlocks(rawContentBlocks, {
+    allowedExternalHosts
+  }).blocks;
   const contentBlocks = sanitizedContentBlocks.length > 0 ? sanitizedContentBlocks : paragraphBlocksFromBody(article.body ?? []);
 
   return {
@@ -323,7 +343,13 @@ function serializeArticle(article) {
     excerpt: article.excerpt,
     body: article.body,
     contentBlocks,
-    cover: serializeCover(article.cover),
+    cover: {
+      ...serializeCover(article.cover),
+      url:
+        article?.syndication?.sourceType === "allied_rss" && article?.syndication?.allowExternalMedia
+          ? sanitizeEditorialMediaUrl(article.cover?.url ?? "", { allowedExternalHosts })
+          : serializeCover(article.cover).url
+    },
     author: article.author
       ? {
           id: article.author._id.toString(),
@@ -344,7 +370,8 @@ function serializeArticle(article) {
     featured: article.featured,
     readingTime: article.readingTime,
     publishedAt: article.publishedAt,
-    updatedAt: article.updatedAt
+    updatedAt: article.updatedAt,
+    syndication: serializeSyndication(article)
   };
 }
 

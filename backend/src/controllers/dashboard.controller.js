@@ -12,13 +12,16 @@ import {
   serializeSiteCommunication,
   setFeaturedArticleSelection
 } from "../lib/site-settings.js";
+import { buildAllowedFeedHosts, parseAlliedArticleDocument, parseAlliedFeedDocument } from "../lib/allied-feeds.js";
+import { AlliedFeedSource } from "../models/AlliedFeedSource.js";
 import { Article } from "../models/Article.js";
 import { AuditLog } from "../models/AuditLog.js";
 import { Category } from "../models/Category.js";
 import { Subscription } from "../models/Subscription.js";
 import { User } from "../models/User.js";
-import { calculateReadingTime, isValidUrl, paragraphBlocksFromBody, sanitizeContentBlocks, sanitizeOwnedMediaUrl, sanitizeParagraphs, sanitizeTags, sanitizeText, slugify } from "../utils/content.js";
+import { calculateReadingTime, isValidUrl, paragraphBlocksFromBody, sanitizeContentBlocks, sanitizeEditorialMediaUrl, sanitizeOwnedMediaUrl, sanitizeParagraphs, sanitizeTags, sanitizeText, slugify } from "../utils/content.js";
 import { readBoundedPositiveInt } from "../utils/request.js";
+import { alliedFeedHostEntrySchema, alliedFeedInputSchema } from "../validators/allied-feed.validator.js";
 import { articleInputSchema, moderationSchema } from "../validators/article.validator.js";
 import { categoryInputSchema } from "../validators/category.validator.js";
 import { communicationInputSchema } from "../validators/site-setting.validator.js";
@@ -51,12 +54,64 @@ function serializeCover(cover = {}) {
   };
 }
 
+function serializeSyndication(article) {
+  const sourceType = article?.syndication?.sourceType === "allied_rss" ? "allied_rss" : "original";
+  const allowedMediaHosts = Array.isArray(article?.syndication?.allowedMediaHosts)
+    ? article.syndication.allowedMediaHosts.filter(Boolean)
+    : [];
+
+  return {
+    sourceType,
+    sourceName: sourceType === "allied_rss" ? sanitizeText(article?.syndication?.sourceName ?? "", 80) : "",
+    sourceUrl: sourceType === "allied_rss" ? sanitizeText(article?.syndication?.sourceUrl ?? "", 500) : "",
+    originalUrl: sourceType === "allied_rss" ? sanitizeText(article?.syndication?.originalUrl ?? "", 500) : "",
+    originalGuid: sourceType === "allied_rss" ? sanitizeText(article?.syndication?.originalGuid ?? "", 240) : "",
+    authorName: sourceType === "allied_rss" ? sanitizeText(article?.syndication?.authorName ?? "", 120) : "",
+    attributionLabel: sourceType === "allied_rss" ? sanitizeText(article?.syndication?.attributionLabel ?? "", 80) : "",
+    importedAt: article?.syndication?.importedAt ?? null,
+    allowedMediaHosts
+  };
+}
+
+function serializeAlliedFeedSource(source) {
+  return {
+    id: source._id.toString(),
+    name: source.name,
+    slug: source.slug,
+    feedUrl: source.feedUrl,
+    siteUrl: source.siteUrl,
+    attributionLabel: source.attributionLabel,
+    logoUrl: source.logoUrl,
+    allowedMediaHosts: Array.isArray(source.allowedMediaHosts) ? source.allowedMediaHosts : [],
+    defaultTags: Array.isArray(source.defaultTags) ? source.defaultTags : [],
+    defaultCategoryId: source.defaultCategory?._id?.toString?.() ?? source.defaultCategory?.toString?.() ?? "",
+    defaultCategoryName: source.defaultCategory?.name ?? "",
+    importMode: source.importMode,
+    maxItemsPerSync: source.maxItemsPerSync,
+    permissionNote: source.permissionNote,
+    isActive: source.isActive,
+    lastFetchedAt: source.lastFetchedAt ?? null,
+    lastImportedAt: source.lastImportedAt ?? null,
+    lastImportCount: Number(source.lastImportCount ?? 0),
+    lastSkippedCount: Number(source.lastSkippedCount ?? 0),
+    lastError: source.lastError ?? "",
+    createdAt: source.createdAt,
+    updatedAt: source.updatedAt
+  };
+}
+
 function serializeArticle(article) {
   const rawContentBlocks =
     Array.isArray(article.contentBlocks) && article.contentBlocks.length > 0
       ? article.contentBlocks
       : paragraphBlocksFromBody(article.body ?? []);
-  const sanitizedContentBlocks = sanitizeContentBlocks(rawContentBlocks).blocks;
+  const allowedExternalHosts =
+    article?.syndication?.sourceType === "allied_rss" && article?.syndication?.allowExternalMedia
+      ? buildAllowedFeedHosts(article.syndication)
+      : [];
+  const sanitizedContentBlocks = sanitizeContentBlocks(rawContentBlocks, {
+    allowedExternalHosts
+  }).blocks;
   const contentBlocks = sanitizedContentBlocks.length > 0 ? sanitizedContentBlocks : paragraphBlocksFromBody(article.body ?? []);
 
   return {
@@ -67,7 +122,13 @@ function serializeArticle(article) {
     excerpt: article.excerpt,
     body: article.body,
     contentBlocks,
-    cover: serializeCover(article.cover),
+    cover: {
+      ...serializeCover(article.cover),
+      url:
+        article?.syndication?.sourceType === "allied_rss" && article?.syndication?.allowExternalMedia
+          ? sanitizeEditorialMediaUrl(article.cover?.url ?? "", { allowedExternalHosts })
+          : serializeCover(article.cover).url
+    },
     author: article.author
       ? {
           id: article.author._id.toString(),
@@ -93,7 +154,8 @@ function serializeArticle(article) {
     updatedAt: article.updatedAt,
     deletedAt: article.deletedAt ?? null,
     moderationNote: article.moderationNote,
-    moderationHistory: article.moderationHistory ?? []
+    moderationHistory: article.moderationHistory ?? [],
+    syndication: serializeSyndication(article)
   };
 }
 
@@ -141,10 +203,67 @@ async function buildUniqueSlug(title, currentId = null) {
   return `${baseSlug}-${Date.now()}`;
 }
 
+function normalizeSyndicatedEditableInput(input, allowedExternalHosts = []) {
+  const title = sanitizeText(input?.title ?? "", 180);
+
+  if (title.length < 6) {
+    const error = new Error("El título debe tener al menos 6 caracteres.");
+    error.status = 400;
+    throw error;
+  }
+
+  const statusOptions = ["draft", "review", "changes_requested", "approved", "published", "archived", "rejected"];
+  const normalizedStatus = sanitizeText(input?.status ?? "", 40);
+  const contentBlocksSource =
+    Array.isArray(input?.contentBlocks) && input.contentBlocks.length > 0
+      ? input.contentBlocks
+      : sanitizeParagraphs(input?.body);
+  const { blocks: contentBlocks, paragraphs: body } = sanitizeContentBlocks(contentBlocksSource, {
+    allowedExternalHosts
+  });
+
+  if (contentBlocks.length === 0) {
+    const error = new Error("El artículo debe incluir contenido.");
+    error.status = 400;
+    throw error;
+  }
+
+  return {
+    title,
+    subtitle: sanitizeText(input?.subtitle ?? "", 220),
+    excerpt: sanitizeText(input?.excerpt ?? "", 320),
+    body,
+    contentBlocks,
+    cover: {
+      url: sanitizeEditorialMediaUrl(input?.cover?.url ?? "", {
+        allowedExternalHosts
+      }),
+      alt: sanitizeText(input?.cover?.alt ?? "", 140),
+      type: ["image", "video", "audio", "infographic"].includes(input?.cover?.type) ? input.cover.type : "image",
+      positionX: clampCoverPosition(input?.cover?.positionX, 50),
+      positionY: clampCoverPosition(input?.cover?.positionY, 50)
+    },
+    categoryId: typeof input?.categoryId === "string" ? input.categoryId : null,
+    tags: Array.isArray(input?.tags) ? input.tags : [],
+    isPremium: Boolean(input?.isPremium),
+    featured: Boolean(input?.featured),
+    status: statusOptions.includes(normalizedStatus) ? normalizedStatus : "draft"
+  };
+}
+
 async function normalizeArticlePayload(input, currentArticle = null) {
-  const parsed = articleInputSchema.parse(input);
+  const allowedExternalHosts =
+    currentArticle?.syndication?.sourceType === "allied_rss" && currentArticle?.syndication?.allowExternalMedia
+      ? buildAllowedFeedHosts(currentArticle.syndication)
+      : [];
+  const parsed =
+    allowedExternalHosts.length > 0
+      ? normalizeSyndicatedEditableInput(input, allowedExternalHosts)
+      : articleInputSchema.parse(input);
   const contentSource = parsed.contentBlocks.length > 0 ? parsed.contentBlocks : sanitizeParagraphs(parsed.body);
-  const { blocks: contentBlocks, paragraphs: body } = sanitizeContentBlocks(contentSource);
+  const { blocks: contentBlocks, paragraphs: body } = sanitizeContentBlocks(contentSource, {
+    allowedExternalHosts
+  });
 
   if (contentBlocks.length === 0) {
     const error = new Error("El artículo debe incluir contenido.");
@@ -193,7 +312,10 @@ async function normalizeArticlePayload(input, currentArticle = null) {
     body,
     contentBlocks,
     cover: {
-      url: isValidUrl(coverUrl) ? coverUrl : "",
+      url:
+        allowedExternalHosts.length > 0
+          ? sanitizeEditorialMediaUrl(coverUrl, { allowedExternalHosts })
+          : (isValidUrl(coverUrl) ? coverUrl : ""),
       alt: sanitizeText(parsed.cover?.alt ?? "", 140),
       type: parsed.cover?.type ?? "image",
       positionX: clampCoverPosition(parsed.cover?.positionX, 50),
@@ -205,6 +327,7 @@ async function normalizeArticlePayload(input, currentArticle = null) {
     isPremium: parsed.isPremium,
     status: parsed.status,
     readingTime: calculateReadingTime(body),
+    syndication: currentArticle?.syndication?.sourceType === "allied_rss" ? currentArticle.syndication : undefined,
     seo: {
       title: sanitizeText(parsed.title, 180),
       description: sanitizeText(excerpt, 160)
@@ -264,6 +387,367 @@ function normalizeCommunicationPayload(input) {
     publishedAt,
     expiresAt,
     version: `comm-${publishedAt.getTime()}`
+  };
+}
+
+async function buildUniqueAlliedFeedSlug(name, currentId = null) {
+  const baseSlug = slugify(name);
+  let nextSlug = baseSlug;
+  let attempts = 0;
+
+  while (attempts < 20) {
+    const existing = await AlliedFeedSource.findOne({
+      slug: nextSlug,
+      ...(currentId ? { _id: { $ne: currentId } } : {})
+    }).select("_id");
+
+    if (!existing) {
+      return nextSlug;
+    }
+
+    attempts += 1;
+    nextSlug = `${baseSlug}-${attempts + 1}`;
+  }
+
+  return `${baseSlug}-${Date.now()}`;
+}
+
+function normalizeAlliedFeedHostsInput(values = []) {
+  const entries = Array.isArray(values) ? values : [];
+  const hosts = [];
+
+  for (const entry of entries) {
+    const host = alliedFeedHostEntrySchema.parse(entry);
+
+    if (host && !hosts.includes(host)) {
+      hosts.push(host);
+    }
+  }
+
+  return hosts.slice(0, 20);
+}
+
+async function normalizeAlliedFeedPayload(input, currentSource = null) {
+  const parsed = alliedFeedInputSchema.parse(input);
+  let defaultCategoryId = null;
+
+  if (parsed.defaultCategoryId) {
+    if (!mongoose.isValidObjectId(parsed.defaultCategoryId)) {
+      const error = new Error("La categoría base del medio aliado no es válida.");
+      error.status = 400;
+      throw error;
+    }
+
+    const category = await Category.findById(parsed.defaultCategoryId).select("_id");
+
+    if (!category) {
+      const error = new Error("La categoría base del medio aliado no existe.");
+      error.status = 400;
+      throw error;
+    }
+
+    defaultCategoryId = category._id;
+  }
+
+  return {
+    name: sanitizeText(parsed.name, 80),
+    slug: await buildUniqueAlliedFeedSlug(parsed.name, currentSource?._id ?? null),
+    feedUrl: sanitizeText(parsed.feedUrl, 500),
+    siteUrl: sanitizeText(parsed.siteUrl ?? "", 500),
+    attributionLabel: sanitizeText(parsed.attributionLabel ?? "", 80) || sanitizeText(parsed.name, 80),
+    logoUrl: sanitizeText(parsed.logoUrl ?? "", 500),
+    allowedMediaHosts: normalizeAlliedFeedHostsInput(parsed.allowedMediaHosts),
+    defaultTags: sanitizeTags(parsed.defaultTags),
+    defaultCategory: defaultCategoryId,
+    importMode: parsed.importMode,
+    maxItemsPerSync: Math.max(1, Math.min(20, Number(parsed.maxItemsPerSync ?? 5))),
+    permissionNote: sanitizeText(parsed.permissionNote ?? "", 240),
+    isActive: parsed.isActive
+  };
+}
+
+function mapFeedImportModeToStatus(importMode) {
+  if (importMode === "review") {
+    return "review";
+  }
+
+  if (importMode === "published") {
+    return "published";
+  }
+
+  return "draft";
+}
+
+async function fetchRemoteFeedXml(feedUrl) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 12_000);
+
+  try {
+    const response = await fetch(feedUrl, {
+      signal: controller.signal,
+      headers: {
+        accept: "application/rss+xml, application/atom+xml, application/xml, text/xml;q=0.9, */*;q=0.5",
+        "user-agent": "ColombianoPromedioRSS/1.0"
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`El feed respondió con estado ${response.status}.`);
+    }
+
+    return await response.text();
+  } catch (error) {
+    if (error?.name === "AbortError") {
+      throw new Error("El feed aliado tardó demasiado en responder.");
+    }
+
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function fetchRemoteArticleHtml(articleUrl) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 12_000);
+
+  try {
+    const response = await fetch(articleUrl, {
+      signal: controller.signal,
+      headers: {
+        accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "user-agent": "ColombianoPromedioRSS/1.0"
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`La nota original respondio con estado ${response.status}.`);
+    }
+
+    return await response.text();
+  } catch (error) {
+    if (error?.name === "AbortError") {
+      throw new Error("La nota original tardo demasiado en responder.");
+    }
+
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function isAllowedAlliedArticleUrl(url, source) {
+  if (!url) {
+    return false;
+  }
+
+  try {
+    const parsedUrl = new URL(url);
+
+    if (!["http:", "https:"].includes(parsedUrl.protocol)) {
+      return false;
+    }
+
+    const hostname = parsedUrl.hostname.trim().toLowerCase();
+    const allowedHosts = buildAllowedFeedHosts(source);
+    return allowedHosts.some((allowedHost) => hostname === allowedHost || hostname.endsWith(`.${allowedHost}`));
+  } catch {
+    return false;
+  }
+}
+
+function shouldHydrateAlliedDraftFromArticlePage(draft) {
+  const bodyLength = Array.isArray(draft?.body) ? draft.body.join(" ").trim().length : 0;
+  const blockCount = Array.isArray(draft?.contentBlocks) ? draft.contentBlocks.length : 0;
+  return bodyLength < 700 || blockCount < 4 || !draft?.cover?.url;
+}
+
+async function hydrateAlliedDraftFromArticlePage(draft, source) {
+  if (!draft?.originalUrl || !isAllowedAlliedArticleUrl(draft.originalUrl, source) || !shouldHydrateAlliedDraftFromArticlePage(draft)) {
+    return draft;
+  }
+
+  try {
+    const articleHtml = await fetchRemoteArticleHtml(draft.originalUrl);
+    const parsedArticle = parseAlliedArticleDocument(articleHtml, source, draft.originalUrl);
+
+    if (!parsedArticle) {
+      return draft;
+    }
+
+    const draftScore = (draft.body?.join(" ").trim().length ?? 0) + ((draft.contentBlocks?.length ?? 0) * 90);
+    const parsedScore = (parsedArticle.body?.join(" ").trim().length ?? 0) + ((parsedArticle.contentBlocks?.length ?? 0) * 90);
+    const hasBetterContent = parsedScore > draftScore;
+
+    return {
+      ...draft,
+      title: draft.title || parsedArticle.title,
+      excerpt: hasBetterContent ? (parsedArticle.excerpt || draft.excerpt) : (draft.excerpt || parsedArticle.excerpt),
+      body: hasBetterContent && parsedArticle.body.length > 0 ? parsedArticle.body : draft.body,
+      contentBlocks: hasBetterContent && parsedArticle.contentBlocks.length > 0 ? parsedArticle.contentBlocks : draft.contentBlocks,
+      cover: parsedArticle.cover?.url ? parsedArticle.cover : draft.cover,
+      publishedAt: parsedArticle.publishedAt || draft.publishedAt,
+      readingTime: hasBetterContent
+        ? Math.max(1, Number(parsedArticle.readingTime ?? draft.readingTime ?? 1))
+        : Math.max(1, Number(draft.readingTime ?? 1)),
+      authorName: parsedArticle.authorName || draft.authorName,
+      allowedMediaHosts:
+        Array.isArray(parsedArticle.allowedMediaHosts) && parsedArticle.allowedMediaHosts.length > 0
+          ? parsedArticle.allowedMediaHosts
+          : draft.allowedMediaHosts
+    };
+  } catch {
+    return draft;
+  }
+}
+
+async function findExistingAlliedArticle(sourceId, originalGuid, originalUrl) {
+  const dedupeConditions = [];
+
+  if (originalGuid) {
+    dedupeConditions.push({ "syndication.originalGuid": originalGuid });
+  }
+
+  if (originalUrl) {
+    dedupeConditions.push({ "syndication.originalUrl": originalUrl });
+  }
+
+  if (dedupeConditions.length === 0) {
+    return null;
+  }
+
+  return Article.findOne({
+    deletedAt: null,
+    "syndication.sourceType": "allied_rss",
+    "syndication.feedSource": sourceId,
+    $or: dedupeConditions
+  }).select("_id title excerpt body contentBlocks cover tags readingTime publishedAt status moderationHistory seo syndication");
+}
+
+async function syncAlliedFeedSource(source, actorUser) {
+  const xml = await fetchRemoteFeedXml(source.feedUrl);
+  const drafts = parseAlliedFeedDocument(xml, source).slice(0, source.maxItemsPerSync);
+  const importedArticles = [];
+  const updatedArticles = [];
+  let skippedCount = 0;
+  const syncedAt = new Date();
+
+  for (const draft of drafts) {
+    const existing = await findExistingAlliedArticle(source._id, draft.originalGuid, draft.originalUrl);
+    const preparedDraft = await hydrateAlliedDraftFromArticlePage(draft, source);
+
+    if (existing) {
+      const nextBody = preparedDraft.body.length > 0 ? preparedDraft.body : sanitizeParagraphs(preparedDraft.excerpt);
+      const nextPublishedAt =
+        existing.status === "published" ? (existing.publishedAt ?? preparedDraft.publishedAt ?? syncedAt) : existing.publishedAt;
+
+      existing.title = preparedDraft.title;
+      existing.excerpt = preparedDraft.excerpt;
+      existing.body = nextBody;
+      existing.contentBlocks = preparedDraft.contentBlocks;
+      existing.cover = preparedDraft.cover;
+      existing.tags = preparedDraft.tags;
+      existing.readingTime = Math.max(1, Number(preparedDraft.readingTime ?? existing.readingTime ?? 1));
+      existing.publishedAt = nextPublishedAt;
+      existing.syndication = {
+        ...existing.syndication,
+        sourceType: "allied_rss",
+        feedSource: source._id,
+        sourceName: source.name,
+        sourceUrl: source.feedUrl,
+        originalUrl: preparedDraft.originalUrl,
+        originalGuid: preparedDraft.originalGuid,
+        authorName: preparedDraft.authorName,
+        attributionLabel: source.attributionLabel || source.name,
+        allowExternalMedia: true,
+        allowedMediaHosts: preparedDraft.allowedMediaHosts,
+        importedAt: syncedAt
+      };
+      existing.seo = {
+        ...(existing.seo ?? {}),
+        title: preparedDraft.title,
+        description: sanitizeText(preparedDraft.excerpt, 160)
+      };
+      existing.moderationHistory = [
+        ...(Array.isArray(existing.moderationHistory) ? existing.moderationHistory : []),
+        {
+          actor: actorUser._id,
+          role: actorUser.role,
+          action: "updated",
+          note: `Sincronizado de nuevo desde el medio aliado ${source.name}.`
+        }
+      ];
+
+      await existing.save();
+      updatedArticles.push(existing);
+      continue;
+    }
+
+    const status = mapFeedImportModeToStatus(source.importMode);
+    const article = await Article.create({
+      title: preparedDraft.title,
+      slug: await buildUniqueSlug(preparedDraft.title),
+      subtitle: "",
+      excerpt: preparedDraft.excerpt,
+      body: preparedDraft.body.length > 0 ? preparedDraft.body : sanitizeParagraphs(preparedDraft.excerpt),
+      contentBlocks: preparedDraft.contentBlocks,
+      cover: preparedDraft.cover,
+      category: source.defaultCategory ?? null,
+      author: actorUser._id,
+      tags: preparedDraft.tags,
+      featured: false,
+      isPremium: false,
+      status,
+      readingTime: Math.max(1, Number(preparedDraft.readingTime ?? 1)),
+      publishedAt: status === "published" ? (preparedDraft.publishedAt ?? syncedAt) : null,
+      moderationHistory: [
+        {
+          actor: actorUser._id,
+          role: actorUser.role,
+          action: "created",
+          note: `Importado desde el medio aliado ${source.name}.`
+        }
+      ],
+      syndication: {
+        sourceType: "allied_rss",
+        feedSource: source._id,
+        sourceName: source.name,
+        sourceUrl: source.feedUrl,
+        originalUrl: preparedDraft.originalUrl,
+        originalGuid: preparedDraft.originalGuid,
+        authorName: preparedDraft.authorName,
+        attributionLabel: source.attributionLabel || source.name,
+        allowExternalMedia: true,
+        allowedMediaHosts: preparedDraft.allowedMediaHosts,
+        importedAt: syncedAt
+      },
+      seo: {
+        title: preparedDraft.title,
+        description: sanitizeText(preparedDraft.excerpt, 160)
+      }
+    });
+
+    importedArticles.push(article);
+  }
+
+  source.lastFetchedAt = syncedAt;
+  source.lastImportedAt = importedArticles.length > 0 || updatedArticles.length > 0 ? syncedAt : source.lastImportedAt;
+  source.lastImportCount = importedArticles.length;
+  source.lastSkippedCount = skippedCount;
+  source.lastError = "";
+  await source.save();
+
+  return {
+    syncedAt,
+    importedCount: importedArticles.length,
+    updatedCount: updatedArticles.length,
+    skippedCount,
+    items: [...importedArticles, ...updatedArticles].map((article) => ({
+      id: article._id.toString(),
+      title: article.title,
+      slug: article.slug,
+      status: article.status
+    }))
   };
 }
 
@@ -372,6 +856,166 @@ export async function deleteDashboardCommunication(req, res, next) {
       message: "La comunicación editorial fue retirada."
     });
   } catch (error) {
+    next(error);
+  }
+}
+
+export async function listAlliedFeedSources(_req, res, next) {
+  try {
+    const sources = await AlliedFeedSource.find({})
+      .populate({ path: "defaultCategory", select: "name slug" })
+      .sort({ updatedAt: -1, createdAt: -1 });
+
+    res.json({
+      items: sources.map(serializeAlliedFeedSource)
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function createAlliedFeedSource(req, res, next) {
+  try {
+    const payload = await normalizeAlliedFeedPayload(req.body);
+    const source = await AlliedFeedSource.create(payload);
+    const populated = await AlliedFeedSource.findById(source._id).populate({ path: "defaultCategory", select: "name slug" });
+
+    await writeAuditLog(req, {
+      actor: req.user,
+      action: "allied_feed.created",
+      targetType: "allied_feed",
+      targetId: source._id.toString(),
+      details: {
+        name: source.name,
+        feedUrl: source.feedUrl,
+        importMode: source.importMode
+      }
+    });
+
+    res.status(201).json({
+      source: serializeAlliedFeedSource(populated)
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function updateAlliedFeedSource(req, res, next) {
+  try {
+    const source = await AlliedFeedSource.findById(req.params.sourceId);
+
+    if (!source) {
+      return res.status(404).json({ message: "Fuente aliada no encontrada." });
+    }
+
+    const payload = await normalizeAlliedFeedPayload(req.body, source);
+    Object.assign(source, payload);
+    await source.save();
+
+    const populated = await AlliedFeedSource.findById(source._id).populate({ path: "defaultCategory", select: "name slug" });
+
+    await writeAuditLog(req, {
+      actor: req.user,
+      action: "allied_feed.updated",
+      targetType: "allied_feed",
+      targetId: source._id.toString(),
+      details: {
+        name: source.name,
+        feedUrl: source.feedUrl,
+        importMode: source.importMode
+      }
+    });
+
+    res.json({
+      source: serializeAlliedFeedSource(populated)
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function deleteAlliedFeedSource(req, res, next) {
+  try {
+    const source = await AlliedFeedSource.findById(req.params.sourceId);
+
+    if (!source) {
+      return res.status(404).json({ message: "Fuente aliada no encontrada." });
+    }
+
+    await source.deleteOne();
+
+    await writeAuditLog(req, {
+      actor: req.user,
+      action: "allied_feed.deleted",
+      targetType: "allied_feed",
+      targetId: source._id.toString(),
+      details: {
+        name: source.name
+      }
+    });
+
+    res.json({
+      message: "La fuente aliada fue eliminada."
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function syncAlliedFeedSourceNow(req, res, next) {
+  try {
+    const source = await AlliedFeedSource.findById(req.params.sourceId);
+
+    if (!source) {
+      return res.status(404).json({ message: "Fuente aliada no encontrada." });
+    }
+
+    if (!source.isActive) {
+      return res.status(409).json({ message: "Activa la fuente antes de sincronizarla." });
+    }
+
+    const result = await syncAlliedFeedSource(source, req.user);
+
+    await writeAuditLog(req, {
+      actor: req.user,
+      action: "allied_feed.synced",
+      targetType: "allied_feed",
+      targetId: source._id.toString(),
+      details: {
+        name: source.name,
+        importedCount: result.importedCount,
+        updatedCount: result.updatedCount,
+        skippedCount: result.skippedCount,
+        syncedAt: result.syncedAt.toISOString()
+      }
+    });
+
+    const syncSummary =
+      result.importedCount > 0 && result.updatedCount > 0
+        ? `Se importaron ${result.importedCount} artículos y se actualizaron ${result.updatedCount} ya existentes.`
+        : result.importedCount > 0
+          ? `Se importaron ${result.importedCount} artículos nuevos.`
+          : result.updatedCount > 0
+            ? `Se actualizaron ${result.updatedCount} artículos ya importados.`
+            : "No hubo artículos nuevos ni cambios para sincronizar.";
+
+    res.json({
+      message:
+        result.skippedCount > 0
+          ? `${syncSummary} Se omitieron ${result.skippedCount} duplicados.`
+          : syncSummary,
+      result
+    });
+  } catch (error) {
+    if (mongoose.isValidObjectId?.(req.params.sourceId)) {
+      await AlliedFeedSource.findByIdAndUpdate(req.params.sourceId, {
+        $set: {
+          lastFetchedAt: new Date(),
+          lastError: sanitizeText(error?.message ?? "Error de sincronización.", 240)
+        }
+      }).catch(() => undefined);
+    }
+
     next(error);
   }
 }

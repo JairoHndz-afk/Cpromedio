@@ -4,10 +4,13 @@ import { FormsModule } from "@angular/forms";
 import { DomSanitizer, SafeResourceUrl } from "@angular/platform-browser";
 
 import { AuthService } from "../../core/services/auth.service";
+import { API_BASE_URL } from "../../core/services/api-base";
 import { DashboardApiService } from "../../core/services/dashboard-api.service";
 import { SeoService } from "../../core/services/seo.service";
 import { ToastService } from "../../core/services/toast.service";
 import {
+  AlliedFeedSource,
+  AlliedFeedSyncResult,
   ArticleContentBlock,
   AuditEntry,
   Category,
@@ -17,6 +20,7 @@ import {
   SubscriptionEntry,
   UserSession
 } from "../../core/types/api.types";
+import { ArticleGalleryImage, ArticleRenderSegment, buildArticleRenderSegments } from "../../core/utils/article-render-segments";
 import { renderEditorialText } from "../../core/utils/editorial-rich-text";
 import { isInstagramEmbed, isTweetEmbed, resolveInstagramEmbedSource, resolveTweetEmbedSource, resolveVideoEmbed } from "../../core/utils/video-embed";
 import { CKEditorModule } from "@ckeditor/ckeditor5-angular";
@@ -43,7 +47,7 @@ import {
 } from "ckeditor5";
 import esTranslations from "ckeditor5/translations/es.js";
 
-type DashboardSection = "overview" | "articles" | "team" | "categories" | "audience" | "communications" | "profile";
+type DashboardSection = "overview" | "articles" | "team" | "categories" | "audience" | "communications" | "alliances" | "profile";
 type OverviewPanel = "recent" | "top" | "account";
 type ArticleWorkspaceTab = "redaction" | "format" | "media" | "preview" | "publish";
 type ArticleEditorStep = "body" | "preview" | "subtitle" | "title" | "settings" | "review";
@@ -52,6 +56,7 @@ type EditorSidebarTab = "document" | "block";
 type BlockTextField = "headingText" | "text" | "quoteText";
 type PasswordFieldKey = "user" | "current" | "next" | "confirm";
 type CommunicationDurationPreset = "hours" | "week" | "month";
+type ArticleAutosaveState = "idle" | "pending" | "saving" | "saved" | "error";
 
 interface SectionConfig {
   id: DashboardSection;
@@ -98,6 +103,22 @@ interface CommunicationFormState {
   ctaUrl: string;
   durationPreset: CommunicationDurationPreset;
   durationHours: number;
+}
+
+interface AlliedFeedFormState {
+  id: string;
+  name: string;
+  feedUrl: string;
+  siteUrl: string;
+  attributionLabel: string;
+  logoUrl: string;
+  allowedMediaHosts: string;
+  defaultTags: string;
+  defaultCategoryId: string;
+  importMode: "draft" | "review" | "published";
+  maxItemsPerSync: number;
+  permissionNote: string;
+  isActive: boolean;
 }
 
 interface SuggestedNewsTag {
@@ -482,6 +503,7 @@ function createEditorialUploadAdapterPlugin(
                     class="doc-editor__title-input"
                     type="text"
                     [(ngModel)]="articleForm.title"
+                    (ngModelChange)="queueArticleAutosave()"
                     name="title"
                     placeholder="Título del artículo"
                     required
@@ -490,6 +512,7 @@ function createEditorialUploadAdapterPlugin(
                   <textarea
                     class="doc-editor__subtitle-input"
                     [(ngModel)]="articleForm.subtitle"
+                    (ngModelChange)="queueArticleAutosave()"
                     name="subtitle"
                     rows="3"
                     placeholder="Bajada o subtítulo"
@@ -509,7 +532,7 @@ function createEditorialUploadAdapterPlugin(
                     <div class="doc-cover__fields">
                       <label>
                         <span>Tipo de portada</span>
-                        <select [(ngModel)]="articleForm.coverType" name="coverType">
+                        <select [(ngModel)]="articleForm.coverType" (ngModelChange)="queueArticleAutosave()" name="coverType">
                           <option value="image">Imagen</option>
                           <option value="video">Video</option>
                           <option value="audio">Audio</option>
@@ -519,7 +542,7 @@ function createEditorialUploadAdapterPlugin(
 
                       <label>
                         <span>URL o ruta de portada</span>
-                        <input type="url" [(ngModel)]="articleForm.coverUrl" name="coverUrl" placeholder="/uploads/news/2026/07/portada.webp" />
+                        <input type="url" [(ngModel)]="articleForm.coverUrl" (ngModelChange)="queueArticleAutosave()" name="coverUrl" placeholder="/uploads/news/2026/07/portada.webp" />
                       </label>
 
                       <label *ngIf="isVisualCoverType(articleForm.coverType)">
@@ -534,19 +557,19 @@ function createEditorialUploadAdapterPlugin(
 
                       <label>
                         <span>Texto alternativo</span>
-                        <input type="text" [(ngModel)]="articleForm.coverAlt" name="coverAlt" placeholder="Describe la imagen de portada" />
+                        <input type="text" [(ngModel)]="articleForm.coverAlt" (ngModelChange)="queueArticleAutosave()" name="coverAlt" placeholder="Describe la imagen de portada" />
                       </label>
                     </div>
 
                     <div class="form-grid" *ngIf="articleForm.coverUrl && isVisualCoverType(articleForm.coverType)">
                       <label>
                         <span>Enfoque X: {{ articleForm.coverPositionX }}%</span>
-                        <input type="range" min="0" max="100" step="0.1" [(ngModel)]="articleForm.coverPositionX" name="coverPositionX" />
+                        <input type="range" min="0" max="100" step="0.1" [(ngModel)]="articleForm.coverPositionX" (ngModelChange)="queueArticleAutosave()" name="coverPositionX" />
                       </label>
 
                       <label>
                         <span>Enfoque Y: {{ articleForm.coverPositionY }}%</span>
-                        <input type="range" min="0" max="100" step="0.1" [(ngModel)]="articleForm.coverPositionY" name="coverPositionY" />
+                        <input type="range" min="0" max="100" step="0.1" [(ngModel)]="articleForm.coverPositionY" (ngModelChange)="queueArticleAutosave()" name="coverPositionY" />
                       </label>
                     </div>
 
@@ -583,9 +606,15 @@ function createEditorialUploadAdapterPlugin(
                     <div class="doc-body-editor__notes">
                       <p class="helper-text">
                         Usa “Encabezado 2” para intertítulos, “Encabezado 3” para subtítulos internos, “Cita” para destacar frases y “Insertar imagen” o
-                        “Insertar contenido multimedia” desde la barra del editor.
+                        “Insertar contenido multimedia” desde la barra del editor. El área de redacción mantiene su propio scroll para que los controles sigan visibles.
                       </p>
-                      <button class="button button--ghost" type="button" (click)="applySuggestedPreview()">Generar resumen sugerido</button>
+                      <div class="doc-body-editor__notes-actions">
+                        <div class="doc-autosave" *ngIf="articleAutosaveMessage() as autosaveMessage" [attr.data-state]="articleAutosaveState">
+                          <span class="doc-autosave__dot"></span>
+                          <span>{{ autosaveMessage }}</span>
+                        </div>
+                        <button class="button button--ghost" type="button" (click)="applySuggestedPreview()">Generar resumen sugerido</button>
+                      </div>
                     </div>
                   </section>
                 </section>
@@ -622,56 +651,94 @@ function createEditorialUploadAdapterPlugin(
                     </div>
 
                     <article class="article-body article-body--editor-preview">
-                      <ng-container *ngFor="let block of articleBodyPreviewBlocks">
-                        <ng-container *ngIf="block.type === 'heading'">
+                      <ng-container *ngFor="let segment of articleBodyPreviewSegments; trackBy: trackRenderSegment">
+                        <ng-container *ngIf="segment.kind === 'block' && segment.block.type === 'heading'">
                           <h2
-                            *ngIf="block.heading.level === 'h2'; else compactPreviewHeading"
+                            *ngIf="segment.block.heading.level === 'h2'; else compactPreviewHeading"
                             class="article-section-heading"
-                            [class.article-section-heading--center]="block.heading.align === 'center'"
-                            [class.article-section-heading--right]="block.heading.align === 'right'"
-                            [innerHTML]="renderPreviewBlockText(block)"
+                            [class.article-section-heading--center]="segment.block.heading.align === 'center'"
+                            [class.article-section-heading--right]="segment.block.heading.align === 'right'"
+                            [innerHTML]="renderPreviewBlockText(segment.block)"
                           ></h2>
                           <ng-template #compactPreviewHeading>
                             <h3
                               class="article-section-heading article-section-heading--compact"
-                              [class.article-section-heading--center]="block.heading.align === 'center'"
-                              [class.article-section-heading--right]="block.heading.align === 'right'"
-                              [innerHTML]="renderPreviewBlockText(block)"
+                              [class.article-section-heading--center]="segment.block.heading.align === 'center'"
+                              [class.article-section-heading--right]="segment.block.heading.align === 'right'"
+                              [innerHTML]="renderPreviewBlockText(segment.block)"
                             ></h3>
                           </ng-template>
                         </ng-container>
 
-                        <p *ngIf="block.type === 'paragraph'" [innerHTML]="renderPreviewBlockText(block)"></p>
+                        <p *ngIf="segment.kind === 'block' && segment.block.type === 'paragraph'" [innerHTML]="renderPreviewBlockText(segment.block)"></p>
 
-                        <blockquote class="article-quote" *ngIf="block.type === 'quote'">
-                          <p [innerHTML]="renderPreviewBlockText(block)"></p>
-                          <footer class="article-quote__attribution" *ngIf="block.quote.attribution">{{ block.quote.attribution }}</footer>
+                        <blockquote class="article-quote" *ngIf="segment.kind === 'block' && segment.block.type === 'quote'">
+                          <p [innerHTML]="renderPreviewBlockText(segment.block)"></p>
+                          <footer class="article-quote__attribution" *ngIf="segment.block.quote.attribution">{{ segment.block.quote.attribution }}</footer>
                         </blockquote>
 
-                        <figure class="article-inline-media" *ngIf="block.type === 'image' && block.image.url">
-                          <img [src]="block.image.url" [alt]="block.image.alt || articleDisplayTitle()" />
-                          <figcaption *ngIf="block.image.caption || block.image.alt">{{ block.image.caption || block.image.alt }}</figcaption>
+                        <figure class="article-inline-media" *ngIf="segment.kind === 'block' && segment.block.type === 'image' && segment.block.image.url">
+                          <img [src]="segment.block.image.url" [alt]="segment.block.image.alt || articleDisplayTitle()" />
+                          <figcaption *ngIf="segment.block.image.caption || segment.block.image.alt">{{ segment.block.image.caption || segment.block.image.alt }}</figcaption>
                         </figure>
 
-                        <ng-container *ngIf="block.type === 'embed'">
-                          <figure class="article-inline-embed article-inline-embed--social-preview" *ngIf="socialEmbedPreviewData(block.embed.url) as socialEmbed; else previewVideoEmbedBlock">
+                        <figure class="article-image-gallery" *ngIf="segment.kind === 'gallery' && previewGalleryImage(segment) as activePreviewImage">
+                          <div class="article-image-gallery__frame">
+                            <button
+                              class="article-image-gallery__control article-image-gallery__control--prev"
+                              type="button"
+                              (click)="previousPreviewGallerySlide(segment)"
+                              [disabled]="segment.images.length < 2"
+                              aria-label="Ver foto anterior"
+                            >
+                              &#8249;
+                            </button>
+                            <img [src]="activePreviewImage.url" [alt]="activePreviewImage.alt || articleDisplayTitle()" />
+                            <button
+                              class="article-image-gallery__control article-image-gallery__control--next"
+                              type="button"
+                              (click)="nextPreviewGallerySlide(segment)"
+                              [disabled]="segment.images.length < 2"
+                              aria-label="Ver foto siguiente"
+                            >
+                              &#8250;
+                            </button>
+                            <span class="article-image-gallery__count">{{ previewGallerySlideLabel(segment) }}</span>
+                          </div>
+                          <figcaption class="article-image-gallery__footer">
+                            <span class="article-image-gallery__caption">{{ activePreviewImage.caption || activePreviewImage.alt || "Serie fotográfica del artículo" }}</span>
+                            <span class="article-image-gallery__dots" *ngIf="segment.images.length > 1">
+                              <button
+                                type="button"
+                                class="article-image-gallery__dot"
+                                *ngFor="let image of segment.images; let imageIndex = index"
+                                [class.is-active]="imageIndex === activePreviewGalleryIndex(segment)"
+                                (click)="setPreviewGallerySlide(segment, imageIndex)"
+                                [attr.aria-label]="'Ver foto ' + (imageIndex + 1)"
+                              ></button>
+                            </span>
+                          </figcaption>
+                        </figure>
+
+                        <ng-container *ngIf="segment.kind === 'block' && segment.block.type === 'embed'">
+                          <figure class="article-inline-embed article-inline-embed--social-preview" *ngIf="socialEmbedPreviewData(segment.block.embed.url) as socialEmbed; else previewVideoEmbedBlock">
                             <div class="article-social-preview">
                               <p class="eyebrow">{{ socialEmbed.label }}</p>
-                              <strong>{{ block.embed.title || socialEmbed.title }}</strong>
+                              <strong>{{ segment.block.embed.title || socialEmbed.title }}</strong>
                               <p>{{ socialEmbed.description }}</p>
                               <a [href]="socialEmbed.url" target="_blank" rel="noopener noreferrer">{{ socialEmbed.url }}</a>
                             </div>
                           </figure>
                           <ng-template #previewVideoEmbedBlock>
-                            <figure class="article-inline-embed" *ngIf="safePreviewEmbedUrl(block.embed.url) as embedUrl">
+                            <figure class="article-inline-embed" *ngIf="safePreviewEmbedUrl(segment.block.embed.url) as embedUrl">
                               <iframe
                                 [src]="embedUrl"
-                                [title]="block.embed.title || articleDisplayTitle()"
+                                [title]="segment.block.embed.title || articleDisplayTitle()"
                                 loading="lazy"
                                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                                 allowfullscreen
                               ></iframe>
-                              <figcaption *ngIf="block.embed.title">{{ block.embed.title }}</figcaption>
+                              <figcaption *ngIf="segment.block.embed.title">{{ segment.block.embed.title }}</figcaption>
                             </figure>
                           </ng-template>
                         </ng-container>
@@ -697,13 +764,13 @@ function createEditorialUploadAdapterPlugin(
                   <div class="doc-editor__settings-grid">
                     <label>
                       <span>Previsualización corta</span>
-                      <textarea [(ngModel)]="articleForm.excerpt" name="excerpt" rows="4" placeholder="Resumen corto para portada, SEO y compartidos"></textarea>
+                      <textarea [(ngModel)]="articleForm.excerpt" (ngModelChange)="queueArticleAutosave()" name="excerpt" rows="4" placeholder="Resumen corto para portada, SEO y compartidos"></textarea>
                     </label>
 
                     <div class="doc-editor__field-group doc-editor__field-group--tags">
                       <label>
                         <span>Etiquetas</span>
-                        <input type="text" [(ngModel)]="articleForm.tags" name="tags" placeholder="actualidad, política, justicia" />
+                        <input type="text" [(ngModel)]="articleForm.tags" (ngModelChange)="queueArticleAutosave()" name="tags" placeholder="actualidad, política, justicia" />
                       </label>
                       <div class="doc-editor__tag-suggestions" aria-label="Etiquetas sugeridas para noticias en Colombia">
                         <button
@@ -723,7 +790,7 @@ function createEditorialUploadAdapterPlugin(
 
                     <label>
                       <span>Categoría opcional</span>
-                      <select [(ngModel)]="articleForm.categoryId" name="categoryId">
+                      <select [(ngModel)]="articleForm.categoryId" (ngModelChange)="queueArticleAutosave()" name="categoryId">
                         <option value="">Sin categoría</option>
                         <option *ngFor="let category of categories" [value]="category.id">{{ category.name }}</option>
                       </select>
@@ -746,7 +813,7 @@ function createEditorialUploadAdapterPlugin(
 
                     <label *ngIf="currentUser.role === 'admin'">
                       <span>Estado</span>
-                      <select [(ngModel)]="articleForm.status" name="status">
+                      <select [(ngModel)]="articleForm.status" (ngModelChange)="queueArticleAutosave()" name="status">
                         <option value="draft">Borrador</option>
                         <option value="review">En revisión</option>
                         <option value="changes_requested">Correcciones</option>
@@ -758,7 +825,7 @@ function createEditorialUploadAdapterPlugin(
                     </label>
 
                     <label class="editor-checkbox" *ngIf="currentUser.role === 'admin'">
-                      <input type="checkbox" [(ngModel)]="articleForm.featured" name="featured" />
+                      <input type="checkbox" [(ngModel)]="articleForm.featured" (ngModelChange)="queueArticleAutosave()" name="featured" />
                       <span>Destacar en portada</span>
                     </label>
                   </div>
@@ -1294,6 +1361,180 @@ function createEditorialUploadAdapterPlugin(
           <p class="empty-state" *ngIf="!communication">
             Cuando publiques una comunicaci&oacute;n, quedar&aacute; activa aqu&iacute; y el sitio la servir&aacute; hasta su fecha de vencimiento.
           </p>
+        </section>
+      </section>
+
+      <section class="dashboard-columns" *ngIf="activeSection === 'alliances' && currentUser.role === 'admin'">
+        <section class="dashboard-panel">
+          <div class="panel-heading">
+            <div>
+              <h2>Medios aliados</h2>
+              <p class="panel-subtitle">Registra feeds RSS autorizados para copiar notas completas, conservar atribución y enviarlas al flujo editorial.</p>
+            </div>
+            <span class="count-pill">{{ alliedFeedForm.id ? "Editando" : "Nueva fuente" }}</span>
+          </div>
+
+          <form class="stack-form" (ngSubmit)="saveAlliedFeed()">
+            <div class="form-grid">
+              <label>
+                <span>Nombre del medio</span>
+                <input type="text" [(ngModel)]="alliedFeedForm.name" name="alliedFeedName" placeholder="Medio aliado" required />
+              </label>
+
+              <label>
+                <span>Modo de entrada</span>
+                <select [(ngModel)]="alliedFeedForm.importMode" name="alliedFeedImportMode">
+                  <option value="draft">Guardar como borrador</option>
+                  <option value="review">Enviar a revisión</option>
+                  <option value="published">Publicar directo</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="form-grid">
+              <label>
+                <span>Feed RSS</span>
+                <input type="text" [(ngModel)]="alliedFeedForm.feedUrl" name="alliedFeedUrl" placeholder="https://medio.co/feed/" required />
+              </label>
+
+              <label>
+                <span>Sitio del aliado</span>
+                <input type="text" [(ngModel)]="alliedFeedForm.siteUrl" name="alliedFeedSiteUrl" placeholder="https://medio.co/" />
+              </label>
+            </div>
+
+            <div class="form-grid">
+              <label>
+                <span>Atribución visible</span>
+                <input type="text" [(ngModel)]="alliedFeedForm.attributionLabel" name="alliedFeedAttribution" placeholder="Publicado originalmente por..." />
+              </label>
+
+              <label>
+                <span>Logo opcional</span>
+                <input type="text" [(ngModel)]="alliedFeedForm.logoUrl" name="alliedFeedLogoUrl" placeholder="https://medio.co/logo.png" />
+              </label>
+            </div>
+
+            <div class="form-grid">
+              <label>
+                <span>Hosts multimedia permitidos</span>
+                <textarea
+                  [(ngModel)]="alliedFeedForm.allowedMediaHosts"
+                  name="alliedFeedAllowedHosts"
+                  rows="3"
+                  placeholder="cdn.medio.co, images.medio.co"
+                ></textarea>
+              </label>
+
+              <label>
+                <span>Etiquetas base</span>
+                <textarea
+                  [(ngModel)]="alliedFeedForm.defaultTags"
+                  name="alliedFeedTags"
+                  rows="3"
+                  placeholder="actualidad, análisis, aliado"
+                ></textarea>
+              </label>
+            </div>
+
+            <div class="form-grid">
+              <label>
+                <span>Categoría base</span>
+                <select [(ngModel)]="alliedFeedForm.defaultCategoryId" name="alliedFeedCategoryId">
+                  <option value="">Sin categoría fija</option>
+                  <option *ngFor="let category of categories" [value]="category.id">{{ category.name }}</option>
+                </select>
+              </label>
+
+              <label>
+                <span>Máximo por sincronización</span>
+                <input type="number" min="1" max="20" [(ngModel)]="alliedFeedForm.maxItemsPerSync" name="alliedFeedMaxItems" />
+              </label>
+            </div>
+
+            <div class="form-grid">
+              <label>
+                <span>Estado</span>
+                <select [(ngModel)]="alliedFeedForm.isActive" name="alliedFeedIsActive">
+                  <option [ngValue]="true">Activa</option>
+                  <option [ngValue]="false">Pausada</option>
+                </select>
+              </label>
+
+              <label>
+                <span>Nota de permiso</span>
+                <input type="text" [(ngModel)]="alliedFeedForm.permissionNote" name="alliedFeedPermissionNote" placeholder="Permiso editorial vigente" />
+              </label>
+            </div>
+
+            <p class="helper-text">
+              Los hosts multimedia permitidos controlan qué dominios externos pueden conservar imágenes dentro del artículo importado.
+            </p>
+
+            <div class="button-row">
+              <button class="button" type="submit" [disabled]="savingAlliedFeed">
+                {{ savingAlliedFeed ? "Guardando..." : (alliedFeedForm.id ? "Actualizar fuente" : "Registrar fuente") }}
+              </button>
+              <button class="button button--secondary" type="button" (click)="resetAlliedFeedForm()">Limpiar</button>
+            </div>
+          </form>
+        </section>
+
+        <section class="dashboard-panel dashboard-panel--accent">
+          <div class="panel-heading">
+            <div>
+              <h2>Fuentes registradas</h2>
+              <p class="panel-subtitle">Sincroniza piezas nuevas y evita duplicados por GUID o URL original.</p>
+            </div>
+            <span class="count-pill">{{ alliedFeeds.length }} fuentes</span>
+          </div>
+
+          <div class="dashboard-list">
+            <article class="history-row" *ngFor="let source of alliedFeeds">
+              <strong>{{ source.name }}</strong>
+              <span>{{ formatAlliedFeedMode(source.importMode) }} | {{ source.isActive ? "Activa" : "Pausada" }}</span>
+              <p>{{ source.feedUrl }}</p>
+              <p *ngIf="source.defaultCategoryName">Categoría base: {{ source.defaultCategoryName }}</p>
+              <p *ngIf="source.lastImportedAt">Última importación: {{ source.lastImportedAt | date: "short" }} | +{{ source.lastImportCount }} nuevas</p>
+              <p *ngIf="source.lastError">Error reciente: {{ source.lastError }}</p>
+
+              <div class="button-row">
+                <button class="button button--secondary" type="button" (click)="editAlliedFeed(source)">Editar</button>
+                <button
+                  class="button"
+                  type="button"
+                  [disabled]="syncingAlliedFeedId === source.id || !source.isActive"
+                  (click)="syncAlliedFeed(source)"
+                >
+                  {{ syncingAlliedFeedId === source.id ? "Sincronizando..." : "Sincronizar ahora" }}
+                </button>
+                <button
+                  class="button button--ghost"
+                  type="button"
+                  [disabled]="deletingAlliedFeedId === source.id"
+                  (click)="deleteAlliedFeed(source)"
+                >
+                  {{ deletingAlliedFeedId === source.id ? "Eliminando..." : "Eliminar" }}
+                </button>
+              </div>
+            </article>
+
+            <p class="empty-state" *ngIf="alliedFeeds.length === 0">Todavía no has registrado medios aliados.</p>
+          </div>
+
+          <div class="history-row" *ngIf="alliedFeedResult">
+            <strong>Última sincronización</strong>
+            <span>{{ alliedFeedResult.syncedAt | date: "short" }}</span>
+            <p>Importadas: {{ alliedFeedResult.importedCount }} | Duplicadas omitidas: {{ alliedFeedResult.skippedCount }}</p>
+          </div>
+
+          <div class="dashboard-list" *ngIf="alliedFeedResult?.items?.length">
+            <div class="history-row" *ngFor="let item of alliedFeedResult?.items">
+              <strong>{{ item.title }}</strong>
+              <span>{{ formatArticleStatus(item.status) }}</span>
+              <p>/articulo/{{ item.slug }}</p>
+            </div>
+          </div>
         </section>
       </section>
 
@@ -2161,6 +2402,7 @@ function createEditorialUploadAdapterPlugin(
     }
 
     .doc-body-editor__surface {
+      display: grid;
       border: 1px solid rgba(18, 28, 46, 0.1);
       border-radius: 20px;
       overflow: hidden;
@@ -2174,6 +2416,53 @@ function createEditorialUploadAdapterPlugin(
       gap: 10px;
       align-items: center;
       justify-content: space-between;
+    }
+
+    .doc-body-editor__notes-actions {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .doc-autosave {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.55rem;
+      padding: 0.7rem 0.95rem;
+      border-radius: 999px;
+      border: 1px solid rgba(18, 28, 46, 0.1);
+      background: rgba(255, 255, 255, 0.88);
+      color: #41506a;
+      font-size: 0.83rem;
+      font-weight: 600;
+      line-height: 1.3;
+    }
+
+    .doc-autosave__dot {
+      width: 0.62rem;
+      height: 0.62rem;
+      border-radius: 999px;
+      background: linear-gradient(135deg, #7f9cff, #ed7464);
+      box-shadow: 0 0 0 4px rgba(102, 137, 255, 0.1);
+      flex: 0 0 auto;
+    }
+
+    .doc-autosave[data-state="pending"] .doc-autosave__dot {
+      background: #f0bf4c;
+      box-shadow: 0 0 0 4px rgba(240, 191, 76, 0.12);
+    }
+
+    .doc-autosave[data-state="saving"] .doc-autosave__dot {
+      background: #5d83ff;
+      box-shadow: 0 0 0 4px rgba(93, 131, 255, 0.12);
+      animation: doc-autosave-pulse 1.1s ease-in-out infinite;
+    }
+
+    .doc-autosave[data-state="error"] .doc-autosave__dot {
+      background: #d45555;
+      box-shadow: 0 0 0 4px rgba(212, 85, 85, 0.12);
     }
 
     .doc-body-preview .article-body {
@@ -2192,7 +2481,10 @@ function createEditorialUploadAdapterPlugin(
     }
 
     :host ::ng-deep .ck.ck-editor {
-      display: block;
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+      min-height: 420px;
+      height: min(68vh, 860px);
     }
 
     :host ::ng-deep .ck.ck-toolbar {
@@ -2208,10 +2500,18 @@ function createEditorialUploadAdapterPlugin(
       border-radius: 12px;
     }
 
+    :host ::ng-deep .ck.ck-editor__main {
+      min-height: 0;
+    }
+
     :host ::ng-deep .ck.ck-editor__main > .ck-editor__editable {
       min-height: 420px;
+      height: 100%;
       padding: 28px 30px;
       border: 0;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      scrollbar-gutter: stable;
       color: #142038;
       background: rgba(255, 255, 255, 0.99);
       box-shadow: none;
@@ -2264,6 +2564,12 @@ function createEditorialUploadAdapterPlugin(
       box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
     }
 
+    :host-context(:root[data-theme="dark"]) .doc-autosave {
+      border-color: rgba(176, 188, 214, 0.12);
+      background: rgba(12, 16, 24, 0.94);
+      color: #d7e1f6;
+    }
+
     :host-context(:root[data-theme="dark"]) :host ::ng-deep .ck.ck-toolbar,
     :host-context(:root[data-theme="dark"]) ::ng-deep .ck.ck-toolbar {
       border-bottom-color: rgba(176, 188, 214, 0.1);
@@ -2288,6 +2594,16 @@ function createEditorialUploadAdapterPlugin(
     :host-context(:root[data-theme="dark"]) ::ng-deep .ck.ck-editor__main > .ck-editor__editable a {
       color: #9abbff;
       text-decoration-color: rgba(154, 187, 255, 0.42);
+    }
+
+    @keyframes doc-autosave-pulse {
+      0%,
+      100% {
+        transform: scale(1);
+      }
+      50% {
+        transform: scale(1.12);
+      }
     }
 
     .doc-block__image-preview figcaption {
@@ -2996,6 +3312,10 @@ function createEditorialUploadAdapterPlugin(
         justify-content: center;
       }
 
+      :host ::ng-deep .ck.ck-editor {
+        height: min(62vh, 720px);
+      }
+
       .dashboard-confirm {
         padding: 16px;
         align-items: end;
@@ -3034,6 +3354,7 @@ export class DashboardPageComponent {
     { id: "categories", label: "Categorías", description: "Taxonomía opcional del sitio.", adminOnly: true },
     { id: "audience", label: "Audiencia", description: "Suscripciones y auditoría.", adminOnly: true },
     { id: "communications", label: "Comunicaciones", description: "Avisos modales y ventanas temporales.", adminOnly: true },
+    { id: "alliances", label: "Medios aliados", description: "RSS, copiado autorizado y sindicación.", adminOnly: true },
     { id: "profile", label: "Perfil", description: "Datos personales y seguridad." }
   ];
   private readonly articleStatusLabels: Record<DashboardArticle["status"], string> = {
@@ -3199,6 +3520,8 @@ export class DashboardPageComponent {
   };
   categories: Category[] = [];
   communication: SiteCommunication | null = null;
+  alliedFeeds: AlliedFeedSource[] = [];
+  alliedFeedResult: AlliedFeedSyncResult | null = null;
   users: UserSession[] = [];
   usersPagination = {
     page: 1,
@@ -3224,13 +3547,26 @@ export class DashboardPageComponent {
   subscriptionsSearch = "";
   uploadingCover = false;
   savingArticle = false;
+  articleAutosaveState: ArticleAutosaveState = "idle";
+  lastArticleAutosaveAt: Date | null = null;
   savingCommunication = false;
   deletingCommunication = false;
+  savingAlliedFeed = false;
+  syncingAlliedFeedId: string | null = null;
+  deletingAlliedFeedId: string | null = null;
   reviewConfirmationOpen = false;
   editorPreviewMode: EditorPreviewMode = "article";
   editorSidebarTab: EditorSidebarTab = "document";
   selectedContentBlockIndex = 0;
   activeBlockCursor: BlockCursorState | null = null;
+  articleBodyPreviewSegments: ArticleRenderSegment[] = [];
+  previewGalleryIndexes: Record<string, number> = {};
+  articleAutosaveErrorMessage = "";
+  articleAutosavePendingMessage = "";
+  private articleAutosaveTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly articleAutosaveDelayMs = 1400;
+  private lastArticleAutosaveSignature = "";
+  private hydratingArticleForm = false;
   passwordVisibility: Record<PasswordFieldKey, boolean> = {
     user: false,
     current: false,
@@ -3330,6 +3666,7 @@ export class DashboardPageComponent {
 
   articleForm: ArticleFormState = this.emptyArticleForm();
   communicationForm: CommunicationFormState = this.emptyCommunicationForm();
+  alliedFeedForm: AlliedFeedFormState = this.emptyAlliedFeedForm();
   categoryForm = {
     id: "",
     name: "",
@@ -3371,7 +3708,65 @@ export class DashboardPageComponent {
   onArticleBodyChange(value: string): void {
     this.articleBodyHtml = value;
     this.syncArticleBodyPreview(this.editorHtmlToContentBlocks(value));
+    this.queueArticleAutosave();
     this.cdr.markForCheck();
+  }
+
+  trackRenderSegment(_index: number, segment: ArticleRenderSegment): string {
+    return segment.key;
+  }
+
+  activePreviewGalleryIndex(segment: ArticleRenderSegment): number {
+    if (segment.kind !== "gallery") {
+      return 0;
+    }
+
+    return this.resolveGalleryIndex(this.previewGalleryIndexes, segment.key, segment.images.length);
+  }
+
+  previewGalleryImage(segment: ArticleRenderSegment): ArticleGalleryImage | null {
+    if (segment.kind !== "gallery" || segment.images.length === 0) {
+      return null;
+    }
+
+    return segment.images[this.activePreviewGalleryIndex(segment)] ?? segment.images[0];
+  }
+
+  previewGallerySlideLabel(segment: ArticleRenderSegment): string {
+    if (segment.kind !== "gallery") {
+      return "";
+    }
+
+    return `${this.activePreviewGalleryIndex(segment) + 1} / ${segment.images.length}`;
+  }
+
+  setPreviewGallerySlide(segment: ArticleRenderSegment, index: number): void {
+    if (segment.kind !== "gallery") {
+      return;
+    }
+
+    this.previewGalleryIndexes[segment.key] = Math.min(Math.max(index, 0), segment.images.length - 1);
+    this.cdr.markForCheck();
+  }
+
+  previousPreviewGallerySlide(segment: ArticleRenderSegment): void {
+    if (segment.kind !== "gallery") {
+      return;
+    }
+
+    const currentIndex = this.activePreviewGalleryIndex(segment);
+    const nextIndex = currentIndex === 0 ? segment.images.length - 1 : currentIndex - 1;
+    this.setPreviewGallerySlide(segment, nextIndex);
+  }
+
+  nextPreviewGallerySlide(segment: ArticleRenderSegment): void {
+    if (segment.kind !== "gallery") {
+      return;
+    }
+
+    const currentIndex = this.activePreviewGalleryIndex(segment);
+    const nextIndex = currentIndex === segment.images.length - 1 ? 0 : currentIndex + 1;
+    this.setPreviewGallerySlide(segment, nextIndex);
   }
 
   renderPreviewBlockText(block: ArticleContentBlock): string {
@@ -3706,6 +4101,7 @@ export class DashboardPageComponent {
 
   applySuggestedPreview(): void {
     this.articleForm.excerpt = this.articlePreviewText();
+    this.queueArticleAutosave();
     this.cdr.markForCheck();
   }
 
@@ -3900,6 +4296,7 @@ export class DashboardPageComponent {
 
   toggleArticleCategory(categoryId: string): void {
     this.articleForm.categoryId = this.articleForm.categoryId === categoryId ? "" : categoryId;
+    this.queueArticleAutosave();
     this.cdr.markForCheck();
   }
 
@@ -3908,6 +4305,7 @@ export class DashboardPageComponent {
 
     if (currentTags.includes(tagValue)) {
       this.articleForm.tags = currentTags.filter((tag) => tag !== tagValue).join(", ");
+      this.queueArticleAutosave();
       this.cdr.markForCheck();
       return;
     }
@@ -3918,6 +4316,7 @@ export class DashboardPageComponent {
     }
 
     this.articleForm.tags = [...currentTags, tagValue].join(", ");
+    this.queueArticleAutosave();
     this.cdr.markForCheck();
   }
 
@@ -4253,6 +4652,7 @@ export class DashboardPageComponent {
       if (!this.articleForm.coverAlt) {
         this.articleForm.coverAlt = uploaded.alt;
       }
+      this.queueArticleAutosave();
       this.notifySuccess("Portada cargada correctamente.");
     } catch (error) {
       this.notifyError(error, "No fue posible subir la portada.");
@@ -4289,6 +4689,7 @@ export class DashboardPageComponent {
         block.imageAlt = uploaded.alt;
       }
 
+      this.queueArticleAutosave();
       this.notifySuccess("Imagen del cuerpo cargada correctamente.");
     } catch (error) {
       this.notifyError(error, "No fue posible subir la imagen del cuerpo.");
@@ -4434,6 +4835,56 @@ export class DashboardPageComponent {
     return payload;
   }
 
+  queueArticleAutosave(): void {
+    if (this.hydratingArticleForm || !this.shouldAutosaveArticleDraft()) {
+      return;
+    }
+
+    const currentSignature = this.currentArticleAutosaveSignature();
+
+    if (currentSignature === this.lastArticleAutosaveSignature) {
+      if (this.articleAutosaveState === "pending") {
+        this.articleAutosaveState = this.lastArticleAutosaveAt ? "saved" : "idle";
+      }
+      return;
+    }
+
+    if (this.articleAutosaveTimer) {
+      clearTimeout(this.articleAutosaveTimer);
+    }
+
+    this.articleAutosaveState = "pending";
+    this.articleAutosavePendingMessage = "";
+    this.articleAutosaveTimer = setTimeout(() => {
+      void this.performArticleAutosave();
+    }, this.articleAutosaveDelayMs);
+    this.cdr.markForCheck();
+  }
+
+  articleAutosaveMessage(): string | null {
+    if (!this.shouldAutosaveArticleDraft()) {
+      return null;
+    }
+
+    if (this.articleAutosaveState === "saving") {
+      return "Guardando borrador automáticamente...";
+    }
+
+    if (this.articleAutosaveState === "pending") {
+      return this.articleAutosavePendingMessage || "Cambios detectados. El borrador se guardará en unos segundos.";
+    }
+
+    if (this.articleAutosaveState === "error") {
+      return this.articleAutosaveErrorMessage || "No se pudo autoguardar. Puedes guardar manualmente sin perder el texto actual.";
+    }
+
+    if (this.articleAutosaveState === "saved" && this.lastArticleAutosaveAt) {
+      return `Borrador guardado automáticamente a las ${this.formatAutosaveTime(this.lastArticleAutosaveAt)}.`;
+    }
+
+    return null;
+  }
+
   private configureCkeditorUploadAdapter(editor: {
     plugins: {
       get: (name: string) => {
@@ -4453,6 +4904,7 @@ export class DashboardPageComponent {
 
   private syncArticleBodyPreview(blocks: ArticleContentBlock[]): void {
     this.articleBodyPreviewBlocks = blocks;
+    this.articleBodyPreviewSegments = buildArticleRenderSegments(blocks);
     this.articleBodyPlainText = this.extractTextFromBlocks(blocks);
     this.articleForm.contentBlocks = blocks.length > 0
       ? blocks.map((block) =>
@@ -4468,6 +4920,139 @@ export class DashboardPageComponent {
         )
       : [this.createParagraphBlock()];
     this.selectedContentBlockIndex = Math.min(this.selectedContentBlockIndex, Math.max(0, this.articleForm.contentBlocks.length - 1));
+  }
+
+  private async performArticleAutosave(): Promise<void> {
+    this.articleAutosaveTimer = null;
+
+    if (this.hydratingArticleForm || !this.shouldAutosaveArticleDraft()) {
+      return;
+    }
+
+    if (this.savingArticle || this.uploadingCover || this.hasUploadingContentBlocks()) {
+      this.queueArticleAutosave();
+      return;
+    }
+
+    const signatureBeforeSave = this.currentArticleAutosaveSignature();
+
+    if (signatureBeforeSave === this.lastArticleAutosaveSignature) {
+      this.articleAutosaveState = this.lastArticleAutosaveAt ? "saved" : "idle";
+      this.cdr.markForCheck();
+      return;
+    }
+
+    const draft = this.composeArticlePayload();
+    const payload = {
+      ...draft.payload,
+      title: this.resolveAutosaveTitle(draft.payload.title),
+      status: this.selectedArticleId ? draft.payload.status : ("draft" as const)
+    };
+    const validationMessage = this.validateArticlePayload(payload);
+
+    if (validationMessage) {
+      this.articleAutosaveErrorMessage = "";
+      this.articleAutosavePendingMessage = validationMessage;
+      this.articleAutosaveState = "pending";
+      this.cdr.markForCheck();
+      return;
+    }
+
+    try {
+      this.articleAutosaveState = "saving";
+      this.articleAutosaveErrorMessage = "";
+      this.articleAutosavePendingMessage = "";
+      this.articleForm.excerpt = draft.excerpt;
+      this.cdr.markForCheck();
+
+      const savedArticle = this.selectedArticleId
+        ? await this.dashboardApi.updateArticle(this.selectedArticleId, payload)
+        : await this.dashboardApi.createArticle(payload);
+
+      this.syncAutosavedArticle(savedArticle);
+      this.lastArticleAutosaveSignature = this.currentArticleAutosaveSignature();
+      this.lastArticleAutosaveAt = new Date();
+      this.articleAutosaveState = "saved";
+      this.articleAutosaveErrorMessage = "";
+      this.articleAutosavePendingMessage = "";
+    } catch (error) {
+      this.articleAutosavePendingMessage = "";
+      this.articleAutosaveErrorMessage = this.readError(error, "No se pudo autoguardar. Puedes guardar manualmente sin perder el texto actual.");
+      this.articleAutosaveState = "error";
+    } finally {
+      this.cdr.markForCheck();
+    }
+  }
+
+  private shouldAutosaveArticleDraft(): boolean {
+    if (this.reviewConfirmationOpen) {
+      return false;
+    }
+
+    if (!this.authService.user()) {
+      return false;
+    }
+
+    const persistedStatus = this.selectedArticle?.status ?? this.articleForm.status;
+    return !["published", "approved", "archived"].includes(persistedStatus);
+  }
+
+  private currentArticleAutosaveSignature(): string {
+    return JSON.stringify({
+      id: this.selectedArticleId ?? "new",
+      title: this.articleForm.title.trim(),
+      subtitle: this.articleForm.subtitle.trim(),
+      excerpt: this.articleForm.excerpt.trim(),
+      coverUrl: this.articleForm.coverUrl.trim(),
+      coverAlt: this.articleForm.coverAlt.trim(),
+      coverPositionX: this.normalizeCoverPosition(this.articleForm.coverPositionX),
+      coverPositionY: this.normalizeCoverPosition(this.articleForm.coverPositionY),
+      coverType: this.articleForm.coverType,
+      categoryId: this.articleForm.categoryId || "",
+      tags: this.parseArticleTags(this.articleForm.tags),
+      featured: this.articleForm.featured,
+      status: this.articleForm.status,
+      body: this.articleBodyHtml.trim()
+    });
+  }
+
+  private syncAutosavedArticle(article: DashboardArticle): void {
+    this.selectedArticleId = article.id;
+    this.selectedArticle = article;
+
+    const articleIndex = this.articles.findIndex((item) => item.id === article.id);
+
+    if (articleIndex >= 0) {
+      const nextArticles = [...this.articles];
+      nextArticles[articleIndex] = article;
+      this.articles = nextArticles;
+      return;
+    }
+
+    this.articles = [article, ...this.articles];
+  }
+
+  private formatAutosaveTime(value: Date): string {
+    return new Intl.DateTimeFormat("es-CO", {
+      hour: "2-digit",
+      minute: "2-digit"
+    }).format(value);
+  }
+
+  private resolveGalleryIndex(indexes: Record<string, number>, key: string, total: number): number {
+    if (total <= 0) {
+      return 0;
+    }
+
+    const current = indexes[key] ?? 0;
+    return Math.min(Math.max(current, 0), total - 1);
+  }
+
+  private cancelArticleAutosave(): void {
+    if (this.articleAutosaveTimer) {
+      clearTimeout(this.articleAutosaveTimer);
+      this.articleAutosaveTimer = null;
+    }
   }
 
   private contentBlocksToEditorHtml(blocks: ArticleContentBlock[]): string {
@@ -4631,14 +5216,23 @@ export class DashboardPageComponent {
       const text = this.normalizeInlineHtml(element.innerHTML);
 
       if (text) {
-        blocks.push({
-          type: "heading",
-          heading: {
-            text,
-            align: this.extractHeadingAlign(element),
-            level: tagName === "H3" ? "h3" : "h2"
-          }
-        });
+        const visibleText = this.extractTextContent(text);
+
+        if (visibleText.length > 220) {
+          blocks.push({
+            type: "paragraph",
+            text
+          });
+        } else {
+          blocks.push({
+            type: "heading",
+            heading: {
+              text,
+              align: this.extractHeadingAlign(element),
+              level: tagName === "H3" ? "h3" : "h2"
+            }
+          });
+        }
       }
 
       return;
@@ -5104,8 +5698,8 @@ export class DashboardPageComponent {
       return "El título debe tener al menos 6 caracteres.";
     }
 
-    if (payload.contentBlocks.length === 0) {
-      return "Agrega al menos un párrafo, una cita, una foto o un embed editorial al cuerpo del artículo.";
+    if (!this.hasPersistableArticleContent(payload.contentBlocks)) {
+      return "Agrega un párrafo, una cita o un intertítulo, o espera a que termine de cargarse la multimedia antes de autoguardar.";
     }
 
     if (payload.excerpt.trim().length < 20) {
@@ -5113,6 +5707,88 @@ export class DashboardPageComponent {
     }
 
     return null;
+  }
+
+  private hasPersistableArticleContent(contentBlocks: Array<Record<string, unknown>>): boolean {
+    return contentBlocks.some((block) => this.isPersistableArticleBlock(block));
+  }
+
+  private isPersistableArticleBlock(block: Record<string, unknown>): boolean {
+    const type = typeof block["type"] === "string" ? block["type"] : "";
+
+    if (type === "heading") {
+      const heading = block["heading"] && typeof block["heading"] === "object" ? block["heading"] as Record<string, unknown> : null;
+      return this.extractTextContent(typeof heading?.["text"] === "string" ? heading["text"] : "").length > 0;
+    }
+
+    if (type === "quote") {
+      const quote = block["quote"] && typeof block["quote"] === "object" ? block["quote"] as Record<string, unknown> : null;
+      return this.extractTextContent(typeof quote?.["text"] === "string" ? quote["text"] : "").length > 0;
+    }
+
+    if (type === "image") {
+      const image = block["image"] && typeof block["image"] === "object" ? block["image"] as Record<string, unknown> : null;
+      return this.isPersistableEditorialMediaUrl(typeof image?.["url"] === "string" ? image["url"] : "");
+    }
+
+    if (type === "embed") {
+      const embed = block["embed"] && typeof block["embed"] === "object" ? block["embed"] as Record<string, unknown> : null;
+      return Boolean(resolveVideoEmbed(typeof embed?.["url"] === "string" ? embed["url"] : ""));
+    }
+
+    return this.extractTextContent(typeof block["text"] === "string" ? block["text"] : "").length > 0;
+  }
+
+  private isPersistableEditorialMediaUrl(value: string): boolean {
+    const normalized = value.trim();
+
+    if (!normalized || normalized.startsWith("blob:") || normalized.startsWith("data:")) {
+      return false;
+    }
+
+    if (normalized.startsWith("/uploads/news/")) {
+      return true;
+    }
+
+    try {
+      const currentOrigin = window.location.origin;
+      const apiOrigin = new URL(API_BASE_URL, currentOrigin).origin;
+      const url = new URL(normalized, currentOrigin);
+
+      if (!["http:", "https:"].includes(url.protocol)) {
+        return false;
+      }
+
+      if (url.hostname === "res.cloudinary.com") {
+        return true;
+      }
+
+      return [currentOrigin, apiOrigin].includes(url.origin) && url.pathname.startsWith("/uploads/news/");
+    } catch {
+      return false;
+    }
+  }
+
+  private resolveAutosaveTitle(currentTitle: string): string {
+    const normalizedTitle = currentTitle.trim().replace(/\s+/g, " ");
+
+    if (normalizedTitle.length >= 6) {
+      return normalizedTitle.slice(0, 180);
+    }
+
+    const normalizedBody = this.articleBodyPlainText.trim().replace(/\s+/g, " ");
+
+    if (normalizedBody.length >= 6) {
+      return normalizedBody.slice(0, 80);
+    }
+
+    const normalizedSubtitle = this.articleForm.subtitle.trim().replace(/\s+/g, " ");
+
+    if (normalizedSubtitle.length >= 6) {
+      return normalizedSubtitle.slice(0, 120);
+    }
+
+    return "Borrador editorial en curso";
   }
 
   private articleStepIndex(step: ArticleEditorStep): number {
@@ -5355,6 +6031,24 @@ export class DashboardPageComponent {
     };
   }
 
+  private emptyAlliedFeedForm(): AlliedFeedFormState {
+    return {
+      id: "",
+      name: "",
+      feedUrl: "",
+      siteUrl: "",
+      attributionLabel: "",
+      logoUrl: "",
+      allowedMediaHosts: "",
+      defaultTags: "",
+      defaultCategoryId: "",
+      importMode: "draft",
+      maxItemsPerSync: 5,
+      permissionNote: "",
+      isActive: true
+    };
+  }
+
   private mapCommunicationToForm(communication: SiteCommunication): CommunicationFormState {
     return {
       eyebrow: communication.eyebrow || "Comunicado editorial",
@@ -5369,6 +6063,24 @@ export class DashboardPageComponent {
             ? "month"
             : "hours",
       durationHours: Math.max(1, Number(communication.durationHours || 24))
+    };
+  }
+
+  private mapAlliedFeedToForm(source: AlliedFeedSource): AlliedFeedFormState {
+    return {
+      id: source.id,
+      name: source.name,
+      feedUrl: source.feedUrl,
+      siteUrl: source.siteUrl,
+      attributionLabel: source.attributionLabel,
+      logoUrl: source.logoUrl,
+      allowedMediaHosts: source.allowedMediaHosts.join(", "),
+      defaultTags: source.defaultTags.join(", "),
+      defaultCategoryId: source.defaultCategoryId || "",
+      importMode: source.importMode,
+      maxItemsPerSync: Math.max(1, Number(source.maxItemsPerSync || 5)),
+      permissionNote: source.permissionNote,
+      isActive: source.isActive
     };
   }
 
@@ -5505,7 +6217,8 @@ export class DashboardPageComponent {
           this.dashboardApi.getAuditLogs(),
           this.loadUsersPage(this.usersPagination.page),
           this.loadSubscriptionsPage(this.subscriptionsPagination.page),
-          this.loadCommunication()
+          this.loadCommunication(),
+          this.loadAlliedFeeds()
         ]);
 
         this.auditEntries = auditEntries;
@@ -5756,7 +6469,146 @@ export class DashboardPageComponent {
     }
   }
 
+  async loadAlliedFeeds(): Promise<void> {
+    try {
+      const response = await this.dashboardApi.getAlliedFeeds();
+      this.alliedFeeds = response.items;
+
+      if (this.alliedFeedForm.id) {
+        const currentSource = this.alliedFeeds.find((item) => item.id === this.alliedFeedForm.id);
+        this.alliedFeedForm = currentSource ? this.mapAlliedFeedToForm(currentSource) : this.emptyAlliedFeedForm();
+      }
+    } catch (error) {
+      this.notifyError(error, "No fue posible cargar los medios aliados.");
+    } finally {
+      this.cdr.markForCheck();
+    }
+  }
+
+  editAlliedFeed(source: AlliedFeedSource): void {
+    this.alliedFeedForm = this.mapAlliedFeedToForm(source);
+    this.cdr.markForCheck();
+  }
+
+  resetAlliedFeedForm(): void {
+    this.alliedFeedForm = this.emptyAlliedFeedForm();
+    this.cdr.markForCheck();
+  }
+
+  private splitCommaSeparatedValues(value: string): string[] {
+    return String(value ?? "")
+      .split(/[,\n]/)
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+
+  formatAlliedFeedMode(mode: AlliedFeedSource["importMode"]): string {
+    if (mode === "published") {
+      return "Publicación directa";
+    }
+
+    if (mode === "review") {
+      return "En revisión";
+    }
+
+    return "Borrador";
+  }
+
+  async saveAlliedFeed(): Promise<void> {
+    this.clearStatus();
+    this.savingAlliedFeed = true;
+
+    try {
+      const payload = {
+        name: this.alliedFeedForm.name,
+        feedUrl: this.alliedFeedForm.feedUrl,
+        siteUrl: this.alliedFeedForm.siteUrl,
+        attributionLabel: this.alliedFeedForm.attributionLabel,
+        logoUrl: this.alliedFeedForm.logoUrl,
+        allowedMediaHosts: this.splitCommaSeparatedValues(this.alliedFeedForm.allowedMediaHosts),
+        defaultTags: this.splitCommaSeparatedValues(this.alliedFeedForm.defaultTags),
+        defaultCategoryId: this.alliedFeedForm.defaultCategoryId || null,
+        importMode: this.alliedFeedForm.importMode,
+        maxItemsPerSync: this.alliedFeedForm.maxItemsPerSync,
+        permissionNote: this.alliedFeedForm.permissionNote,
+        isActive: this.alliedFeedForm.isActive
+      };
+
+      const response = this.alliedFeedForm.id
+        ? await this.dashboardApi.updateAlliedFeed(this.alliedFeedForm.id, payload)
+        : await this.dashboardApi.createAlliedFeed(payload);
+
+      this.notifySuccess(this.alliedFeedForm.id ? "Fuente aliada actualizada." : "Fuente aliada registrada.");
+      await this.loadAlliedFeeds();
+      this.alliedFeedForm = this.mapAlliedFeedToForm(response.source);
+    } catch (error) {
+      this.notifyError(error, "No fue posible guardar la fuente aliada.");
+    } finally {
+      this.savingAlliedFeed = false;
+      this.cdr.markForCheck();
+    }
+  }
+
+  async syncAlliedFeed(source: AlliedFeedSource): Promise<void> {
+    if (this.syncingAlliedFeedId) {
+      return;
+    }
+
+    this.clearStatus();
+    this.syncingAlliedFeedId = source.id;
+
+    try {
+      const response = await this.dashboardApi.syncAlliedFeed(source.id);
+      this.alliedFeedResult = response.result;
+      this.notifySuccess(response.message);
+      await Promise.all([this.loadAlliedFeeds(), this.loadArticles()]);
+    } catch (error) {
+      this.notifyError(error, "No fue posible sincronizar la fuente aliada.");
+    } finally {
+      this.syncingAlliedFeedId = null;
+      this.cdr.markForCheck();
+    }
+  }
+
+  async deleteAlliedFeed(source: AlliedFeedSource): Promise<void> {
+    if (this.deletingAlliedFeedId) {
+      return;
+    }
+
+    const confirmed = await this.requestConfirmation({
+      title: "Eliminar medio aliado",
+      message: `La fuente "${source.name}" dejará de estar disponible para nuevas sincronizaciones. Las notas ya importadas se conservarán tal como están.`,
+      confirmLabel: "Eliminar fuente",
+      cancelLabel: "Conservar fuente",
+      tone: "danger"
+    });
+
+    if (!confirmed) {
+      return;
+    }
+
+    this.clearStatus();
+    this.deletingAlliedFeedId = source.id;
+
+    try {
+      const response = await this.dashboardApi.deleteAlliedFeed(source.id);
+      this.notifySuccess(response.message);
+      await this.loadAlliedFeeds();
+
+      if (this.alliedFeedForm.id === source.id) {
+        this.alliedFeedForm = this.emptyAlliedFeedForm();
+      }
+    } catch (error) {
+      this.notifyError(error, "No fue posible eliminar la fuente aliada.");
+    } finally {
+      this.deletingAlliedFeedId = null;
+      this.cdr.markForCheck();
+    }
+  }
+
   editArticle(article: DashboardArticle): void {
+    this.hydratingArticleForm = true;
+    this.cancelArticleAutosave();
     const articleBlocks = Array.isArray(article.contentBlocks) && article.contentBlocks.length > 0
       ? article.contentBlocks
       : article.body.map((text) => ({ type: "paragraph", text } as ArticleContentBlock));
@@ -5789,10 +6641,18 @@ export class DashboardPageComponent {
     this.selectedContentBlockIndex = 0;
     this.editorPreviewMode = "article";
     this.editorSidebarTab = "document";
+    this.lastArticleAutosaveSignature = this.currentArticleAutosaveSignature();
+    this.lastArticleAutosaveAt = null;
+    this.articleAutosaveErrorMessage = "";
+    this.articleAutosavePendingMessage = "";
+    this.articleAutosaveState = "idle";
+    this.hydratingArticleForm = false;
     this.cdr.markForCheck();
   }
 
   resetArticleForm(): void {
+    this.hydratingArticleForm = true;
+    this.cancelArticleAutosave();
     this.selectedArticleId = null;
     this.selectedArticle = null;
     this.moderationNote = "";
@@ -5807,10 +6667,17 @@ export class DashboardPageComponent {
     this.selectedContentBlockIndex = 0;
     this.editorPreviewMode = "article";
     this.editorSidebarTab = "document";
+    this.lastArticleAutosaveSignature = this.currentArticleAutosaveSignature();
+    this.lastArticleAutosaveAt = null;
+    this.articleAutosaveErrorMessage = "";
+    this.articleAutosavePendingMessage = "";
+    this.articleAutosaveState = "idle";
+    this.hydratingArticleForm = false;
     this.cdr.markForCheck();
   }
 
   async saveArticle(options: { submitForReview?: boolean } = {}): Promise<void> {
+    this.cancelArticleAutosave();
     this.clearStatus();
 
     const draft = this.composeArticlePayload();
@@ -5839,6 +6706,8 @@ export class DashboardPageComponent {
           ? (this.selectedArticleId ? "Artículo actualizado y enviado a revisión final." : "Artículo creado y enviado a revisión final.")
           : (this.selectedArticleId ? "Artículo actualizado." : "Artículo creado.")
       );
+      this.articleAutosaveState = "saved";
+      this.lastArticleAutosaveAt = new Date();
       await this.loadDashboard();
       const refreshed = this.articles.find((item) => item.id === article.id);
       this.editArticle(refreshed ?? article);

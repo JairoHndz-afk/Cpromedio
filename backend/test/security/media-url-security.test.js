@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { env } from "../../src/config/env.js";
-import { isOwnedMediaUrl, sanitizeContentBlocks, sanitizeOwnedMediaUrl } from "../../src/utils/content.js";
+import { isOwnedMediaUrl, sanitizeContentBlocks, sanitizeEditorialMediaUrl, sanitizeOwnedMediaUrl } from "../../src/utils/content.js";
 import { articleInputSchema } from "../../src/validators/article.validator.js";
 
 const allowedUploadUrl = `${env.publicServerUrl}/uploads/news/2026/07/portada-segura.webp`;
@@ -185,4 +185,52 @@ test("rechaza rutas relativas con traversal aunque aparenten salir de /uploads/n
   assert.equal(sanitizeOwnedMediaUrl("/uploads/news/../../api/auth/me"), "");
   assert.equal(sanitizeOwnedMediaUrl(`${env.publicServerUrl}/uploads/news/../../api/auth/me`), "");
   assert.equal(sanitizeOwnedMediaUrl("/uploads/news/2026/07/../08/portada.webp"), "/uploads/news/2026/08/portada.webp");
+});
+
+test("solo conserva medios externos cuando el host pertenece a una fuente aliada autorizada", () => {
+  const allowedUrl = "https://cdn.medio-aliado.co/imagenes/portada-principal.webp";
+  const blockedUrl = "https://cdn.intruso.example/imagenes/portada-principal.webp";
+
+  assert.equal(
+    sanitizeEditorialMediaUrl(allowedUrl, {
+      allowedExternalHosts: ["cdn.medio-aliado.co", "imagenes.medio-aliado.co"]
+    }),
+    allowedUrl
+  );
+  assert.equal(
+    sanitizeEditorialMediaUrl(blockedUrl, {
+      allowedExternalHosts: ["cdn.medio-aliado.co", "imagenes.medio-aliado.co"]
+    }),
+    ""
+  );
+
+  const { blocks } = sanitizeContentBlocks(
+    [
+      {
+        type: "paragraph",
+        text: "Contenido sindicado seguro."
+      },
+      {
+        type: "image",
+        image: {
+          url: allowedUrl,
+          alt: "Imagen aliada"
+        }
+      },
+      {
+        type: "image",
+        image: {
+          url: blockedUrl,
+          alt: "Imagen intrusa"
+        }
+      }
+    ],
+    {
+      allowedExternalHosts: ["cdn.medio-aliado.co"]
+    }
+  );
+
+  assert.equal(blocks.length, 2);
+  assert.equal(blocks[1].type, "image");
+  assert.equal(blocks[1].image.url, allowedUrl);
 });

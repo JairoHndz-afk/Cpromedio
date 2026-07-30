@@ -7,6 +7,7 @@ import { ActivatedRoute, RouterLink } from "@angular/router";
 import { PublicApiService } from "../../core/services/public-api.service";
 import { SeoService } from "../../core/services/seo.service";
 import { ArticleContentBlock, PublicArticle, PublicArticlePreview } from "../../core/types/api.types";
+import { ArticleGalleryImage, ArticleRenderSegment, buildArticleRenderSegments } from "../../core/utils/article-render-segments";
 import { renderEditorialText } from "../../core/utils/editorial-rich-text";
 import { isInstagramEmbed, isTweetEmbed, resolveInstagramEmbedSource, resolveTweetEmbedSource, resolveVideoEmbed } from "../../core/utils/video-embed";
 
@@ -71,61 +72,99 @@ type ShareChannel = "whatsapp" | "telegram" | "x" | "facebook" | "copy";
       </ng-template>
 
       <article class="article-body">
-        <ng-container *ngFor="let block of article.contentBlocks">
-          <ng-container *ngIf="block.type === 'heading'">
+        <ng-container *ngFor="let segment of articleRenderSegments; trackBy: trackRenderSegment">
+          <ng-container *ngIf="segment.kind === 'block' && segment.block.type === 'heading'">
             <h2
-              *ngIf="block.heading.level === 'h2'; else compactHeading"
+              *ngIf="segment.block.heading.level === 'h2'; else compactHeading"
               class="article-section-heading"
-              [class.article-section-heading--center]="block.heading.align === 'center'"
-              [class.article-section-heading--right]="block.heading.align === 'right'"
-              [innerHTML]="renderBlockText(block)"
+              [class.article-section-heading--center]="segment.block.heading.align === 'center'"
+              [class.article-section-heading--right]="segment.block.heading.align === 'right'"
+              [innerHTML]="renderBlockText(segment.block)"
             ></h2>
             <ng-template #compactHeading>
               <h3
                 class="article-section-heading article-section-heading--compact"
-                [class.article-section-heading--center]="block.heading.align === 'center'"
-                [class.article-section-heading--right]="block.heading.align === 'right'"
-                [innerHTML]="renderBlockText(block)"
+                [class.article-section-heading--center]="segment.block.heading.align === 'center'"
+                [class.article-section-heading--right]="segment.block.heading.align === 'right'"
+                [innerHTML]="renderBlockText(segment.block)"
               ></h3>
             </ng-template>
           </ng-container>
 
-          <p *ngIf="block.type === 'paragraph'" [innerHTML]="renderBlockText(block)"></p>
+          <p *ngIf="segment.kind === 'block' && segment.block.type === 'paragraph'" [innerHTML]="renderBlockText(segment.block)"></p>
 
-          <blockquote class="article-quote" *ngIf="block.type === 'quote'">
-            <p [innerHTML]="renderBlockText(block)"></p>
-            <footer class="article-quote__attribution" *ngIf="block.quote.attribution">{{ block.quote.attribution }}</footer>
+          <blockquote class="article-quote" *ngIf="segment.kind === 'block' && segment.block.type === 'quote'">
+            <p [innerHTML]="renderBlockText(segment.block)"></p>
+            <footer class="article-quote__attribution" *ngIf="segment.block.quote.attribution">{{ segment.block.quote.attribution }}</footer>
           </blockquote>
 
-          <figure class="article-inline-media" *ngIf="block.type === 'image' && block.image.url">
-            <img [src]="block.image.url" [alt]="block.image.alt || article.title" />
-            <figcaption *ngIf="block.image.caption || block.image.alt">{{ block.image.caption || block.image.alt }}</figcaption>
+          <figure class="article-inline-media" *ngIf="segment.kind === 'block' && segment.block.type === 'image' && segment.block.image.url">
+            <img [src]="segment.block.image.url" [alt]="segment.block.image.alt || article.title" />
+            <figcaption *ngIf="segment.block.image.caption || segment.block.image.alt">{{ segment.block.image.caption || segment.block.image.alt }}</figcaption>
           </figure>
 
-          <ng-container *ngIf="block.type === 'embed'">
-            <figure class="article-inline-embed article-inline-embed--tweet" *ngIf="isTweetEmbedUrl(block.embed.url) && tweetEmbedSource(block.embed.url) as tweetUrl; else articleVideoEmbed">
+          <figure class="article-image-gallery" *ngIf="segment.kind === 'gallery' && articleGalleryImage(segment) as activeArticleImage">
+            <div class="article-image-gallery__frame">
+              <button
+                class="article-image-gallery__control article-image-gallery__control--prev"
+                type="button"
+                (click)="previousArticleGallerySlide(segment)"
+                [disabled]="segment.images.length < 2"
+                aria-label="Ver foto anterior"
+              >
+                &#8249;
+              </button>
+              <img [src]="activeArticleImage.url" [alt]="activeArticleImage.alt || article.title" />
+              <button
+                class="article-image-gallery__control article-image-gallery__control--next"
+                type="button"
+                (click)="nextArticleGallerySlide(segment)"
+                [disabled]="segment.images.length < 2"
+                aria-label="Ver foto siguiente"
+              >
+                &#8250;
+              </button>
+              <span class="article-image-gallery__count">{{ articleGallerySlideLabel(segment) }}</span>
+            </div>
+            <figcaption class="article-image-gallery__footer">
+              <span class="article-image-gallery__caption">{{ activeArticleImage.caption || activeArticleImage.alt || "Serie fotográfica del artículo" }}</span>
+              <span class="article-image-gallery__dots" *ngIf="segment.images.length > 1">
+                <button
+                  type="button"
+                  class="article-image-gallery__dot"
+                  *ngFor="let image of segment.images; let imageIndex = index"
+                  [class.is-active]="imageIndex === activeArticleGalleryIndex(segment)"
+                  (click)="setArticleGallerySlide(segment, imageIndex)"
+                  [attr.aria-label]="'Ver foto ' + (imageIndex + 1)"
+                ></button>
+              </span>
+            </figcaption>
+          </figure>
+
+          <ng-container *ngIf="segment.kind === 'block' && segment.block.type === 'embed'">
+            <figure class="article-inline-embed article-inline-embed--tweet" *ngIf="isTweetEmbedUrl(segment.block.embed.url) && tweetEmbedSource(segment.block.embed.url) as tweetUrl; else articleVideoEmbed">
               <blockquote class="twitter-tweet" [attr.data-theme]="tweetTheme()" data-dnt="true">
                 <a [href]="tweetUrl" target="_blank" rel="noopener noreferrer">Ver publicacion en X / Twitter</a>
               </blockquote>
-              <figcaption *ngIf="block.embed.title">{{ block.embed.title }}</figcaption>
+              <figcaption *ngIf="segment.block.embed.title">{{ segment.block.embed.title }}</figcaption>
             </figure>
             <ng-template #articleVideoEmbed>
-              <figure class="article-inline-embed article-inline-embed--instagram" *ngIf="isInstagramEmbedUrl(block.embed.url) && instagramEmbedSource(block.embed.url) as instagramUrl; else articleMediaEmbed">
+              <figure class="article-inline-embed article-inline-embed--instagram" *ngIf="isInstagramEmbedUrl(segment.block.embed.url) && instagramEmbedSource(segment.block.embed.url) as instagramUrl; else articleMediaEmbed">
                 <blockquote class="instagram-media" data-instgrm-captioned [attr.data-instgrm-permalink]="instagramUrl" data-instgrm-version="14">
                   <a [href]="instagramUrl" target="_blank" rel="noopener noreferrer">Ver publicacion en Instagram</a>
                 </blockquote>
-                <figcaption *ngIf="block.embed.title">{{ block.embed.title }}</figcaption>
+                <figcaption *ngIf="segment.block.embed.title">{{ segment.block.embed.title }}</figcaption>
               </figure>
               <ng-template #articleMediaEmbed>
-                <figure class="article-inline-embed" *ngIf="safeArticleEmbedUrl(block.embed.url) as embedUrl">
+                <figure class="article-inline-embed" *ngIf="safeArticleEmbedUrl(segment.block.embed.url) as embedUrl">
                   <iframe
                     [src]="embedUrl"
-                    [title]="block.embed.title || article.title"
+                    [title]="segment.block.embed.title || article.title"
                     loading="lazy"
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                     allowfullscreen
                   ></iframe>
-                  <figcaption *ngIf="block.embed.title">{{ block.embed.title }}</figcaption>
+                  <figcaption *ngIf="segment.block.embed.title">{{ segment.block.embed.title }}</figcaption>
                 </figure>
               </ng-template>
             </ng-template>
@@ -207,12 +246,14 @@ export class ArticlePageComponent {
   private readonly sanitizer = inject(DomSanitizer);
 
   article: PublicArticle | null = null;
+  articleRenderSegments: ArticleRenderSegment[] = [];
   nextArticle: PublicArticlePreview | null = null;
   errorMessage = "";
   shareMessage = "";
   relatedTopicLabel: string | null = null;
   nextActionLabel = "Leer siguiente";
   nextSectionLabel = "Quizás te puede interesar";
+  private readonly articleGalleryIndexes: Record<string, number> = {};
 
   constructor() {
     this.route.paramMap.pipe(takeUntilDestroyed()).subscribe((params) => {
@@ -234,6 +275,63 @@ export class ArticlePageComponent {
     }
 
     return "";
+  }
+
+  trackRenderSegment(_index: number, segment: ArticleRenderSegment): string {
+    return segment.key;
+  }
+
+  activeArticleGalleryIndex(segment: ArticleRenderSegment): number {
+    if (segment.kind !== "gallery") {
+      return 0;
+    }
+
+    return this.resolveGalleryIndex(segment.key, segment.images.length);
+  }
+
+  articleGalleryImage(segment: ArticleRenderSegment): ArticleGalleryImage | null {
+    if (segment.kind !== "gallery" || segment.images.length === 0) {
+      return null;
+    }
+
+    return segment.images[this.activeArticleGalleryIndex(segment)] ?? segment.images[0];
+  }
+
+  articleGallerySlideLabel(segment: ArticleRenderSegment): string {
+    if (segment.kind !== "gallery") {
+      return "";
+    }
+
+    return `${this.activeArticleGalleryIndex(segment) + 1} / ${segment.images.length}`;
+  }
+
+  setArticleGallerySlide(segment: ArticleRenderSegment, index: number): void {
+    if (segment.kind !== "gallery") {
+      return;
+    }
+
+    this.articleGalleryIndexes[segment.key] = Math.min(Math.max(index, 0), segment.images.length - 1);
+    this.cdr.markForCheck();
+  }
+
+  previousArticleGallerySlide(segment: ArticleRenderSegment): void {
+    if (segment.kind !== "gallery") {
+      return;
+    }
+
+    const currentIndex = this.activeArticleGalleryIndex(segment);
+    const nextIndex = currentIndex === 0 ? segment.images.length - 1 : currentIndex - 1;
+    this.setArticleGallerySlide(segment, nextIndex);
+  }
+
+  nextArticleGallerySlide(segment: ArticleRenderSegment): void {
+    if (segment.kind !== "gallery") {
+      return;
+    }
+
+    const currentIndex = this.activeArticleGalleryIndex(segment);
+    const nextIndex = currentIndex === segment.images.length - 1 ? 0 : currentIndex + 1;
+    this.setArticleGallerySlide(segment, nextIndex);
   }
 
   formatTopicLabel(value: string): string {
@@ -349,6 +447,7 @@ export class ArticlePageComponent {
     let shouldRenderSocialEmbeds = false;
 
     this.article = null;
+    this.articleRenderSegments = [];
     this.nextArticle = null;
     this.errorMessage = "";
     this.shareMessage = "";
@@ -360,6 +459,7 @@ export class ArticlePageComponent {
     try {
       const response = await this.publicApi.getArticle(currentSlug);
       this.article = response.article;
+      this.articleRenderSegments = buildArticleRenderSegments(response.article.contentBlocks);
       this.nextArticle = response.nextArticle;
       shouldRenderSocialEmbeds = this.articleHasSocialEmbeds(response.article);
       this.syncTopicState();
@@ -428,6 +528,15 @@ export class ArticlePageComponent {
 
   private articleHasTweetEmbeds(article: PublicArticle | null): boolean {
     return article?.contentBlocks.some((block) => block.type === "embed" && isTweetEmbed(block.embed.url)) ?? false;
+  }
+
+  private resolveGalleryIndex(key: string, total: number): number {
+    if (total <= 0) {
+      return 0;
+    }
+
+    const current = this.articleGalleryIndexes[key] ?? 0;
+    return Math.min(Math.max(current, 0), total - 1);
   }
 
   private articleHasInstagramEmbeds(article: PublicArticle | null): boolean {

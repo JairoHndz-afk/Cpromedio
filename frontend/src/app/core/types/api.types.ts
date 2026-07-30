@@ -94,6 +94,14 @@ export interface PublicArticle {
   readingTime: number;
   publishedAt: string | null;
   updatedAt: string;
+  syndication: {
+    sourceType: "original" | "allied_rss";
+    sourceName: string;
+    sourceUrl: string;
+    originalUrl: string;
+    authorName: string;
+    attributionLabel: string;
+  };
 }
 
 export interface PublicArticlePreview
@@ -143,6 +151,43 @@ export interface SiteCommunication {
   publishedAt: string | null;
   expiresAt: string;
   version: string;
+}
+
+export interface AlliedFeedSource {
+  id: string;
+  name: string;
+  slug: string;
+  feedUrl: string;
+  siteUrl: string;
+  attributionLabel: string;
+  logoUrl: string;
+  allowedMediaHosts: string[];
+  defaultTags: string[];
+  defaultCategoryId: string;
+  defaultCategoryName: string;
+  importMode: "draft" | "review" | "published";
+  maxItemsPerSync: number;
+  permissionNote: string;
+  isActive: boolean;
+  lastFetchedAt: string | null;
+  lastImportedAt: string | null;
+  lastImportCount: number;
+  lastSkippedCount: number;
+  lastError: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AlliedFeedSyncResult {
+  syncedAt: string;
+  importedCount: number;
+  skippedCount: number;
+  items: Array<{
+    id: string;
+    title: string;
+    slug: string;
+    status: "draft" | "review" | "changes_requested" | "approved" | "published" | "archived" | "rejected";
+  }>;
 }
 
 export interface SitePayload {

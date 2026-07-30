@@ -1,13 +1,16 @@
 import { Router } from "express";
 
 import {
+  createAlliedFeedSource,
   createCategory,
   createDashboardArticle,
   createUser,
   changeOwnPassword,
+  deleteAlliedFeedSource,
   deleteDashboardCommunication,
   deleteDashboardArticle,
   getDashboardArticle,
+  listAlliedFeedSources,
   getDashboardCommunication,
   getDashboardOverview,
   listAuditLogs,
@@ -19,7 +22,9 @@ import {
   deleteSubscription,
   deleteUser,
   submitArticleForReview,
+  syncAlliedFeedSourceNow,
   updateOwnProfile,
+  updateAlliedFeedSource,
   updateDashboardCommunication,
   updateCategory,
   updateDashboardArticle,
@@ -38,6 +43,11 @@ router.get("/overview", getDashboardOverview);
 router.get("/communication", requireRole("admin"), getDashboardCommunication);
 router.put("/communication", requireRole("admin"), updateDashboardCommunication);
 router.delete("/communication", requireRole("admin"), deleteDashboardCommunication);
+router.get("/allied-feeds", requireRole("admin"), listAlliedFeedSources);
+router.post("/allied-feeds", requireRole("admin"), createAlliedFeedSource);
+router.put("/allied-feeds/:sourceId", requireRole("admin"), updateAlliedFeedSource);
+router.delete("/allied-feeds/:sourceId", requireRole("admin"), deleteAlliedFeedSource);
+router.post("/allied-feeds/:sourceId/sync", requireRole("admin"), syncAlliedFeedSourceNow);
 router.put("/profile", updateOwnProfile);
 router.put("/profile/password", changeOwnPassword);
 router.post("/uploads/images", uploadImageRateLimit, uploadArticleImage);
