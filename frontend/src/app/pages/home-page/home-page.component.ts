@@ -41,7 +41,6 @@ import { NewsCardComponent } from "../../shared/components/news-card/news-card.c
               <p class="eyebrow">{{ homeFeatured.featured ? "Tema del d&iacute;a" : "Lo &uacute;ltimo" }}</p>
               <h1>{{ homeFeatured.title }}</h1>
               <p class="hero-copy">{{ homeFeatured.subtitle || homeFeatured.excerpt }}</p>
-              <a class="button home-focus__cta" [routerLink]="['/articulo', homeFeatured.slug]">Leer artículo completo</a>
             </div>
 
             <ng-container *ngIf="hasVisualCover(homeFeatured); else homeFocusFallback">
@@ -64,6 +63,7 @@ import { NewsCardComponent } from "../../shared/components/news-card/news-card.c
                 </a>
               </div>
             </ng-template>
+            <a class="button home-focus__cta" [routerLink]="['/articulo', homeFeatured.slug]">Leer artículo completo</a>
           </div>
 
         </ng-container>

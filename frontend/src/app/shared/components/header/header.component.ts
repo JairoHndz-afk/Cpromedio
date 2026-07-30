@@ -1,6 +1,9 @@
 import { NgIf } from "@angular/common";
 import { ChangeDetectionStrategy, Component, HostListener, inject, input } from "@angular/core";
-import { Router, RouterLink, RouterLinkActive } from "@angular/router";
+import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
+import { FormsModule } from "@angular/forms";
+import { NavigationEnd, Router, RouterLink, RouterLinkActive } from "@angular/router";
+import { filter } from "rxjs";
 
 import { AuthService } from "../../../core/services/auth.service";
 import { ThemeService } from "../../../core/services/theme.service";
@@ -9,7 +12,7 @@ import { BrandMarkComponent } from "../brand-mark/brand-mark.component";
 @Component({
   selector: "app-header",
   standalone: true,
-  imports: [RouterLink, RouterLinkActive, NgIf, BrandMarkComponent],
+  imports: [RouterLink, RouterLinkActive, NgIf, BrandMarkComponent, FormsModule],
   template: `
     <header class="site-header" [class.site-header--wide]="wide()">
       <div class="site-header__inner" [class.site-header__inner--wide]="wide()">
@@ -37,6 +40,17 @@ import { BrandMarkComponent } from "../brand-mark/brand-mark.component";
           </button>
 
           <div class="site-nav__panel" id="site-nav-panel" *ngIf="!isCompactViewport || menuOpen">
+            <form class="site-nav__search" *ngIf="isCompactViewport" (ngSubmit)="submitSearch()">
+              <input
+                type="text"
+                [(ngModel)]="searchTerm"
+                name="navSearchTerm"
+                placeholder="Buscar art&iacute;culos"
+                aria-label="Buscar art&iacute;culos"
+              />
+              <button class="button button--secondary" type="submit">Buscar</button>
+            </form>
+
             <div class="site-nav__links">
               <a routerLink="/" routerLinkActive="is-active" [routerLinkActiveOptions]="{ exact: true }" (click)="closeMenu()">Inicio</a>
               <a routerLink="/privacidad" routerLinkActive="is-active" (click)="closeMenu()">Privacidad</a>
@@ -108,8 +122,21 @@ export class HeaderComponent {
   readonly authService = inject(AuthService);
   readonly themeService = inject(ThemeService);
   private readonly router = inject(Router);
+  searchTerm = "";
   menuOpen = false;
   isCompactViewport = typeof window !== "undefined" ? window.innerWidth <= 960 : false;
+
+  constructor() {
+    this.syncSearchTermFromUrl(this.router.url);
+    this.router.events
+      .pipe(
+        filter((event): event is NavigationEnd => event instanceof NavigationEnd),
+        takeUntilDestroyed()
+      )
+      .subscribe((event) => {
+        this.syncSearchTermFromUrl(event.urlAfterRedirects);
+      });
+  }
 
   @HostListener("window:keydown.escape")
   onEscape(): void {
@@ -141,6 +168,18 @@ export class HeaderComponent {
     this.menuOpen = false;
   }
 
+  submitSearch(): void {
+    const query = this.searchTerm.trim();
+    this.closeMenu();
+    void this.router.navigate(["/"], {
+      queryParams: {
+        search: query || null,
+        tag: null,
+        category: null
+      }
+    });
+  }
+
   toggleTheme(): void {
     this.themeService.toggle();
     this.closeMenu();
@@ -150,5 +189,10 @@ export class HeaderComponent {
     this.closeMenu();
     await this.authService.logout();
     await this.router.navigateByUrl("/");
+  }
+
+  private syncSearchTermFromUrl(url: string): void {
+    const query = this.router.parseUrl(url).queryParams["search"];
+    this.searchTerm = typeof query === "string" ? query : "";
   }
 }
