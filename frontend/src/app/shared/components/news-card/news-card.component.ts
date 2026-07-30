@@ -56,7 +56,7 @@ import { PublicArticle } from "../../../core/types/api.types";
           <a
             class="tag tag--category"
             *ngIf="article.category"
-            routerLink="/"
+            [routerLink]="filterRoute"
             [queryParams]="{ category: article.category.slug }"
           >
             {{ article.category.name }}
@@ -72,7 +72,7 @@ import { PublicArticle } from "../../../core/types/api.types";
         </h3>
         <p>{{ article.excerpt }}</p>
         <div class="tag-row news-card__tags" *ngIf="article.tags.length > 0">
-          <a class="tag tag--interactive" *ngFor="let tag of article.tags.slice(0, 2)" routerLink="/" [queryParams]="{ tag: tag }">
+          <a class="tag tag--interactive" *ngFor="let tag of article.tags.slice(0, 2)" [routerLink]="filterRoute" [queryParams]="{ tag: tag }">
             {{ formatTopicLabel(tag) }}
           </a>
         </div>
@@ -90,6 +90,7 @@ import { PublicArticle } from "../../../core/types/api.types";
 export class NewsCardComponent {
   @Input({ required: true }) article!: PublicArticle;
   @Input() variant: "default" | "compact" = "default";
+  @Input() filterRoute: string | any[] = "/";
 
   coverObjectPosition(): string {
     return `${this.article.cover.positionX ?? 50}% ${this.article.cover.positionY ?? 50}%`;

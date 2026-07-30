@@ -2678,6 +2678,20 @@ h3 {
   width: min(100%, var(--max-width));
 }
 
+.archive-search,
+.archive-shell {
+  width: min(100%, var(--max-width));
+}
+
+.archive-search {
+  margin-bottom: 1rem;
+}
+
+.archive-shell__actions {
+  justify-content: flex-end;
+  margin-top: 1rem;
+}
+
 .policy-shell {
   width: min(100%, var(--max-width));
 }

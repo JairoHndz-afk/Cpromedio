@@ -3,6 +3,7 @@ import { CanActivateFn, Router, Routes } from "@angular/router";
 
 import { AuthService } from "./core/services/auth.service";
 import { ArticlePageComponent } from "./pages/article-page/article-page.component";
+import { ArchivePageComponent } from "./pages/archive-page/archive-page.component";
 import { AuthorPageComponent } from "./pages/author-page/author-page.component";
 import { DashboardPageComponent } from "./pages/dashboard-page/dashboard-page.component";
 import { HomePageComponent } from "./pages/home-page/home-page.component";
@@ -35,6 +36,10 @@ export const routes: Routes = [
     path: "login",
     canActivate: [guestGuard],
     component: LoginPageComponent
+  },
+  {
+    path: "archivo",
+    component: ArchivePageComponent
   },
   {
     path: "privacidad",

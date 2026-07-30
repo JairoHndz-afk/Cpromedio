@@ -97,7 +97,7 @@ import { NewsCardComponent } from "../../shared/components/news-card/news-card.c
             <a class="button button--secondary" *ngIf="homeMostRead" [routerLink]="['/articulo', homeMostRead.slug]">
               Mostrar el m&aacute;s le&iacute;do
             </a>
-            <button class="button button--ghost" type="button" (click)="jumpToArchive()">Ir al archivo</button>
+            <button class="button button--ghost" type="button" (click)="jumpToArchive()">Ver todas las noticias</button>
           </div>
         </section>
       </aside>
@@ -447,18 +447,7 @@ export class HomePageComponent {
   }
 
   jumpToArchive(): void {
-    const target = document.getElementById("archivo-editorial");
-
-    if (!target) {
-      return;
-    }
-
-    if (target.getClientRects().length === 0) {
-      window.scrollTo({ top: 0, behavior: "smooth" });
-      return;
-    }
-
-    target.scrollIntoView({ behavior: "smooth", block: "start" });
+    void this.router.navigate(["/archivo"]);
   }
 
   canLoadMoreHomeRecent(): boolean {

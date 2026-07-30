@@ -98,6 +98,36 @@ export class SeoService {
     });
   }
 
+  setArchive(payload: { page?: number; description?: string } = {}): void {
+    const page = Math.max(Number(payload.page ?? 1), 1);
+    const description =
+      payload.description?.trim() ||
+      "Archivo completo de Colombiano Promedio con acceso a todas las publicaciones ordenadas de la más reciente a la más antigua.";
+    const title = page > 1 ? `Archivo de noticias | Página ${page} | Colombiano Promedio` : "Archivo de noticias | Colombiano Promedio";
+    const url = page > 1 ? this.absoluteUrl(`/archivo?page=${page}`) : this.absoluteUrl("/archivo");
+
+    this.applyCommonMeta({
+      title,
+      description,
+      url,
+      type: "website",
+      robots: "index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1"
+    });
+
+    this.setJsonLd({
+      "@context": "https://schema.org",
+      "@type": "CollectionPage",
+      name: "Archivo de noticias",
+      description,
+      url,
+      isPartOf: {
+        "@type": "WebSite",
+        name: "Colombiano Promedio",
+        url: this.absoluteUrl("/")
+      }
+    });
+  }
+
   setNoIndex(title: string, description: string): void {
     const url = this.absoluteUrl(this.document.location.pathname + this.document.location.search);
 
