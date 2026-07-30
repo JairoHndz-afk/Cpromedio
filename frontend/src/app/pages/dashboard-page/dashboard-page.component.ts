@@ -499,15 +499,17 @@ function createEditorialUploadAdapterPlugin(
                     </div>
                   </div>
 
-                  <input
+                  <textarea
                     class="doc-editor__title-input"
-                    type="text"
                     [(ngModel)]="articleForm.title"
                     (ngModelChange)="queueArticleAutosave()"
+                    (input)="syncTextareaHeight($event)"
+                    (focus)="syncTextareaHeight($event)"
                     name="title"
+                    rows="3"
                     placeholder="Título del artículo"
                     required
-                  />
+                  ></textarea>
 
                   <textarea
                     class="doc-editor__subtitle-input"
@@ -2214,8 +2216,8 @@ function createEditorialUploadAdapterPlugin(
     .doc-editor__preview-head h2 {
       margin: 0;
       font-family: var(--headline);
-      font-size: clamp(2rem, 3vw, 3rem);
-      line-height: 1.04;
+      font-size: clamp(1.55rem, 2.2vw, 2.15rem);
+      line-height: 1.12;
       color: var(--text);
     }
 
@@ -2243,9 +2245,14 @@ function createEditorialUploadAdapterPlugin(
     .doc-editor__title-input {
       min-height: 90px;
       font-family: var(--headline);
-      font-size: clamp(2.4rem, 4vw, 3.8rem);
-      line-height: 1.02;
+      font-size: clamp(1.65rem, 2.5vw, 2.35rem);
+      line-height: 1.1;
       font-weight: 700;
+      resize: none;
+      overflow-y: hidden;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      word-break: break-word;
     }
 
     .doc-editor__subtitle-input {
@@ -2524,17 +2531,17 @@ function createEditorialUploadAdapterPlugin(
     :host ::ng-deep .ck.ck-editor__main > .ck-editor__editable h3 {
       font-family: var(--headline);
       color: #13203a;
-      line-height: 1.12;
+      line-height: 1.18;
     }
 
     :host ::ng-deep .ck.ck-editor__main > .ck-editor__editable h2 {
-      font-size: clamp(1.9rem, 2.8vw, 2.5rem);
-      margin: 1.4rem 0 0.75rem;
+      font-size: clamp(1.35rem, 2vw, 1.9rem);
+      margin: 1.2rem 0 0.7rem;
     }
 
     :host ::ng-deep .ck.ck-editor__main > .ck-editor__editable h3 {
-      font-size: clamp(1.35rem, 2.2vw, 1.8rem);
-      margin: 1.1rem 0 0.65rem;
+      font-size: clamp(1.12rem, 1.55vw, 1.42rem);
+      margin: 1rem 0 0.6rem;
     }
 
     :host ::ng-deep .ck.ck-editor__main > .ck-editor__editable blockquote {
@@ -3271,7 +3278,7 @@ function createEditorialUploadAdapterPlugin(
 
       .doc-editor__title-input {
         min-height: 70px;
-        font-size: clamp(2rem, 8vw, 2.7rem);
+        font-size: clamp(1.45rem, 6vw, 1.95rem);
       }
 
       .doc-editor__subtitle-input {
@@ -5924,6 +5931,17 @@ export class DashboardPageComponent {
 
   insertLinkTemplate(index: number): void {
     this.insertTextIntoParagraph(index, "[texto del enlace](https://ejemplo.com)", "[", "](https://ejemplo.com)");
+  }
+
+  syncTextareaHeight(event: Event): void {
+    const target = event.target;
+
+    if (!(target instanceof HTMLTextAreaElement)) {
+      return;
+    }
+
+    target.style.height = "auto";
+    target.style.height = `${target.scrollHeight}px`;
   }
 
   private insertTextIntoParagraph(index: number, placeholder: string, prefix = "", suffix = ""): void {
