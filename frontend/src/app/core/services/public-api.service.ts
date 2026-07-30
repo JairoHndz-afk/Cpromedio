@@ -44,6 +44,10 @@ export class PublicApiService {
   searchArticles(filters: PublicArticleFilters = {}): Promise<PaginatedArticles> {
     let params = new HttpParams().set("page", filters.page ?? 1);
 
+    if (filters.limit) {
+      params = params.set("limit", filters.limit);
+    }
+
     if (filters.search?.trim()) {
       params = params.set("search", filters.search.trim());
     }
@@ -54,6 +58,10 @@ export class PublicApiService {
 
     if (filters.category?.trim()) {
       params = params.set("category", filters.category.trim());
+    }
+
+    if (filters.excludeId?.trim()) {
+      params = params.set("excludeId", filters.excludeId.trim());
     }
 
     return firstValueFrom(

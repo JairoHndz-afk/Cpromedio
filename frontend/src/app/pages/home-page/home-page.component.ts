@@ -97,7 +97,7 @@ import { NewsCardComponent } from "../../shared/components/news-card/news-card.c
             <a class="button button--secondary" *ngIf="homeMostRead" [routerLink]="['/articulo', homeMostRead.slug]">
               Mostrar el m&aacute;s le&iacute;do
             </a>
-            <button class="button button--ghost" type="button" (click)="jumpToRecentArticles()">Ver más noticias</button>
+            <button class="button button--ghost" type="button" (click)="jumpToArchive()">Ir al archivo</button>
           </div>
         </section>
       </aside>
@@ -161,11 +161,28 @@ import { NewsCardComponent } from "../../shared/components/news-card/news-card.c
             <div>
               <p class="eyebrow">Portada reciente</p>
               <h2>Más lecturas del archivo cercano</h2>
+              <p class="helper-text home-stage__recent-summary" *ngIf="homeRecentTotal > 0">
+                Mostrando {{ homeRecent.length }} de {{ homeRecentTotal }} publicaciones.
+              </p>
             </div>
           </div>
 
           <div class="cards-grid">
             <app-news-card *ngFor="let article of homeRecent" [article]="article" variant="compact"></app-news-card>
+          </div>
+          <div class="button-row home-stage__recent-actions" *ngIf="homeRecent.length > 0">
+            <button
+              class="button button--secondary"
+              type="button"
+              *ngIf="canLoadMoreHomeRecent()"
+              (click)="loadMoreHomeRecent()"
+              [disabled]="loadingMoreRecent"
+            >
+              {{ loadingMoreRecent ? "Cargando..." : "Cargar más" }}
+            </button>
+            <p class="helper-text home-stage__recent-actions-note" *ngIf="!canLoadMoreHomeRecent() && homeRecentTotal > 0">
+              Ya estás viendo todas las publicaciones disponibles en esta portada.
+            </p>
           </div>
           <p class="empty-state" *ngIf="loading">Cargando portada...</p>
           <p class="empty-state" *ngIf="!loading && homeRecent.length === 0">Todavía no hay más artículos para mostrar.</p>
@@ -230,6 +247,7 @@ export class HomePageComponent {
     day: "2-digit",
     month: "short"
   });
+  private readonly homeRecentPageSize = 10;
 
   site: SitePayload | null = null;
   homeFeatured: PublicArticle | null = null;
@@ -237,6 +255,10 @@ export class HomePageComponent {
   homeTimeline: PublicArticle[] = [];
   visibleHomeTimeline: PublicArticle[] = [];
   homeRecent: PublicArticle[] = [];
+  homeRecentPage = 0;
+  homeRecentTotal = 0;
+  homeRecentTotalPages = 0;
+  loadingMoreRecent = false;
   searchResults: PublicArticle[] = [];
   searchTerm = "";
   filterActive = false;
@@ -388,9 +410,10 @@ export class HomePageComponent {
       this.activeResultsTitle = "Selecciones editoriales";
       this.activeResultsDescription = "Explora artículos relacionados con el tema actual.";
       this.syncHomeCollections();
+      await this.loadHomeRecentPage(1, true, requestId);
       this.seo.setHome({
-        description: site.featured?.excerpt || "Lecturas, archivo editorial y nuevas publicaciones en Colombiano Promedio.",
-        imageUrl: site.featured?.cover.url
+        description: this.homeFeatured?.excerpt || "Lecturas, archivo editorial y nuevas publicaciones en Colombiano Promedio.",
+        imageUrl: this.homeFeatured?.cover.url
       });
     } catch {
       if (requestId !== this.requestId) {
@@ -413,14 +436,51 @@ export class HomePageComponent {
 
   private syncHomeCollections(): void {
     this.homeFeatured = this.site?.featured ?? this.site?.latest?.[0] ?? null;
-
-    const featuredId = this.homeFeatured?.id ?? "";
-    const remaining = (this.site?.latest ?? []).filter((article) => article.id !== featuredId);
-    const byRecency = [...remaining].sort((left, right) => this.compareByRecency(right, left));
     this.homeMostRead = this.site?.mostRead ?? this.findMostInteractedArticle(this.site?.latest ?? []);
+  }
+
+  private syncHomeRecentCollections(): void {
+    const byRecency = [...this.homeRecent].sort((left, right) => this.compareByRecency(right, left));
+    this.homeRecent = byRecency;
     this.homeTimeline = byRecency.slice(0, this.homeTimelineWindowSize);
     this.visibleHomeTimeline = [...this.homeTimeline];
-    this.homeRecent = byRecency;
+  }
+
+  jumpToArchive(): void {
+    const target = document.getElementById("archivo-editorial");
+
+    if (!target) {
+      return;
+    }
+
+    if (target.getClientRects().length === 0) {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+
+    target.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  canLoadMoreHomeRecent(): boolean {
+    return this.homeRecentPage < this.homeRecentTotalPages;
+  }
+
+  async loadMoreHomeRecent(): Promise<void> {
+    if (this.loadingMoreRecent || !this.canLoadMoreHomeRecent()) {
+      return;
+    }
+
+    this.loadingMoreRecent = true;
+    this.cdr.markForCheck();
+
+    try {
+      await this.loadHomeRecentPage(this.homeRecentPage + 1, false, this.requestId);
+    } catch (error) {
+      this.toast.error(this.readError(error, "No fue posible cargar más artículos del archivo."));
+    } finally {
+      this.loadingMoreRecent = false;
+      this.cdr.markForCheck();
+    }
   }
 
   jumpToRecentArticles(): void {
@@ -443,6 +503,31 @@ export class HomePageComponent {
     }, 2200);
 
     this.cdr.markForCheck();
+  }
+
+  private async loadHomeRecentPage(page: number, replace: boolean, requestId: number): Promise<void> {
+    const response = await this.publicApi.searchArticles({
+      page,
+      limit: this.homeRecentPageSize,
+      excludeId: this.homeFeatured?.id
+    });
+
+    if (requestId !== this.requestId) {
+      return;
+    }
+
+    const incomingItems = response.items.filter((article) => article.id !== this.homeFeatured?.id);
+
+    this.homeRecent = replace
+      ? incomingItems
+      : [
+          ...this.homeRecent,
+          ...incomingItems.filter((article) => !this.homeRecent.some((existing) => existing.id === article.id))
+        ];
+    this.homeRecentPage = response.pagination.page;
+    this.homeRecentTotal = response.pagination.total;
+    this.homeRecentTotalPages = response.pagination.totalPages;
+    this.syncHomeRecentCollections();
   }
 
   private compareByRecency(left: PublicArticle, right: PublicArticle): number {

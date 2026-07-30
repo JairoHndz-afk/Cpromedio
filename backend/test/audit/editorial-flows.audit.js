@@ -664,6 +664,97 @@ test("audita que la busqueda publica use coincidencias parciales sin depender de
   assert.equal(firstRegex.test("premiará"), true);
 });
 
+test("audita que el archivo publico permita excluir el articulo destacado de la paginacion", async (t) => {
+  const originalFind = Article.find;
+  const originalCountDocuments = Article.countDocuments;
+
+  let capturedFilter = null;
+  let capturedSort = null;
+  let capturedSkip = null;
+  let capturedLimit = null;
+
+  const foundArticle = {
+    _id: createMockObjectId("article-archive-2"),
+    slug: "archivo-visible-sin-destacado",
+    title: "Archivo visible sin repetir la portada destacada",
+    subtitle: "Listado paginado",
+    excerpt: "Esta nota debe aparecer en el archivo sin duplicar la portada.",
+    body: ["Esta nota debe aparecer en el archivo sin duplicar la portada."],
+    contentBlocks: [{ type: "paragraph", text: "Esta nota debe aparecer en el archivo sin duplicar la portada." }],
+    cover: { url: "", alt: "", type: "image", positionX: 50, positionY: 50 },
+    author: {
+      _id: createMockObjectId("admin-archive"),
+      name: "Administrador",
+      email: "admin@periodico.local",
+      role: "admin"
+    },
+    category: null,
+    tags: ["archivo"],
+    metrics: { views: 9, shares: 1, reactions: 0 },
+    status: "published",
+    featured: false,
+    isPremium: false,
+    readingTime: 3,
+    publishedAt: new Date("2026-07-29T08:00:00.000Z"),
+    updatedAt: new Date("2026-07-29T08:00:00.000Z"),
+    moderationNote: "",
+    moderationHistory: []
+  };
+
+  Article.find = (filter) => {
+    capturedFilter = filter;
+
+    return {
+      populate() {
+        return this;
+      },
+      sort(sort) {
+        capturedSort = sort;
+        return this;
+      },
+      skip(value) {
+        capturedSkip = value;
+        return this;
+      },
+      async limit(value) {
+        capturedLimit = value;
+        return [foundArticle];
+      }
+    };
+  };
+
+  Article.countDocuments = async () => 21;
+
+  t.after(() => {
+    Article.find = originalFind;
+    Article.countDocuments = originalCountDocuments;
+  });
+
+  const request = createMockRequest({
+    query: {
+      page: "1",
+      limit: "10",
+      excludeId: "507f191e810c19729de860ea"
+    }
+  });
+  const response = createMockResponse();
+
+  await listPublicArticles(request, response, (error) => {
+    throw error;
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.payload?.items?.length, 1);
+  assert.equal(capturedFilter?.status, "published");
+  assert.equal(capturedFilter?.deletedAt, null);
+  assert.deepEqual(capturedFilter?._id, { $ne: "507f191e810c19729de860ea" });
+  assert.deepEqual(capturedSort, { publishedAt: -1, _id: -1 });
+  assert.equal(capturedSkip, 0);
+  assert.equal(capturedLimit, 10);
+  assert.equal(response.payload?.pagination?.total, 21);
+  assert.equal(response.payload?.pagination?.totalPages, 3);
+});
+
 test("audita que destacar un articulo retire el destacado previo para mantener una unica portada activa", async (t) => {
   const originalFindOne = Article.findOne;
   const originalUpdateMany = Article.updateMany;

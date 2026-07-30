@@ -212,8 +212,10 @@ export interface PaginatedArticles {
 export interface PublicArticleFilters {
   search?: string;
   page?: number;
+  limit?: number;
   tag?: string;
   category?: string;
+  excludeId?: string;
 }
 
 export interface SubscriptionActionPayload {

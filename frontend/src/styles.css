@@ -1458,6 +1458,20 @@ a:focus-visible {
   transition: border-color 180ms ease, box-shadow 180ms ease, background 180ms ease;
 }
 
+.home-stage__recent-summary {
+  margin-top: 0.35rem;
+}
+
+.home-stage__recent-actions {
+  justify-content: center;
+  margin-top: 1.15rem;
+}
+
+.home-stage__recent-actions-note {
+  width: 100%;
+  text-align: center;
+}
+
 .home-stage__recent.is-highlighted {
   border-color: rgba(248, 196, 0, 0.34);
   box-shadow:

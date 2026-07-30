@@ -595,6 +595,7 @@ async function buildPublicFilters(query) {
   const filters = publishedVisibleArticleFilter();
   const search = String(query.search ?? "").trim();
   const tag = sanitizeTags([query.tag])[0] ?? "";
+  const excludeId = String(query.excludeId ?? "").trim();
   const categorySlug = String(query.category ?? "")
     .trim()
     .toLowerCase();
@@ -609,6 +610,12 @@ async function buildPublicFilters(query) {
 
   if (tag) {
     filters.tags = tag;
+  }
+
+  if (excludeId && isValidObjectId(excludeId)) {
+    filters._id = {
+      $ne: excludeId
+    };
   }
 
   if (categorySlug) {
