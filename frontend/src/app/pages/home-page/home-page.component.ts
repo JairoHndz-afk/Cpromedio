@@ -247,7 +247,7 @@ export class HomePageComponent {
     day: "2-digit",
     month: "short"
   });
-  private readonly homeRecentPageSize = 10;
+  private readonly homeRecentPageSize = 9;
 
   site: SitePayload | null = null;
   homeFeatured: PublicArticle | null = null;
