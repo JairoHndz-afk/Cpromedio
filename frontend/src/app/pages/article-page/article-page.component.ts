@@ -465,7 +465,13 @@ export class ArticlePageComponent {
       this.syncTopicState();
       this.applySeo(response.article);
       window.scrollTo({ top: 0, behavior: "smooth" });
-    } catch {
+    } catch (error) {
+      const status = typeof error === "object" && error && "status" in error ? Number(error.status) : 0;
+
+      if (status !== 404) {
+        this.errorMessage = "No fue posible cargar el artÃ­culo.";
+        return;
+      }
       this.errorMessage = "No fue posible cargar el artículo.";
       this.seo.setNoIndex("Artículo no disponible | Colombiano Promedio", this.errorMessage);
     } finally {
