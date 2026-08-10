@@ -424,7 +424,12 @@ export class HomePageComponent {
         ? "No fue posible cargar esta selección editorial."
         : "No fue posible cargar la portada.";
       this.clearColdStartHint();
-      this.seo.setNoIndex("Portada no disponible | Colombiano Promedio", this.errorMessage);
+      if (this.filterActive) {
+        this.seo.setNoIndex(`${this.activeResultsTitle} | Colombiano Promedio`, this.activeResultsDescription || this.errorMessage);
+      } else {
+        this.errorMessage = "";
+        this.seo.setHome();
+      }
     } finally {
       if (requestId === this.requestId) {
         this.loading = false;
