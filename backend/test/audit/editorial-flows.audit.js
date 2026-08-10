@@ -10,6 +10,7 @@ import {
   getPublicArticle,
   getPublicArchiveFilters,
   listPublicArticles,
+  getSitemapXml,
   reactivatePublicSubscription,
   unsubscribePublicSubscription
 } from "../../src/controllers/public.controller.js";
@@ -26,9 +27,14 @@ function createMockResponse() {
   return {
     statusCode: 200,
     payload: null,
+    contentType: "",
     cookies: [],
     status(code) {
       this.statusCode = code;
+      return this;
+    },
+    type(value) {
+      this.contentType = value;
       return this;
     },
     cookie(name, value, options) {
@@ -36,6 +42,10 @@ function createMockResponse() {
       return this;
     },
     json(payload) {
+      this.payload = payload;
+      return this;
+    },
+    send(payload) {
       this.payload = payload;
       return this;
     }
@@ -357,7 +367,7 @@ test("audita que un token de confirmacion no reactive suscripciones fuera del es
     status: "paused",
     interests: [],
     confirmationTokenHash: "token-paused",
-    confirmationTokenExpiresAt: new Date("2026-08-01T00:00:00.000Z"),
+    confirmationTokenExpiresAt: new Date("2026-08-20T00:00:00.000Z"),
     unsubscribeTokenHash: "hash",
     confirmedAt: new Date("2026-07-24T00:00:00.000Z"),
     welcomeSentAt: new Date("2026-07-24T00:00:00.000Z"),
@@ -890,6 +900,53 @@ test("audita que el archivo publico exponga filtros avanzados con categorias y e
   assert.equal(aggregateCalls.length, 2);
   assert.equal(aggregateCalls[0][0].$match.status, "published");
   assert.equal(aggregateCalls[1][1].$unwind, "$tags");
+});
+
+test("audita que el sitemap publico incluya la portada, el archivo y los articulos publicados", async (t) => {
+  const originalFind = Article.find;
+  const originalDistinct = Article.distinct;
+  const originalPublicSiteUrl = env.publicSiteUrl;
+
+  env.publicSiteUrl = "https://www.colombianopromedio.co";
+
+  Article.find = () => ({
+    select() {
+      return this;
+    },
+    async sort() {
+      return [
+        {
+          slug: "daniel-coronell-gana-el-premio-maria-moors-de-periodismo",
+          author: createMockObjectId("author-sitemap-1"),
+          featured: true,
+          publishedAt: new Date("2026-08-09T18:00:00.000Z"),
+          updatedAt: new Date("2026-08-09T20:30:00.000Z")
+        }
+      ];
+    }
+  });
+
+  Article.distinct = async () => [createMockObjectId("author-sitemap-1")];
+
+  t.after(() => {
+    Article.find = originalFind;
+    Article.distinct = originalDistinct;
+    env.publicSiteUrl = originalPublicSiteUrl;
+  });
+
+  const request = createMockRequest();
+  const response = createMockResponse();
+
+  await getSitemapXml(request, response, (error) => {
+    throw error;
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.contentType, "application/xml; charset=utf-8");
+  assert.match(response.payload ?? "", /<loc>https:\/\/www\.colombianopromedio\.co\/<\/loc>/);
+  assert.match(response.payload ?? "", /<loc>https:\/\/www\.colombianopromedio\.co\/archivo<\/loc>/);
+  assert.match(response.payload ?? "", /<loc>https:\/\/www\.colombianopromedio\.co\/autor\/author-sitemap-1<\/loc>/);
+  assert.match(response.payload ?? "", /<loc>https:\/\/www\.colombianopromedio\.co\/articulo\/daniel-coronell-gana-el-premio-maria-moors-de-periodismo<\/loc>/);
 });
 
 test("audita que destacar un articulo retire el destacado previo para mantener una unica portada activa", async (t) => {

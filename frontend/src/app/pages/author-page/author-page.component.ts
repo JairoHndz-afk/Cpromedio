@@ -144,11 +144,22 @@ export class AuthorPageComponent {
         description: this.authorDescription,
         authorId: response.author.id
       });
-    } catch {
+    } catch (error) {
+      const status = typeof error === "object" && error && "status" in error ? Number(error.status) : 0;
+
       this.author = null;
       this.articles = [];
-      this.errorMessage = "No fue posible cargar el archivo del autor.";
-      this.seo.setNoIndex("Autor no disponible | Colombiano Promedio", this.errorMessage);
+
+      if (status === 404) {
+        this.errorMessage = "Autor no disponible.";
+        this.seo.setNoIndex("Autor no disponible | Colombiano Promedio", this.errorMessage);
+      } else {
+        this.errorMessage = "No fue posible cargar el archivo del autor.";
+        this.seo.setAuthorFallback({
+          authorId,
+          description: "Archivo publico de autores y publicaciones de Colombiano Promedio."
+        });
+      }
     } finally {
       this.cdr.markForCheck();
     }

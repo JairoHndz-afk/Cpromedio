@@ -470,6 +470,9 @@ export class ArticlePageComponent {
 
       if (status !== 404) {
         this.errorMessage = "No fue posible cargar el artÃ­culo.";
+        this.seo.setArticleFallback({
+          slug: currentSlug
+        });
         return;
       }
       this.errorMessage = "No fue posible cargar el artículo.";

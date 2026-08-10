@@ -79,6 +79,21 @@ export class SeoService {
     });
   }
 
+  setArticleFallback(payload: { slug?: string; title?: string; description?: string } = {}): void {
+    const slug = payload.slug?.trim();
+    const description = payload.description?.trim() || "Lectura editorial de Colombiano Promedio.";
+    const url = slug ? this.absoluteUrl(`/articulo/${slug}`) : this.absoluteUrl("/");
+
+    this.applyCommonMeta({
+      title: payload.title?.trim() || "Articulo | Colombiano Promedio",
+      description,
+      url,
+      type: "article",
+      robots: "index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1"
+    });
+    this.clearJsonLd();
+  }
+
   setAuthor(payload: SeoAuthorPayload): void {
     const url = this.absoluteUrl(`/autor/${payload.authorId}`);
 
@@ -96,6 +111,19 @@ export class SeoService {
       name: payload.name,
       url
     });
+  }
+
+  setAuthorFallback(payload: { authorId: string; title?: string; description?: string }): void {
+    const url = this.absoluteUrl(`/autor/${payload.authorId}`);
+
+    this.applyCommonMeta({
+      title: payload.title?.trim() || "Archivo de autor | Colombiano Promedio",
+      description: payload.description?.trim() || "Archivo publico de autores y publicaciones de Colombiano Promedio.",
+      url,
+      type: "profile",
+      robots: "index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1"
+    });
+    this.clearJsonLd();
   }
 
   setArchive(payload: { page?: number; description?: string } = {}): void {

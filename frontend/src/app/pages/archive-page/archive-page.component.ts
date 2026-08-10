@@ -463,7 +463,15 @@ export class ArchivePageComponent {
 
       this.articles = [];
       this.errorMessage = "No fue posible cargar el archivo publico.";
-      this.seo.setNoIndex("Archivo no disponible | Colombiano Promedio", this.errorMessage);
+
+      if (this.hasActiveFilters) {
+        this.seo.setNoIndex("Archivo no disponible | Colombiano Promedio", this.errorMessage);
+      } else {
+        this.seo.setArchive({
+          page,
+          description: this.archiveDescription
+        });
+      }
     } finally {
       if (requestId === this.requestId) {
         this.loading = false;

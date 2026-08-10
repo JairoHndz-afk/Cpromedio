@@ -465,8 +465,16 @@ function buildPublicArticleUrl(slug) {
   return new URL(`/articulo/${slug}`, `${env.publicSiteUrl}/`).toString();
 }
 
+function buildPublicHomeUrl() {
+  return new URL("/", `${env.publicSiteUrl}/`).toString();
+}
+
 function buildPublicAuthorUrl(authorId) {
   return new URL(`/autor/${authorId}`, `${env.publicSiteUrl}/`).toString();
+}
+
+function buildPublicArchiveUrl() {
+  return new URL("/archivo", `${env.publicSiteUrl}/`).toString();
 }
 
 function serializeSubscriptionMessage(message) {
@@ -1036,12 +1044,19 @@ export async function getSitemapXml(_req, res, next) {
     ]);
 
     const uniqueAuthorIds = [...new Set(authorIds.map((item) => item?.toString?.() ?? "").filter(Boolean))];
+    const latestPublicationDate = formatSeoDate(articles[0]?.updatedAt ?? articles[0]?.publishedAt) || new Date().toISOString();
     const urls = [
       {
-        loc: env.publicSiteUrl,
-        lastmod: new Date().toISOString(),
+        loc: buildPublicHomeUrl(),
+        lastmod: latestPublicationDate,
         changefreq: "hourly",
         priority: "1.0"
+      },
+      {
+        loc: buildPublicArchiveUrl(),
+        lastmod: latestPublicationDate,
+        changefreq: "daily",
+        priority: "0.9"
       },
       ...uniqueAuthorIds.map((authorId) => ({
         loc: buildPublicAuthorUrl(authorId),
