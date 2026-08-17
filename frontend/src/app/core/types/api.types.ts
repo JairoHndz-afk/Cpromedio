@@ -125,7 +125,7 @@ export interface PublicAuthorProfile {
 
 export interface PublicAuthorProfilePayload {
   author: PublicAuthorProfile;
-  items: PublicArticle[];
+  items: PublicArticlePreview[];
   pagination: PaginationMeta;
 }
 
@@ -191,9 +191,10 @@ export interface AlliedFeedSyncResult {
 }
 
 export interface SitePayload {
-  featured: PublicArticle | null;
-  mostRead: PublicArticle | null;
-  latest: PublicArticle[];
+  featured: PublicArticlePreview | null;
+  mostRead: PublicArticlePreview | null;
+  latest: PublicArticlePreview[];
+  latestPagination: PaginationMeta;
   communication: SiteCommunication | null;
 }
 
@@ -205,7 +206,7 @@ export interface PaginationMeta {
 }
 
 export interface PaginatedArticles {
-  items: PublicArticle[];
+  items: PublicArticlePreview[];
   pagination: PaginationMeta;
 }
 

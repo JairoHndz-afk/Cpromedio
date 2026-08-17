@@ -1,5 +1,18 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "colombianopromedio.co"
+        }
+      ],
+      "destination": "https://www.colombianopromedio.co/:path*",
+      "permanent": true
+    }
+  ],
   "rewrites": [
     {
       "source": "/compartir/:slug",

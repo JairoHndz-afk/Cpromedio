@@ -2,7 +2,7 @@ import { DatePipe, NgClass, NgIf, NgSwitch, NgSwitchCase, NgSwitchDefault } from
 import { ChangeDetectionStrategy, Component, Input } from "@angular/core";
 import { RouterLink } from "@angular/router";
 
-import { PublicArticle } from "../../../core/types/api.types";
+import { PublicArticlePreview } from "../../../core/types/api.types";
 
 @Component({
   selector: "app-news-card",
@@ -88,7 +88,7 @@ import { PublicArticle } from "../../../core/types/api.types";
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class NewsCardComponent {
-  @Input({ required: true }) article!: PublicArticle;
+  @Input({ required: true }) article!: PublicArticlePreview;
   @Input() variant: "default" | "compact" = "default";
   @Input() filterRoute: string | any[] = "/";
 

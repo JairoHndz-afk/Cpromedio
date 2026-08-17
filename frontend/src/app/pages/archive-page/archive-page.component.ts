@@ -10,7 +10,7 @@ import {
   PaginationMeta,
   PublicArchiveFilterCategory,
   PublicArchiveFilterTag,
-  PublicArticle,
+  PublicArticlePreview,
   PublicArticleSort
 } from "../../core/types/api.types";
 import { NewsCardComponent } from "../../shared/components/news-card/news-card.component";
@@ -182,7 +182,7 @@ export class ArchivePageComponent {
     { value: "oldest", label: "Mas antiguas" }
   ];
 
-  articles: PublicArticle[] = [];
+  articles: PublicArticlePreview[] = [];
   availableCategories: PublicArchiveFilterCategory[] = [];
   availableTags: PublicArchiveFilterTag[] = [];
   searchTerm = "";

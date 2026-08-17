@@ -6,7 +6,7 @@ import { combineLatest } from "rxjs";
 
 import { PublicApiService } from "../../core/services/public-api.service";
 import { SeoService } from "../../core/services/seo.service";
-import { PaginationMeta, PublicAuthorProfile, PublicArticle } from "../../core/types/api.types";
+import { PaginationMeta, PublicAuthorProfile, PublicArticlePreview } from "../../core/types/api.types";
 import { NewsCardComponent } from "../../shared/components/news-card/news-card.component";
 
 @Component({
@@ -74,7 +74,7 @@ export class AuthorPageComponent {
   private readonly cdr = inject(ChangeDetectorRef);
 
   author: PublicAuthorProfile | null = null;
-  articles: PublicArticle[] = [];
+  articles: PublicArticlePreview[] = [];
   errorMessage = "";
   pagination: PaginationMeta = {
     page: 1,

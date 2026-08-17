@@ -26,8 +26,25 @@ const publicConsentCookieName = "cp_cookie_preferences";
 const recentArticleViewWindowMs = 1000 * 60 * 45;
 const recentArticleViewLimit = 24;
 const publicArchiveTagLimit = 12;
+const publicHomeLatestLimit = 9;
 const publicSubscriptionAcceptedMessage = "Si el correo es válido, revisa tu bandeja para continuar con el boletín.";
 const publicSubscriptionProcessedMessage = "Si el correo es válido, la suscripción fue procesada correctamente.";
+const publicArticlePreviewSelect = [
+  "slug",
+  "title",
+  "subtitle",
+  "excerpt",
+  "cover",
+  "author",
+  "category",
+  "tags",
+  "metrics",
+  "featured",
+  "readingTime",
+  "publishedAt",
+  "updatedAt",
+  "syndication"
+].join(" ");
 const searchablePublicArticleFields = [
   "title",
   "subtitle",
@@ -105,6 +122,10 @@ function publishedVisibleArticleFilter(filters = {}) {
     deletedAt: null,
     ...filters
   };
+}
+
+function previewArticleQuery(query) {
+  return query.select(publicArticlePreviewSelect).populate(articlePopulate());
 }
 
 function escapeRegexLiteral(value) {
@@ -357,77 +378,69 @@ async function shouldCountArticleView(req, res, articleId) {
 }
 
 function serializeArticle(article) {
+  const serializedBase = serializeArticlePreview(article);
   const rawContentBlocks =
     Array.isArray(article.contentBlocks) && article.contentBlocks.length > 0
       ? article.contentBlocks
       : paragraphBlocksFromBody(article.body ?? []);
-  const allowedExternalHosts =
-    article?.syndication?.sourceType === "allied_rss" && article?.syndication?.allowExternalMedia
-      ? buildAllowedFeedHosts(article.syndication)
-      : [];
   const sanitizedContentBlocks = sanitizeContentBlocks(rawContentBlocks, {
-    allowedExternalHosts
+    allowedExternalHosts: serializedBase.allowedExternalHosts
   }).blocks;
   const contentBlocks = sanitizedContentBlocks.length > 0 ? sanitizedContentBlocks : paragraphBlocksFromBody(article.body ?? []);
 
   return {
-    id: article._id.toString(),
-    slug: article.slug,
-    title: article.title,
-    subtitle: article.subtitle,
-    excerpt: article.excerpt,
+    ...serializedBase.article,
     body: article.body,
     contentBlocks,
-    cover: {
-      ...serializeCover(article.cover),
-      url:
-        article?.syndication?.sourceType === "allied_rss" && article?.syndication?.allowExternalMedia
-          ? sanitizeEditorialMediaUrl(article.cover?.url ?? "", { allowedExternalHosts })
-          : serializeCover(article.cover).url
-    },
-    author: article.author
-      ? {
-          id: article.author._id.toString(),
-          name: article.author.name,
-          role: article.author.role
-        }
-      : null,
-    category: article.category
-      ? {
-          id: article.category._id.toString(),
-          name: article.category.name,
-          slug: article.category.slug
-        }
-      : null,
-    tags: article.tags,
-    metrics: article.metrics ?? { views: 0, shares: 0, reactions: 0 },
     isPremium: article.isPremium,
-    featured: article.featured,
-    readingTime: article.readingTime,
-    publishedAt: article.publishedAt,
-    updatedAt: article.updatedAt,
-    syndication: serializeSyndication(article)
   };
 }
 
 function serializeArticlePreview(article) {
-  const serialized = serializeArticle(article);
+  const allowedExternalHosts =
+    article?.syndication?.sourceType === "allied_rss" && article?.syndication?.allowExternalMedia
+      ? buildAllowedFeedHosts(article.syndication)
+      : [];
+  const baseCover = serializeCover(article.cover);
+  const cover = {
+    ...baseCover,
+    url:
+      article?.syndication?.sourceType === "allied_rss" && article?.syndication?.allowExternalMedia
+        ? sanitizeEditorialMediaUrl(article.cover?.url ?? "", { allowedExternalHosts })
+        : baseCover.url
+  };
 
   return {
-    id: serialized.id,
-    slug: serialized.slug,
-    title: serialized.title,
-    subtitle: serialized.subtitle,
-    excerpt: serialized.excerpt,
-    cover: serialized.cover,
-    author: serialized.author,
-    category: serialized.category,
-    tags: serialized.tags,
-    metrics: serialized.metrics,
-    featured: serialized.featured,
-    readingTime: serialized.readingTime,
-    publishedAt: serialized.publishedAt,
-    updatedAt: serialized.updatedAt
+    article: {
+      id: article._id.toString(),
+      slug: article.slug,
+      title: article.title,
+      subtitle: article.subtitle,
+      excerpt: article.excerpt,
+      cover,
+      author: article.author
+        ? {
+            id: article.author._id.toString(),
+            name: article.author.name,
+            role: article.author.role
+          }
+        : null,
+      category: article.category
+        ? {
+            id: article.category._id.toString(),
+            name: article.category.name,
+            slug: article.category.slug
+          }
+        : null,
+      tags: article.tags,
+      metrics: article.metrics ?? { views: 0, shares: 0, reactions: 0 },
+      featured: article.featured,
+      readingTime: article.readingTime,
+      publishedAt: article.publishedAt,
+      updatedAt: article.updatedAt,
+      syndication: serializeSyndication(article)
+    },
+    allowedExternalHosts
   };
 }
 
@@ -702,6 +715,7 @@ async function findNextArticle(currentArticle) {
       publishedAt: { $gt: currentPublishedAt },
       ...query
     })
+      .select(publicArticlePreviewSelect)
       .populate(articlePopulate())
       .sort({ publishedAt: 1, _id: 1 });
 
@@ -715,6 +729,7 @@ async function findNextArticle(currentArticle) {
       _id: { $ne: currentArticle._id },
       ...query
     })
+      .select(publicArticlePreviewSelect)
       .populate(articlePopulate())
       .sort({ publishedAt: -1, _id: -1 });
 
@@ -728,6 +743,7 @@ async function findNextArticle(currentArticle) {
     deletedAt: null,
     _id: { $ne: currentArticle._id }
   })
+    .select(publicArticlePreviewSelect)
     .populate(articlePopulate())
     .sort({ publishedAt: -1, _id: -1 });
 }
@@ -736,24 +752,46 @@ export async function getPublicSite(_req, res, next) {
   try {
     const siteSetting = await getMainSiteSetting();
     const communication = await getActiveSiteCommunication(siteSetting);
+    const featuredArticleId = siteSetting.featuredArticle ?? null;
+    const latestFilters = featuredArticleId
+      ? publishedVisibleArticleFilter({
+          _id: { $ne: featuredArticleId }
+        })
+      : publishedVisibleArticleFilter();
+    const latestQueryLimit = featuredArticleId ? publicHomeLatestLimit : publicHomeLatestLimit + 1;
 
-    const [featured, mostRead, latest] = await Promise.all([
+    const [featured, mostRead, latestCandidates, latestTotal] = await Promise.all([
       siteSetting.featuredArticle
-        ? Article.findOne(publishedVisibleArticleFilter({ _id: siteSetting.featuredArticle })).populate(articlePopulate())
+        ? previewArticleQuery(Article.findOne(publishedVisibleArticleFilter({ _id: siteSetting.featuredArticle })))
         : Promise.resolve(null),
-      Article.findOne(publishedVisibleArticleFilter())
-        .populate(articlePopulate())
+      previewArticleQuery(Article.findOne(publishedVisibleArticleFilter()))
         .sort({ "metrics.views": -1, "metrics.shares": -1, "metrics.reactions": -1, publishedAt: -1, _id: -1 }),
-      Article.find(publishedVisibleArticleFilter())
-        .populate(articlePopulate())
-        .sort({ publishedAt: -1 })
-        .limit(8)
+      previewArticleQuery(Article.find(latestFilters))
+        .sort({ publishedAt: -1, updatedAt: -1, _id: -1 })
+        .limit(latestQueryLimit),
+      Article.countDocuments(latestFilters)
     ]);
+    const featuredPreview = featured
+      ? serializeArticlePreview(featured).article
+      : latestCandidates[0]
+        ? serializeArticlePreview(latestCandidates[0]).article
+        : null;
+    const latest = latestCandidates
+      .filter((article) => article._id.toString() !== featuredPreview?.id)
+      .slice(0, publicHomeLatestLimit)
+      .map((article) => serializeArticlePreview(article).article);
+    const latestTotalAdjusted = featuredArticleId ? latestTotal : Math.max(latestTotal - (featuredPreview ? 1 : 0), 0);
 
     res.json({
-      featured: featured ? serializeArticle(featured) : latest[0] ? serializeArticle(latest[0]) : null,
-      mostRead: mostRead ? serializeArticle(mostRead) : null,
-      latest: latest.map(serializeArticle),
+      featured: featuredPreview,
+      mostRead: mostRead ? serializeArticlePreview(mostRead).article : null,
+      latest,
+      latestPagination: {
+        page: 1,
+        limit: publicHomeLatestLimit,
+        total: latestTotalAdjusted,
+        totalPages: Math.ceil(latestTotalAdjusted / publicHomeLatestLimit)
+      },
       communication
     });
   } catch (error) {
@@ -902,8 +940,7 @@ export async function listPublicArticles(req, res, next) {
     }
 
     const [items, total] = await Promise.all([
-      Article.find(filters)
-        .populate(articlePopulate())
+      previewArticleQuery(Article.find(filters))
         .sort(sortDefinition.sort)
         .skip((page - 1) * limit)
         .limit(limit),
@@ -911,7 +948,7 @@ export async function listPublicArticles(req, res, next) {
     ]);
 
     res.json({
-      items: items.map(serializeArticle),
+      items: items.map((article) => serializeArticlePreview(article).article),
       pagination: {
         page,
         limit,
@@ -956,7 +993,7 @@ export async function getPublicArticle(req, res, next) {
 
     res.json({
       article: serializeArticle(item),
-      nextArticle: nextArticle ? serializeArticlePreview(nextArticle) : null
+      nextArticle: nextArticle ? serializeArticlePreview(nextArticle).article : null
     });
   } catch (error) {
     next(error);
@@ -986,8 +1023,7 @@ export async function getPublicAuthor(req, res, next) {
     const filters = publishedVisibleArticleFilter({ author: author._id });
 
     const [items, total, latestPublication] = await Promise.all([
-      Article.find(filters)
-        .populate(articlePopulate())
+      previewArticleQuery(Article.find(filters))
         .sort({ publishedAt: -1, updatedAt: -1, _id: -1 })
         .skip((page - 1) * limit)
         .limit(limit),
@@ -1002,7 +1038,7 @@ export async function getPublicAuthor(req, res, next) {
         articleCount: total,
         latestPublishedAt: latestPublication?.publishedAt ?? latestPublication?.updatedAt ?? null
       }),
-      items: items.map(serializeArticle),
+      items: items.map((article) => serializeArticlePreview(article).article),
       pagination: {
         page,
         limit,

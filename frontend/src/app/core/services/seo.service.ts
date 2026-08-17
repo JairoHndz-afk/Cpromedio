@@ -30,16 +30,45 @@ export class SeoService {
       payload.description?.trim() ||
       "Colombiano Promedio: periodismo digital, archivo editorial, autores y lecturas recientes con identidad colombiana.";
     const url = this.absoluteUrl("/");
+    const imageUrl = this.toAbsoluteMediaUrl(payload.imageUrl) || this.siteLogoUrl();
 
     this.applyCommonMeta({
       title,
       description,
       url,
-      imageUrl: payload.imageUrl,
+      imageUrl,
       type: "website",
       robots: "index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1"
     });
-    this.clearJsonLd();
+
+    this.setJsonLd([
+      {
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        "@id": `${url}#organization`,
+        name: "Colombiano Promedio",
+        alternateName: "colombianopromedio",
+        url,
+        logo: {
+          "@type": "ImageObject",
+          url: this.siteLogoUrl()
+        }
+      },
+      {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "@id": `${url}#website`,
+        url,
+        name: "Colombiano Promedio",
+        alternateName: "colombianopromedio",
+        description,
+        inLanguage: "es-CO",
+        publisher: {
+          "@id": `${url}#organization`
+        },
+        image: imageUrl
+      }
+    ]);
   }
 
   setArticle(payload: SeoArticlePayload): void {
@@ -63,6 +92,10 @@ export class SeoService {
       description,
       url,
       image: imageUrl ? [imageUrl] : undefined,
+      mainEntityOfPage: {
+        "@type": "WebPage",
+        "@id": url
+      },
       datePublished: payload.publishedAt || undefined,
       dateModified: payload.updatedAt || payload.publishedAt || undefined,
       author: payload.authorName
@@ -74,7 +107,11 @@ export class SeoService {
       publisher: {
         "@type": "Organization",
         name: "Colombiano Promedio",
-        url: this.absoluteUrl("/")
+        url: this.absoluteUrl("/"),
+        logo: {
+          "@type": "ImageObject",
+          url: this.siteLogoUrl()
+        }
       }
     });
   }
@@ -216,7 +253,7 @@ export class SeoService {
     canonical.setAttribute("href", url);
   }
 
-  private setJsonLd(data: Record<string, unknown>): void {
+  private setJsonLd(data: Record<string, unknown> | Array<Record<string, unknown>>): void {
     this.clearJsonLd();
 
     const script = this.document.createElement("script");
@@ -228,6 +265,10 @@ export class SeoService {
 
   private clearJsonLd(): void {
     this.document.getElementById("cp-jsonld")?.remove();
+  }
+
+  private siteLogoUrl(): string {
+    return this.absoluteUrl("/assets/branding/logo-c-light.png");
   }
 
   private absoluteUrl(pathname: string): string {

@@ -7,7 +7,7 @@ import { ActivatedRoute, Router, RouterLink } from "@angular/router";
 import { PublicApiService } from "../../core/services/public-api.service";
 import { SeoService } from "../../core/services/seo.service";
 import { ToastService } from "../../core/services/toast.service";
-import { PublicArticle, SitePayload } from "../../core/types/api.types";
+import { PublicArticlePreview, SitePayload } from "../../core/types/api.types";
 import { NewsCardComponent } from "../../shared/components/news-card/news-card.component";
 
 @Component({
@@ -250,16 +250,16 @@ export class HomePageComponent {
   private readonly homeRecentPageSize = 9;
 
   site: SitePayload | null = null;
-  homeFeatured: PublicArticle | null = null;
-  homeMostRead: PublicArticle | null = null;
-  homeTimeline: PublicArticle[] = [];
-  visibleHomeTimeline: PublicArticle[] = [];
-  homeRecent: PublicArticle[] = [];
+  homeFeatured: PublicArticlePreview | null = null;
+  homeMostRead: PublicArticlePreview | null = null;
+  homeTimeline: PublicArticlePreview[] = [];
+  visibleHomeTimeline: PublicArticlePreview[] = [];
+  homeRecent: PublicArticlePreview[] = [];
   homeRecentPage = 0;
   homeRecentTotal = 0;
   homeRecentTotalPages = 0;
   loadingMoreRecent = false;
-  searchResults: PublicArticle[] = [];
+  searchResults: PublicArticlePreview[] = [];
   searchTerm = "";
   filterActive = false;
   activeTag = "";
@@ -292,19 +292,19 @@ export class HomePageComponent {
     });
   }
 
-  hasVisualCover(article: PublicArticle): boolean {
+  hasVisualCover(article: PublicArticlePreview): boolean {
     return article.cover.type === "image" || article.cover.type === "infographic";
   }
 
-  coverObjectPosition(cover: PublicArticle["cover"]): string {
+  coverObjectPosition(cover: PublicArticlePreview["cover"]): string {
     return `${cover.positionX ?? 50}% ${cover.positionY ?? 50}%`;
   }
 
-  featuredCoverObjectPosition(cover: PublicArticle["cover"]): string {
+  featuredCoverObjectPosition(cover: PublicArticlePreview["cover"]): string {
     return `${cover.positionX ?? 50}% 0%`;
   }
 
-  articleDateLabel(article: PublicArticle): string {
+  articleDateLabel(article: PublicArticlePreview): string {
     const value = this.articleDateSource(article);
 
     if (!value) {
@@ -315,7 +315,7 @@ export class HomePageComponent {
     return Number.isNaN(date.getTime()) ? "Fecha editorial" : this.timelineDateFormatter.format(date);
   }
 
-  formatTimelineStamp(article: PublicArticle): string {
+  formatTimelineStamp(article: PublicArticlePreview): string {
     const value = this.articleDateSource(article);
 
     if (!value) {
@@ -333,7 +333,7 @@ export class HomePageComponent {
       : this.timelineDateFormatter.format(date);
   }
 
-  private articleDateSource(article: PublicArticle): string | null {
+  private articleDateSource(article: PublicArticlePreview): string | null {
     return article.publishedAt || article.updatedAt || null;
   }
 
@@ -410,7 +410,7 @@ export class HomePageComponent {
       this.activeResultsTitle = "Selecciones editoriales";
       this.activeResultsDescription = "Explora artículos relacionados con el tema actual.";
       this.syncHomeCollections();
-      await this.loadHomeRecentPage(1, true, requestId);
+      this.seedHomeRecentFromSite();
       this.seo.setHome({
         description: this.homeFeatured?.excerpt || "Lecturas, archivo editorial y nuevas publicaciones en Colombiano Promedio.",
         imageUrl: this.homeFeatured?.cover.url
@@ -442,6 +442,16 @@ export class HomePageComponent {
   private syncHomeCollections(): void {
     this.homeFeatured = this.site?.featured ?? this.site?.latest?.[0] ?? null;
     this.homeMostRead = this.site?.mostRead ?? this.findMostInteractedArticle(this.site?.latest ?? []);
+  }
+
+  private seedHomeRecentFromSite(): void {
+    const initialItems = (this.site?.latest ?? []).filter((article) => article.id !== this.homeFeatured?.id);
+
+    this.homeRecent = initialItems;
+    this.homeRecentPage = this.site?.latestPagination.page ?? (initialItems.length > 0 ? 1 : 0);
+    this.homeRecentTotal = this.site?.latestPagination.total ?? initialItems.length;
+    this.homeRecentTotalPages = this.site?.latestPagination.totalPages ?? (initialItems.length > 0 ? 1 : 0);
+    this.syncHomeRecentCollections();
   }
 
   private syncHomeRecentCollections(): void {
@@ -524,13 +534,13 @@ export class HomePageComponent {
     this.syncHomeRecentCollections();
   }
 
-  private compareByRecency(left: PublicArticle, right: PublicArticle): number {
+  private compareByRecency(left: PublicArticlePreview, right: PublicArticlePreview): number {
     const leftTime = new Date(this.articleDateSource(left) ?? 0).getTime();
     const rightTime = new Date(this.articleDateSource(right) ?? 0).getTime();
     return leftTime - rightTime;
   }
 
-  private findMostInteractedArticle(articles: PublicArticle[]): PublicArticle | null {
+  private findMostInteractedArticle(articles: PublicArticlePreview[]): PublicArticlePreview | null {
     if (articles.length === 0) {
       return null;
     }
