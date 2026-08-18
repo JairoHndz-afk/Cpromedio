@@ -1,12 +1,14 @@
 import { DatePipe, NgFor, NgIf, NgSwitch, NgSwitchCase, NgSwitchDefault } from "@angular/common";
 import { ChangeDetectionStrategy, ChangeDetectorRef, Component, inject } from "@angular/core";
 import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
+import { FormsModule } from "@angular/forms";
 import { DomSanitizer, SafeResourceUrl } from "@angular/platform-browser";
 import { ActivatedRoute, RouterLink } from "@angular/router";
 
+import { AuthService } from "../../core/services/auth.service";
 import { PublicApiService } from "../../core/services/public-api.service";
 import { SeoService } from "../../core/services/seo.service";
-import { ArticleContentBlock, PublicArticle, PublicArticlePreview } from "../../core/types/api.types";
+import { ArticleContentBlock, PublicArticle, PublicArticleComment, PublicArticleCommentsPayload, PublicArticlePreview } from "../../core/types/api.types";
 import { ArticleGalleryImage, ArticleRenderSegment, buildArticleRenderSegments } from "../../core/utils/article-render-segments";
 import { renderEditorialText } from "../../core/utils/editorial-rich-text";
 import { isInstagramEmbed, isTweetEmbed, resolveInstagramEmbedSource, resolveTweetEmbedSource, resolveVideoEmbed } from "../../core/utils/video-embed";
@@ -16,7 +18,7 @@ type ShareChannel = "whatsapp" | "telegram" | "x" | "facebook" | "copy";
 @Component({
   selector: "app-article-page",
   standalone: true,
-  imports: [NgFor, NgIf, RouterLink, DatePipe, NgSwitch, NgSwitchCase, NgSwitchDefault],
+  imports: [NgFor, NgIf, RouterLink, DatePipe, NgSwitch, NgSwitchCase, NgSwitchDefault, FormsModule],
   template: `
     <section class="article-shell" *ngIf="article; else loadingState">
       <div class="article-header">
@@ -205,6 +207,113 @@ type ShareChannel = "whatsapp" | "telegram" | "x" | "facebook" | "copy";
         <p class="helper-text" *ngIf="shareMessage">{{ shareMessage }}</p>
       </section>
 
+      <section class="article-comments">
+        <div class="article-comments__header">
+          <div>
+            <p class="eyebrow">Comentarios</p>
+            <h2>La conversación de esta noticia</h2>
+            <p class="helper-text">Publicación inmediata para aportes útiles, con censura automática de insultos fuertes y opción de gestión desde tu cuenta.</p>
+          </div>
+
+          <div class="article-comments__summary">
+            <span class="tag tag--category">{{ articleCommentTotal }} comentarios visibles</span>
+            <span class="tag">Más recientes</span>
+          </div>
+        </div>
+
+        <article class="article-comment article-comment--editorial" *ngIf="editorialCommentNote">
+          <div class="article-comment__meta">
+            <span class="article-comment__avatar">CP</span>
+            <strong>Redacción</strong>
+            <span class="tag tag--category">Nota editorial</span>
+          </div>
+          <p>{{ editorialCommentNote }}</p>
+        </article>
+
+        <form class="article-comments__form" (ngSubmit)="submitComment()">
+          <div class="article-comments__form-header">
+            <strong>Participa en la conversación</strong>
+            <span class="tag">Publicación inmediata con censura automática de insultos fuertes</span>
+          </div>
+
+          <div class="article-comments__reader-chip" *ngIf="authService.user() as currentReader; else anonymousCommenter">
+            <div class="article-comments__reader-avatar">
+              <img *ngIf="currentReader.avatar.url; else readerInitials" [src]="currentReader.avatar.url" [alt]="currentReader.avatar.alt || currentReader.name" />
+              <ng-template #readerInitials>{{ initials(currentReader.name) }}</ng-template>
+            </div>
+            <div>
+              <strong>{{ currentReader.name }}</strong>
+              <p class="helper-text">Tu comentario se publicará con esta cuenta y luego podrás editarlo desde tu perfil.</p>
+            </div>
+          </div>
+
+          <ng-template #anonymousCommenter>
+            <div class="article-comments__guest-note">
+              <p class="helper-text">
+                Puedes comentar como invitado, pero si te registras después podrás editar tus aportes y manejar tu foto de perfil.
+              </p>
+              <div class="button-row">
+                <a class="button button--ghost" [routerLink]="['/registro']" [queryParams]="commentRedirectQueryParams">Registrarse</a>
+                <a class="button button--secondary" [routerLink]="['/login']" [queryParams]="commentRedirectQueryParams">Entrar con mi cuenta</a>
+              </div>
+            </div>
+          </ng-template>
+
+          <div class="article-comments__form-grid">
+            <input
+              *ngIf="!authService.isAuthenticated()"
+              type="text"
+              [(ngModel)]="commentForm.authorName"
+              name="commentAuthorName"
+              placeholder="Nombre"
+              [disabled]="submittingComment"
+              required
+            />
+            <textarea
+              [(ngModel)]="commentForm.body"
+              name="commentBody"
+              rows="4"
+              placeholder="Escribe un comentario con contexto y respeto"
+              [disabled]="submittingComment"
+              required
+            ></textarea>
+          </div>
+
+          <div class="button-row">
+            <button class="button" type="submit" [disabled]="submittingComment">
+              {{ submittingComment ? "Enviando..." : "Publicar comentario" }}
+            </button>
+          </div>
+
+          <p class="helper-text" *ngIf="commentMessage">{{ commentMessage }}</p>
+          <p class="error-text" *ngIf="commentsErrorMessage">{{ commentsErrorMessage }}</p>
+        </form>
+
+        <p class="helper-text" *ngIf="commentsLoading">Cargando comentarios...</p>
+
+        <div class="article-comments__list" *ngIf="articleComments.length > 0; else emptyComments">
+          <article class="article-comment" *ngFor="let comment of articleComments; trackBy: trackArticleComment" [class.article-comment--featured]="comment.featured">
+            <div class="article-comment__meta">
+              <span class="article-comment__avatar article-comment__avatar--image" *ngIf="comment.authorAvatarUrl; else articleCommentInitials">
+                <img [src]="comment.authorAvatarUrl" [alt]="comment.authorAvatarAlt || comment.authorName" />
+              </span>
+              <ng-template #articleCommentInitials>
+                <span class="article-comment__avatar">{{ initials(comment.authorName) }}</span>
+              </ng-template>
+              <strong>{{ comment.authorName }}</strong>
+              <span class="tag tag--category" *ngIf="comment.isOwner">Tu comentario</span>
+              <span class="tag tag--category" *ngIf="comment.featured">Destacado</span>
+              <span class="tag">{{ comment.createdAt | date: "d MMM y, h:mm a" }}</span>
+            </div>
+            <p>{{ comment.body }}</p>
+          </article>
+        </div>
+
+        <ng-template #emptyComments>
+          <p class="empty-state" *ngIf="!commentsLoading">Aún no hay comentarios visibles. La conversación puede empezar contigo.</p>
+        </ng-template>
+      </section>
+
       <section class="article-next" *ngIf="nextArticle as next">
         <p class="eyebrow">{{ nextSectionLabel }}</p>
         <a class="article-next__card" [routerLink]="['/articulo', next.slug]">
@@ -240,6 +349,7 @@ type ShareChannel = "whatsapp" | "telegram" | "x" | "facebook" | "copy";
 })
 export class ArticlePageComponent {
   private readonly route = inject(ActivatedRoute);
+  readonly authService = inject(AuthService);
   private readonly publicApi = inject(PublicApiService);
   private readonly seo = inject(SeoService);
   private readonly cdr = inject(ChangeDetectorRef);
@@ -248,8 +358,19 @@ export class ArticlePageComponent {
   article: PublicArticle | null = null;
   articleRenderSegments: ArticleRenderSegment[] = [];
   nextArticle: PublicArticlePreview | null = null;
+  articleComments: PublicArticleComment[] = [];
+  articleCommentTotal = 0;
+  editorialCommentNote = "Los comentarios aparecen de inmediato. Si detectamos groserías o insultos frecuentes, el sistema los censura con símbolos antes de publicarlos.";
   errorMessage = "";
   shareMessage = "";
+  commentsErrorMessage = "";
+  commentMessage = "";
+  commentsLoading = false;
+  submittingComment = false;
+  commentForm = {
+    authorName: "",
+    body: ""
+  };
   relatedTopicLabel: string | null = null;
   nextActionLabel = "Leer siguiente";
   nextSectionLabel = "Quizás te puede interesar";
@@ -279,6 +400,10 @@ export class ArticlePageComponent {
 
   trackRenderSegment(_index: number, segment: ArticleRenderSegment): string {
     return segment.key;
+  }
+
+  trackArticleComment(_index: number, comment: PublicArticleComment): string {
+    return comment.id;
   }
 
   activeArticleGalleryIndex(segment: ArticleRenderSegment): number {
@@ -341,6 +466,24 @@ export class ArticlePageComponent {
       .filter(Boolean)
       .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
       .join(" ");
+  }
+
+  initials(value: string): string {
+    return value
+      .split(/\s+/)
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part.charAt(0).toUpperCase())
+      .join("") || "CP";
+  }
+
+  get commentRedirectQueryParams(): Record<string, string> {
+    return this.article
+      ? {
+          redirect: `/articulo/${this.article.slug}`
+        }
+      : {};
   }
 
   hasVisualCover(article: Pick<PublicArticle, "cover"> | PublicArticlePreview): boolean {
@@ -453,8 +596,17 @@ export class ArticlePageComponent {
     this.article = null;
     this.articleRenderSegments = [];
     this.nextArticle = null;
+    this.articleComments = [];
+    this.articleCommentTotal = 0;
+    this.editorialCommentNote = "Los comentarios aparecen de inmediato. Si detectamos groserías o insultos frecuentes, el sistema los censura con símbolos antes de publicarlos.";
     this.errorMessage = "";
     this.shareMessage = "";
+    this.commentsErrorMessage = "";
+    this.commentMessage = "";
+    this.commentForm = {
+      authorName: "",
+      body: ""
+    };
     this.relatedTopicLabel = null;
     this.nextActionLabel = "Leer siguiente";
     this.nextSectionLabel = "Quizás te puede interesar";
@@ -468,6 +620,7 @@ export class ArticlePageComponent {
       shouldRenderSocialEmbeds = this.articleHasSocialEmbeds(response.article);
       this.syncTopicState();
       this.applySeo(response.article);
+      await this.loadArticleComments(currentSlug);
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (error) {
       const status = typeof error === "object" && error && "status" in error ? Number(error.status) : 0;
@@ -488,6 +641,74 @@ export class ArticlePageComponent {
         setTimeout(() => this.renderSocialEmbeds(), 0);
       }
     }
+  }
+
+  async submitComment(): Promise<void> {
+    if (!this.article || this.submittingComment) {
+      return;
+    }
+
+    const authorName = this.commentForm.authorName.trim();
+    const body = this.commentForm.body.trim();
+    const requiresAnonymousName = !this.authService.isAuthenticated();
+
+    if (requiresAnonymousName && authorName.length < 2) {
+      this.commentsErrorMessage = "Escribe un nombre de al menos 2 caracteres.";
+      this.commentMessage = "";
+      this.cdr.markForCheck();
+      return;
+    }
+
+    if (body.length < 8) {
+      this.commentsErrorMessage = "Escribe un comentario de al menos 8 caracteres.";
+      this.commentMessage = "";
+      this.cdr.markForCheck();
+      return;
+    }
+
+    try {
+      this.submittingComment = true;
+      const response = await this.publicApi.createArticleComment(this.article.slug, {
+        authorName: requiresAnonymousName ? authorName : undefined,
+        body
+      });
+      this.articleComments = [response.comment, ...this.articleComments].slice(0, 60);
+      this.articleCommentTotal += 1;
+      this.commentForm = {
+        authorName: "",
+        body: ""
+      };
+      this.commentsErrorMessage = "";
+      this.commentMessage = response.message;
+    } catch {
+      this.commentMessage = "";
+      this.commentsErrorMessage = "No fue posible enviar tu comentario.";
+    } finally {
+      this.submittingComment = false;
+      this.cdr.markForCheck();
+    }
+  }
+
+  private async loadArticleComments(slug: string): Promise<void> {
+    try {
+      this.commentsLoading = true;
+      const response = await this.publicApi.getArticleComments(slug);
+      this.applyArticleComments(response);
+      this.commentsErrorMessage = "";
+    } catch {
+      this.articleComments = [];
+      this.articleCommentTotal = 0;
+      this.commentsErrorMessage = "No fue posible cargar los comentarios.";
+    } finally {
+      this.commentsLoading = false;
+      this.cdr.markForCheck();
+    }
+  }
+
+  private applyArticleComments(payload: PublicArticleCommentsPayload): void {
+    this.editorialCommentNote = payload.editorialNote?.trim() || this.editorialCommentNote;
+    this.articleComments = payload.items;
+    this.articleCommentTotal = Math.max(Number(payload.total ?? 0), this.articleComments.length);
   }
 
   private articleHasSocialEmbeds(article: PublicArticle | null): boolean {

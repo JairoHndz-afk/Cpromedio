@@ -15,6 +15,7 @@ import {
 import { buildAllowedFeedHosts, parseAlliedArticleDocument, parseAlliedFeedDocument } from "../lib/allied-feeds.js";
 import { AlliedFeedSource } from "../models/AlliedFeedSource.js";
 import { Article } from "../models/Article.js";
+import { ArticleComment } from "../models/ArticleComment.js";
 import { AuditLog } from "../models/AuditLog.js";
 import { Category } from "../models/Category.js";
 import { Subscription } from "../models/Subscription.js";
@@ -23,9 +24,12 @@ import { calculateReadingTime, isValidUrl, paragraphBlocksFromBody, sanitizeCont
 import { readBoundedPositiveInt } from "../utils/request.js";
 import { alliedFeedHostEntrySchema, alliedFeedInputSchema } from "../validators/allied-feed.validator.js";
 import { articleInputSchema, moderationSchema } from "../validators/article.validator.js";
+import { commentModerationSchema } from "../validators/comment.validator.js";
 import { categoryInputSchema } from "../validators/category.validator.js";
 import { communicationInputSchema } from "../validators/site-setting.validator.js";
 import { passwordChangeSchema, profileUpdateSchema, subscriptionUpdateSchema, userCreateSchema, userUpdateSchema } from "../validators/user.validator.js";
+
+const readerNameChangeWindowMs = 7 * 24 * 60 * 60 * 1000;
 
 function clampCoverPosition(value, fallback = 50) {
   const numericValue = Number(value);
@@ -166,6 +170,10 @@ function serializeUser(user) {
     email: user.email,
     role: user.role,
     status: user.status,
+    avatar: {
+      url: sanitizeOwnedMediaUrl(user.avatar?.url ?? ""),
+      alt: sanitizeText(user.avatar?.alt ?? "", 140)
+    },
     createdAt: user.createdAt,
     lastLoginAt: user.lastLoginAt ?? null
   };
@@ -178,6 +186,32 @@ function serializeCategory(category) {
     slug: category.slug,
     description: category.description,
     isActive: category.isActive
+  };
+}
+
+function serializeArticleComment(comment) {
+  return {
+    id: comment._id.toString(),
+    articleId: comment.article?._id?.toString?.() ?? comment.article?.toString?.() ?? "",
+    authorName: sanitizeText(comment.authorName ?? "", 80),
+    authorAvatarUrl: sanitizeOwnedMediaUrl(comment.authorAvatarUrl ?? ""),
+    authorAvatarAlt: sanitizeText(comment.authorAvatarAlt ?? "", 140),
+    body: sanitizeText(comment.body ?? "", 1600),
+    status: comment.status,
+    censored: comment.censored === true,
+    censoredTerms: Array.isArray(comment.censoredTerms) ? comment.censoredTerms : [],
+    featured: comment.featured === true,
+    moderationNote: sanitizeText(comment.moderationNote ?? "", 240),
+    createdAt: comment.createdAt,
+    moderatedAt: comment.moderatedAt ?? null,
+    moderatedBy: comment.moderatedBy
+      ? {
+          id: comment.moderatedBy._id.toString(),
+          name: comment.moderatedBy.name,
+          email: comment.moderatedBy.email ?? "",
+          role: comment.moderatedBy.role
+        }
+      : null
   };
 }
 
@@ -765,12 +799,17 @@ export async function getDashboardOverview(req, res, next) {
     const baseArticleFilter = req.user.role === "admin" ? {} : { author: req.user._id };
     const articleFilter = visibleArticleFilter(baseArticleFilter);
     const activeOverviewFilter = visibleArticleFilter({ ...baseArticleFilter, status: { $ne: "archived" } });
+    const editorialUserFilter = {
+      role: {
+        $in: ["admin", "journalist"]
+      }
+    };
 
     const [articleCount, reviewCount, publishedCount, usersCount, subscriptionsCount, recentArticles, topViewedArticles] = await Promise.all([
       Article.countDocuments(articleFilter),
       Article.countDocuments({ ...articleFilter, status: "review" }),
       Article.countDocuments({ ...articleFilter, status: "published" }),
-      req.user.role === "admin" ? User.countDocuments({}) : Promise.resolve(null),
+      req.user.role === "admin" ? User.countDocuments(editorialUserFilter) : Promise.resolve(null),
       req.user.role === "admin" ? Subscription.countDocuments({ status: "active" }) : Promise.resolve(null),
       Article.find(activeOverviewFilter)
         .populate([
@@ -1398,6 +1437,153 @@ export async function moderateArticle(req, res, next) {
   }
 }
 
+export async function listDashboardArticleComments(req, res, next) {
+  try {
+    const article = await Article.findOne({
+      _id: req.params.articleId,
+      deletedAt: null
+    }).select("_id title");
+
+    if (!article) {
+      return res.status(404).json({ message: "Artículo no encontrado." });
+    }
+
+    const [items, grouped] = await Promise.all([
+      ArticleComment.find({ article: article._id })
+        .populate({ path: "moderatedBy", select: "name email role" })
+        .sort({ status: 1, featured: -1, createdAt: -1, _id: -1 })
+        .limit(120),
+      ArticleComment.aggregate([
+        {
+          $match: {
+            article: article._id
+          }
+        },
+        {
+          $group: {
+            _id: "$status",
+            count: { $sum: 1 },
+            featured: {
+              $sum: {
+                $cond: ["$featured", 1, 0]
+              }
+            }
+          }
+        }
+      ])
+    ]);
+
+    const summary = {
+      total: 0,
+      pending: 0,
+      approved: 0,
+      hidden: 0,
+      rejected: 0,
+      featured: 0
+    };
+
+    for (const entry of grouped) {
+      const statusKey = String(entry?._id ?? "");
+      const count = Number(entry?.count ?? 0);
+      const featuredCount = Number(entry?.featured ?? 0);
+
+      summary.total += count;
+      summary.featured += featuredCount;
+
+      if (statusKey === "pending" || statusKey === "approved" || statusKey === "hidden" || statusKey === "rejected") {
+        summary[statusKey] = count;
+      }
+    }
+
+    res.json({
+      items: items.map((comment) => serializeArticleComment(comment)),
+      summary
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function moderateDashboardArticleComment(req, res, next) {
+  try {
+    const payload = commentModerationSchema.parse(req.body);
+    const article = await Article.findOne({
+      _id: req.params.articleId,
+      deletedAt: null
+    }).select("_id title");
+
+    if (!article) {
+      return res.status(404).json({ message: "Artículo no encontrado." });
+    }
+
+    const comment = await ArticleComment.findOne({
+      _id: req.params.commentId,
+      article: article._id
+    });
+
+    if (!comment) {
+      return res.status(404).json({ message: "Comentario no encontrado." });
+    }
+
+    const note = sanitizeText(payload.note, 240);
+
+    switch (payload.action) {
+      case "approve":
+        comment.status = "approved";
+        break;
+      case "hide":
+        comment.status = "hidden";
+        comment.featured = false;
+        break;
+      case "feature":
+        comment.status = "approved";
+        comment.featured = true;
+        break;
+      case "unfeature":
+        comment.featured = false;
+        if (comment.status === "pending") {
+          comment.status = "approved";
+        }
+        break;
+      case "reject":
+        comment.status = "rejected";
+        comment.featured = false;
+        break;
+      default:
+        break;
+    }
+
+    comment.moderationNote = note;
+    comment.moderatedAt = new Date();
+    comment.moderatedBy = req.user._id;
+    await comment.save();
+
+    const hydratedComment = await ArticleComment.findById(comment._id).populate({
+      path: "moderatedBy",
+      select: "name email role"
+    });
+
+    await writeAuditLog(req, {
+      actor: req.user,
+      action: `comment.${payload.action}`,
+      targetType: "article-comment",
+      targetId: comment._id.toString(),
+      details: {
+        articleId: article._id.toString(),
+        articleTitle: article.title,
+        authorName: comment.authorName,
+        note
+      }
+    });
+
+    res.json({
+      comment: hydratedComment ? serializeArticleComment(hydratedComment) : null
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
 export async function listDashboardCategories(req, res, next) {
   try {
     const filters = req.user.role === "admin" ? {} : { isActive: true };
@@ -1471,7 +1657,11 @@ export async function listUsers(req, res, next) {
     const search = sanitizeText(String(req.query.search ?? ""), 120);
     const page = readBoundedPositiveInt(req.query.page, 1);
     const limit = readBoundedPositiveInt(req.query.limit, 12, { max: 50 });
-    const filters = {};
+    const filters = {
+      role: {
+        $in: ["admin", "journalist"]
+      }
+    };
 
     if (search) {
       const pattern = new RegExp(escapeRegexLiteral(search), "i");
@@ -1653,7 +1843,32 @@ export async function deleteUser(req, res, next) {
 export async function updateOwnProfile(req, res, next) {
   try {
     const payload = profileUpdateSchema.parse(req.body);
-    req.user.name = sanitizeText(payload.name, 80);
+    const nextName = sanitizeText(payload.name, 80);
+    const currentName = sanitizeText(req.user.name ?? "", 80);
+
+    if (req.user.role === "reader" && nextName !== currentName) {
+      const lastNameChangeTime = req.user.nameChangedAt ? new Date(req.user.nameChangedAt).getTime() : 0;
+      const nameChangeAvailableAt = lastNameChangeTime ? lastNameChangeTime + readerNameChangeWindowMs : 0;
+
+      if (nameChangeAvailableAt && nameChangeAvailableAt > Date.now()) {
+        return res.status(409).json({
+          message: `Solo puedes cambiar tu nombre una vez cada 7 días. Vuelve a intentarlo después del ${new Date(nameChangeAvailableAt).toLocaleString("es-CO", {
+            dateStyle: "long",
+            timeStyle: "short",
+            timeZone: "America/Bogota"
+          })}.`,
+          nameChangeAvailableAt: new Date(nameChangeAvailableAt).toISOString()
+        });
+      }
+
+      req.user.nameChangedAt = new Date();
+    }
+
+    req.user.name = nextName;
+    req.user.avatar = {
+      url: sanitizeOwnedMediaUrl(payload.avatarUrl ?? ""),
+      alt: sanitizeText(payload.avatarAlt ?? "", 140)
+    };
     await req.user.save();
 
     await writeAuditLog(req, {

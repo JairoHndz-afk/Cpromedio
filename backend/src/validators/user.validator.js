@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-const passwordSchema = z
+export const passwordSchema = z
   .string()
   .min(10)
   .max(120)
@@ -26,7 +26,9 @@ export const subscriptionUpdateSchema = z.object({
 });
 
 export const profileUpdateSchema = z.object({
-  name: z.string().min(2).max(80)
+  name: z.string().min(2).max(80),
+  avatarUrl: z.string().max(500).optional().default(""),
+  avatarAlt: z.string().max(140).optional().default("")
 });
 
 export const passwordChangeSchema = z

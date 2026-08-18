@@ -14,6 +14,8 @@ export class AuthService {
   readonly ready = signal(false);
   readonly isAuthenticated = computed(() => this.user() !== null);
   readonly isAdmin = computed(() => this.user()?.role === "admin");
+  readonly isReader = computed(() => this.user()?.role === "reader");
+  readonly isEditorial = computed(() => this.user()?.role === "admin" || this.user()?.role === "journalist");
 
   async restoreSession(): Promise<UserSession | null> {
     if (this.ready()) {
@@ -21,7 +23,7 @@ export class AuthService {
     }
 
     const restored = await firstValueFrom(
-      this.http.get<{ user: UserSession }>(`${API_BASE_URL}/auth/me`).pipe(
+      this.http.get<{ user: UserSession | null }>(`${API_BASE_URL}/auth/me`).pipe(
         map((response) => response.user),
         catchError(() => of(null))
       )

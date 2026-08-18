@@ -8,6 +8,8 @@ import {
   AuditEntry,
   Category,
   DashboardArticle,
+  DashboardArticleComment,
+  DashboardArticleCommentsPayload,
   DashboardArticlePage,
   DashboardOverview,
   PaginatedSubscriptions,
@@ -120,6 +122,19 @@ export class DashboardApiService {
   moderateArticle(articleId: string, action: string, note: string): Promise<DashboardArticle> {
     return firstValueFrom(
       this.http.post<DashboardArticle>(`${API_BASE_URL}/dashboard/articles/${articleId}/moderate`, { action, note })
+    );
+  }
+
+  getArticleComments(articleId: string): Promise<DashboardArticleCommentsPayload> {
+    return firstValueFrom(this.http.get<DashboardArticleCommentsPayload>(`${API_BASE_URL}/dashboard/articles/${articleId}/comments`));
+  }
+
+  moderateArticleComment(articleId: string, commentId: string, action: string, note = ""): Promise<{ comment: DashboardArticleComment | null }> {
+    return firstValueFrom(
+      this.http.post<{ comment: DashboardArticleComment | null }>(`${API_BASE_URL}/dashboard/articles/${articleId}/comments/${commentId}/moderate`, {
+        action,
+        note
+      })
     );
   }
 

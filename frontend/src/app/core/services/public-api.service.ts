@@ -4,6 +4,7 @@ import { firstValueFrom } from "rxjs";
 
 import {
   PaginatedArticles,
+  PublicArticleCommentsPayload,
   PublicArticleDetailPayload,
   PublicArchiveFiltersPayload,
   PublicAuthorProfilePayload,
@@ -28,6 +29,16 @@ export class PublicApiService {
 
   getArticle(slug: string): Promise<PublicArticleDetailPayload> {
     return firstValueFrom(this.http.get<PublicArticleDetailPayload>(`${API_BASE_URL}/public/articles/${slug}`));
+  }
+
+  getArticleComments(slug: string): Promise<PublicArticleCommentsPayload> {
+    return firstValueFrom(this.http.get<PublicArticleCommentsPayload>(`${API_BASE_URL}/public/articles/${slug}/comments`));
+  }
+
+  createArticleComment(slug: string, payload: { authorName?: string; body: string }): Promise<{ message: string; comment: PublicArticleCommentsPayload["items"][number] }> {
+    return firstValueFrom(
+      this.http.post<{ message: string; comment: PublicArticleCommentsPayload["items"][number] }>(`${API_BASE_URL}/public/articles/${slug}/comments`, payload)
+    );
   }
 
   getAuthorProfile(authorId: string, page = 1, limit = 12): Promise<PublicAuthorProfilePayload> {

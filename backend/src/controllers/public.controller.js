@@ -2,11 +2,15 @@ import crypto from "node:crypto";
 import { isValidObjectId } from "mongoose";
 
 import { Article } from "../models/Article.js";
+import { ArticleComment } from "../models/ArticleComment.js";
 import { ArticleView } from "../models/ArticleView.js";
 import { Category } from "../models/Category.js";
 import { writeAuditLog } from "../lib/audit.js";
 import { env } from "../config/env.js";
 import { getActiveSiteCommunication, getMainSiteSetting } from "../lib/site-settings.js";
+import {
+  censorColombianProfanity,
+} from "../lib/colombian-profanity.js";
 import {
   sendNewsletterArticlePublishedEmail,
   sendNewsletterConfirmationEmail,
@@ -19,6 +23,7 @@ import { User } from "../models/User.js";
 import { paragraphBlocksFromBody, sanitizeContentBlocks, sanitizeEditorialMediaUrl, sanitizeOwnedMediaUrl, sanitizeTags, sanitizeText } from "../utils/content.js";
 import { buildAllowedFeedHosts } from "../lib/allied-feeds.js";
 import { readBoundedPositiveInt } from "../utils/request.js";
+import { publicCommentInputSchema } from "../validators/comment.validator.js";
 import { subscriptionInputSchema, subscriptionTokenSchema } from "../validators/subscription.validator.js";
 
 const recentArticleViewsCookieName = "cp_recent_views";
@@ -27,6 +32,8 @@ const recentArticleViewWindowMs = 1000 * 60 * 45;
 const recentArticleViewLimit = 24;
 const publicArchiveTagLimit = 12;
 const publicHomeLatestLimit = 9;
+const publicCommentApprovedLimit = 60;
+const defaultEditorialCommentNote = "Los comentarios aparecen de inmediato. Si detectamos groserias o insultos frecuentes, el sistema los censura con simbolos antes de publicarlos.";
 const publicSubscriptionAcceptedMessage = "Si el correo es válido, revisa tu bandeja para continuar con el boletín.";
 const publicSubscriptionProcessedMessage = "Si el correo es válido, la suscripción fue procesada correctamente.";
 const publicArticlePreviewSelect = [
@@ -441,6 +448,23 @@ function serializeArticlePreview(article) {
       syndication: serializeSyndication(article)
     },
     allowedExternalHosts
+  };
+}
+
+function buildEditorialCommentNote(article) {
+  return sanitizeText(article?.moderationNote ?? "", 400) || defaultEditorialCommentNote;
+}
+
+function serializePublicArticleComment(comment, currentUserId = "") {
+  return {
+    id: comment._id.toString(),
+    authorName: sanitizeText(comment.authorName ?? "", 80),
+    authorAvatarUrl: sanitizeOwnedMediaUrl(comment.authorAvatarUrl ?? ""),
+    authorAvatarAlt: sanitizeText(comment.authorAvatarAlt ?? "", 140),
+    body: sanitizeText(comment.body ?? "", 1600),
+    featured: comment.featured === true,
+    createdAt: comment.createdAt,
+    isOwner: Boolean(currentUserId) && String(comment.authorUser ?? "") === currentUserId
   };
 }
 
@@ -1000,6 +1024,108 @@ export async function getPublicArticle(req, res, next) {
   }
 }
 
+export async function getPublicArticleComments(req, res, next) {
+  try {
+    const article = await Article.findOne({
+      slug: req.params.slug,
+      status: "published",
+      deletedAt: null
+    }).select("_id moderationNote");
+
+    if (!article) {
+      return res.status(404).json({
+        message: "Artículo no encontrado."
+      });
+    }
+
+    const [items, total] = await Promise.all([
+      ArticleComment.find({
+        article: article._id,
+        status: "approved"
+      })
+        .sort({ featured: -1, createdAt: -1, _id: -1 })
+        .limit(publicCommentApprovedLimit),
+      ArticleComment.countDocuments({
+        article: article._id,
+        status: "approved"
+      })
+    ]);
+
+    res.json({
+      editorialNote: buildEditorialCommentNote(article),
+      total,
+      items: items.map((comment) => serializePublicArticleComment(comment, req.user?._id?.toString?.() ?? ""))
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function createPublicArticleComment(req, res, next) {
+  try {
+    const payload = publicCommentInputSchema.parse(req.body);
+    const article = await Article.findOne({
+      slug: req.params.slug,
+      status: "published",
+      deletedAt: null
+    }).select("_id title slug");
+
+    if (!article) {
+      return res.status(404).json({
+        message: "Artículo no encontrado."
+      });
+    }
+
+    const isAuthenticatedCommenter = Boolean(req.user);
+    const authorName = isAuthenticatedCommenter
+      ? sanitizeText(req.user.name ?? "", 80)
+      : sanitizeText(payload.authorName ?? "", 80);
+
+    if (!isAuthenticatedCommenter && authorName.length < 2) {
+      return res.status(400).json({
+        message: "Escribe un nombre de al menos 2 caracteres."
+      });
+    }
+
+    const censorship = censorColombianProfanity(sanitizeText(payload.body, 1600));
+    const comment = await ArticleComment.create({
+      article: article._id,
+      authorUser: req.user?._id ?? null,
+      authorName,
+      authorAvatarUrl: sanitizeOwnedMediaUrl(req.user?.avatar?.url ?? ""),
+      authorAvatarAlt: sanitizeText(req.user?.avatar?.alt ?? "", 140),
+      body: censorship.value,
+      status: "approved",
+      censored: censorship.wasCensored,
+      censoredTerms: censorship.matchedTerms
+    });
+
+    await writeAuditLog(req, {
+      actor: req.user,
+      action: "comment.created",
+      actorEmail: req.user?.email ?? "",
+      targetType: "article-comment",
+      targetId: comment._id.toString(),
+      details: {
+        articleId: article._id.toString(),
+        articleSlug: article.slug,
+        articleTitle: article.title,
+        censored: censorship.wasCensored,
+        censoredTerms: censorship.matchedTerms
+      }
+    });
+
+    res.status(201).json({
+      message: censorship.wasCensored
+        ? "Tu comentario quedó publicado. Algunas expresiones fueron censuradas automáticamente."
+        : "Tu comentario quedó publicado.",
+      comment: serializePublicArticleComment(comment, req.user?._id?.toString?.() ?? "")
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
 export async function getPublicAuthor(req, res, next) {
   try {
     const authorId = String(req.params.authorId ?? "").trim();
@@ -1059,6 +1185,8 @@ export async function getRobotsTxt(_req, res, next) {
       "Allow: /",
       "Disallow: /dashboard",
       "Disallow: /login",
+      "Disallow: /cuenta",
+      "Disallow: /lectores",
       "Disallow: /boletin",
       "Disallow: /api/",
       `Sitemap: ${sitemapUrl}`

@@ -54,8 +54,10 @@ import { BrandMarkComponent } from "../brand-mark/brand-mark.component";
             <div class="site-nav__links">
               <a routerLink="/" routerLinkActive="is-active" [routerLinkActiveOptions]="{ exact: true }" (click)="closeMenu()">Inicio</a>
               <a routerLink="/privacidad" routerLinkActive="is-active" (click)="closeMenu()">Privacidad</a>
+              <a routerLink="/registro" routerLinkActive="is-active" *ngIf="!authService.isAuthenticated()" (click)="closeMenu()">Registrarse</a>
               <a routerLink="/login" routerLinkActive="is-active" *ngIf="!authService.isAuthenticated()" (click)="closeMenu()">Acceso</a>
-              <a routerLink="/dashboard" routerLinkActive="is-active" *ngIf="authService.isAuthenticated()" (click)="closeMenu()">Panel</a>
+              <a routerLink="/cuenta" routerLinkActive="is-active" *ngIf="authService.isReader()" (click)="closeMenu()">Mi cuenta</a>
+              <a routerLink="/dashboard" routerLinkActive="is-active" *ngIf="authService.isEditorial()" (click)="closeMenu()">Panel</a>
             </div>
             <div class="site-nav__actions">
               <button

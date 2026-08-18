@@ -1,7 +1,7 @@
 import { NgIf } from "@angular/common";
 import { ChangeDetectionStrategy, Component, inject } from "@angular/core";
 import { FormsModule } from "@angular/forms";
-import { Router } from "@angular/router";
+import { ActivatedRoute, Router, RouterLink } from "@angular/router";
 
 import { AuthService } from "../../core/services/auth.service";
 import { SeoService } from "../../core/services/seo.service";
@@ -9,13 +9,13 @@ import { SeoService } from "../../core/services/seo.service";
 @Component({
   selector: "app-login-page",
   standalone: true,
-  imports: [FormsModule, NgIf],
+  imports: [FormsModule, NgIf, RouterLink],
   template: `
     <section class="auth-shell">
       <form class="auth-card" (ngSubmit)="submit()">
-        <p class="eyebrow">Acceso editorial</p>
-        <h1>Admin y periodistas</h1>
-        <p class="helper-text">Ingreso protegido por sesión, roles y moderación editorial.</p>
+        <p class="eyebrow">Acceso</p>
+        <h1>Ingresa al sitio</h1>
+        <p class="helper-text">Desde aquí puedes entrar a tu cuenta para comentar, administrar tu perfil o acceder al panel editorial si haces parte del equipo.</p>
 
         <label>
           <span>Correo</span>
@@ -61,6 +61,11 @@ import { SeoService } from "../../core/services/seo.service";
         </button>
 
         <p class="error-text" *ngIf="errorMessage">{{ errorMessage }}</p>
+
+        <div class="reader-login-note">
+          <p class="helper-text">¿Todavía no tienes cuenta?</p>
+          <a class="button button--ghost" [routerLink]="['/registro']" [queryParams]="redirectQueryParams">Registrarse</a>
+        </div>
       </form>
     </section>
   `,
@@ -68,6 +73,7 @@ import { SeoService } from "../../core/services/seo.service";
 })
 export class LoginPageComponent {
   private readonly authService = inject(AuthService);
+  private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly seo = inject(SeoService);
 
@@ -80,7 +86,12 @@ export class LoginPageComponent {
   };
 
   constructor() {
-    this.seo.setNoIndex("Acceso editorial | Colombiano Promedio", "Ingreso privado para administración y periodistas.");
+    this.seo.setNoIndex("Acceso al sitio | Colombiano Promedio", "Ingreso privado para cuentas del sitio y equipo editorial.");
+  }
+
+  get redirectQueryParams(): Record<string, string> {
+    const redirect = this.redirectTarget();
+    return redirect ? { redirect } : {};
   }
 
   togglePassword(): void {
@@ -92,12 +103,33 @@ export class LoginPageComponent {
     this.submitting = true;
 
     try {
-      await this.authService.login(this.form);
-      await this.router.navigateByUrl("/dashboard");
-    } catch {
-      this.errorMessage = "No fue posible iniciar sesión.";
+      const user = await this.authService.login(this.form);
+      await this.router.navigateByUrl(this.redirectTarget() || (user.role === "reader" ? "/cuenta" : "/dashboard"));
+    } catch (error) {
+      this.errorMessage = this.readError(error, "No fue posible iniciar sesión.");
     } finally {
       this.submitting = false;
     }
+  }
+
+  private redirectTarget(): string {
+    const redirect = this.route.snapshot.queryParamMap.get("redirect") ?? "";
+    return redirect.startsWith("/") ? redirect : "";
+  }
+
+  private readError(error: unknown, fallback: string): string {
+    if (error && typeof error === "object") {
+      const payload = (error as { error?: { message?: string; details?: string[] } }).error;
+
+      if (Array.isArray(payload?.details) && payload.details.length > 0) {
+        return payload.details.join(" ");
+      }
+
+      if (typeof payload?.message === "string" && payload.message.trim()) {
+        return payload.message;
+      }
+    }
+
+    return fallback;
   }
 }

@@ -8,7 +8,7 @@ import { AppComponent } from "./app/app.component";
 import { appConfig } from "./app/app.config";
 
 const PRODUCTION_HOSTS = new Set(["colombianopromedio.co", "www.colombianopromedio.co"]);
-const EXCLUDED_INSIGHTS_PATHS = ["/dashboard", "/login", "/boletin"];
+const EXCLUDED_INSIGHTS_PATHS = ["/dashboard", "/login", "/boletin", "/cuenta", "/lectores", "/registro"];
 
 function shouldTrackSpeedInsights(url: string): boolean {
   try {

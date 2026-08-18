@@ -21,8 +21,29 @@ const userSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: ["admin", "journalist"],
+      enum: ["admin", "journalist", "reader"],
       required: true
+    },
+    avatar: {
+      url: {
+        type: String,
+        default: "",
+        trim: true
+      },
+      alt: {
+        type: String,
+        default: "",
+        trim: true
+      }
+    },
+    subscription: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Subscription",
+      default: null
+    },
+    nameChangedAt: {
+      type: Date,
+      default: null
     },
     status: {
       type: String,
@@ -42,5 +63,7 @@ const userSchema = new mongoose.Schema(
     timestamps: true
   }
 );
+
+userSchema.index({ subscription: 1 }, { sparse: true, unique: true });
 
 export const User = mongoose.model("User", userSchema);

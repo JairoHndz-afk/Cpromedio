@@ -40,6 +40,36 @@ export const subscriptionTokenRateLimit = rateLimit({
   }
 });
 
+export const commentCreateRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    message: "Demasiados comentarios en poco tiempo. Intenta de nuevo en unos minutos."
+  }
+});
+
+export const readerRegisterRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 6,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    message: "Demasiados intentos de creación de cuenta. Intenta de nuevo en unos minutos."
+  }
+});
+
+export const readerAccessRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 12,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    message: "Demasiados intentos sobre accesos de lector. Intenta de nuevo en unos minutos."
+  }
+});
+
 export const uploadImageRateLimit = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 20,

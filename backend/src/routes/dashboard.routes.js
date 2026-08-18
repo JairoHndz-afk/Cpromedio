@@ -9,6 +9,7 @@ import {
   deleteAlliedFeedSource,
   deleteDashboardCommunication,
   deleteDashboardArticle,
+  listDashboardArticleComments,
   getDashboardArticle,
   listAlliedFeedSources,
   getDashboardCommunication,
@@ -19,6 +20,7 @@ import {
   listSubscriptions,
   listUsers,
   moderateArticle,
+  moderateDashboardArticleComment,
   deleteSubscription,
   deleteUser,
   submitArticleForReview,
@@ -51,6 +53,7 @@ router.post("/allied-feeds/:sourceId/sync", requireRole("admin"), syncAlliedFeed
 router.put("/profile", updateOwnProfile);
 router.put("/profile/password", changeOwnPassword);
 router.post("/uploads/images", uploadImageRateLimit, uploadArticleImage);
+router.use(requireRole("admin", "journalist"));
 router.get("/articles", listDashboardArticles);
 router.get("/articles/:articleId", getDashboardArticle);
 router.post("/articles", createDashboardArticle);
@@ -58,6 +61,8 @@ router.put("/articles/:articleId", updateDashboardArticle);
 router.delete("/articles/:articleId", deleteDashboardArticle);
 router.post("/articles/:articleId/submit", submitArticleForReview);
 router.post("/articles/:articleId/moderate", requireRole("admin"), moderateArticle);
+router.get("/articles/:articleId/comments", requireRole("admin"), listDashboardArticleComments);
+router.post("/articles/:articleId/comments/:commentId/moderate", requireRole("admin"), moderateDashboardArticleComment);
 
 router.get("/categories", listDashboardCategories);
 router.post("/categories", requireRole("admin"), createCategory);

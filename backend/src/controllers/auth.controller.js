@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { buildClearCookieOptions, buildCookieOptions, signAuthToken } from "../lib/auth.js";
 import { writeAuditLog } from "../lib/audit.js";
 import { User } from "../models/User.js";
+import { sanitizeOwnedMediaUrl, sanitizeText } from "../utils/content.js";
 import { loginSchema } from "../validators/auth.validator.js";
 
 export function serializeUser(user) {
@@ -12,6 +13,10 @@ export function serializeUser(user) {
     email: user.email,
     role: user.role,
     status: user.status,
+    avatar: {
+      url: sanitizeOwnedMediaUrl(user.avatar?.url ?? ""),
+      alt: sanitizeText(user.avatar?.alt ?? "", 140)
+    },
     lastLoginAt: user.lastLoginAt ?? null,
     createdAt: user.createdAt
   };
@@ -91,14 +96,8 @@ export async function logout(req, res, next) {
 
 export async function getSession(req, res, next) {
   try {
-    if (!req.user) {
-      return res.status(401).json({
-        message: "Sesión no iniciada."
-      });
-    }
-
     res.json({
-      user: serializeUser(req.user)
+      user: req.user ? serializeUser(req.user) : null
     });
   } catch (error) {
     next(error);

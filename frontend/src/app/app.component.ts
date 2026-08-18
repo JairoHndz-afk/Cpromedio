@@ -92,7 +92,9 @@ export class AppComponent {
   private isCommunicationEligibleUrl(url: string): boolean {
     const path = url.split("?")[0]?.split("#")[0] ?? "/";
 
-    return !["/dashboard", "/login", "/privacidad", "/boletin"].some((prefix) => path === prefix || path.startsWith(`${prefix}/`));
+    return !["/dashboard", "/login", "/privacidad", "/boletin", "/cuenta", "/lectores", "/registro"].some(
+      (prefix) => path === prefix || path.startsWith(`${prefix}/`)
+    );
   }
 
   private async loadSiteCommunication(): Promise<void> {

@@ -9,14 +9,27 @@ import { DashboardPageComponent } from "./pages/dashboard-page/dashboard-page.co
 import { HomePageComponent } from "./pages/home-page/home-page.component";
 import { LoginPageComponent } from "./pages/login-page/login-page.component";
 import { PrivacyPageComponent } from "./pages/privacy-page/privacy-page.component";
+import { ReaderAccountPageComponent } from "./pages/reader-account-page/reader-account-page.component";
+import { ReaderRegisterPageComponent } from "./pages/reader-register-page/reader-register-page.component";
+import { ReaderSubscriptionManagePageComponent } from "./pages/reader-subscription-manage-page/reader-subscription-manage-page.component";
 import { SubscriptionStatusPageComponent } from "./pages/subscription-status-page/subscription-status-page.component";
 
-const authGuard: CanActivateFn = async () => {
+function resolveAuthenticatedLandingPath(user: Awaited<ReturnType<AuthService["restoreSession"]>>): string {
+  return user?.role === "reader" ? "/cuenta" : "/dashboard";
+}
+
+const authGuard: CanActivateFn = async (_route, state) => {
   const authService = inject(AuthService);
   const router = inject(Router);
   const user = await authService.restoreSession();
 
-  return user ? true : router.createUrlTree(["/login"]);
+  return user
+    ? true
+    : router.createUrlTree(["/login"], {
+        queryParams: {
+          redirect: state.url
+        }
+      });
 };
 
 const guestGuard: CanActivateFn = async () => {
@@ -24,7 +37,39 @@ const guestGuard: CanActivateFn = async () => {
   const router = inject(Router);
   const user = await authService.restoreSession();
 
-  return user ? router.createUrlTree(["/dashboard"]) : true;
+  return user ? router.createUrlTree([resolveAuthenticatedLandingPath(user)]) : true;
+};
+
+const editorialGuard: CanActivateFn = async (_route, state) => {
+  const authService = inject(AuthService);
+  const router = inject(Router);
+  const user = await authService.restoreSession();
+
+  if (!user) {
+    return router.createUrlTree(["/login"], {
+      queryParams: {
+        redirect: state.url
+      }
+    });
+  }
+
+  return user.role === "reader" ? router.createUrlTree(["/cuenta"]) : true;
+};
+
+const readerGuard: CanActivateFn = async (_route, state) => {
+  const authService = inject(AuthService);
+  const router = inject(Router);
+  const user = await authService.restoreSession();
+
+  if (!user) {
+    return router.createUrlTree(["/login"], {
+      queryParams: {
+        redirect: state.url
+      }
+    });
+  }
+
+  return user.role === "reader" ? true : router.createUrlTree(["/dashboard"]);
 };
 
 export const routes: Routes = [
@@ -38,6 +83,21 @@ export const routes: Routes = [
     component: LoginPageComponent
   },
   {
+    path: "registro",
+    canActivate: [guestGuard],
+    component: ReaderRegisterPageComponent
+  },
+  {
+    path: "lectores/registro",
+    canActivate: [guestGuard],
+    component: ReaderRegisterPageComponent
+  },
+  {
+    path: "cuenta",
+    canActivate: [readerGuard],
+    component: ReaderAccountPageComponent
+  },
+  {
     path: "archivo",
     component: ArchivePageComponent
   },
@@ -47,7 +107,7 @@ export const routes: Routes = [
   },
   {
     path: "dashboard",
-    canActivate: [authGuard],
+    canActivate: [editorialGuard],
     component: DashboardPageComponent
   },
   {
@@ -57,6 +117,10 @@ export const routes: Routes = [
   {
     path: "autor/:authorId",
     component: AuthorPageComponent
+  },
+  {
+    path: "boletin/gestionar",
+    component: ReaderSubscriptionManagePageComponent
   },
   {
     path: "boletin/:action",

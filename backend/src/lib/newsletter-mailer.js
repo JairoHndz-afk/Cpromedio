@@ -379,6 +379,7 @@ export function buildNewsletterLinks({ confirmationToken, unsubscribeToken }) {
   return {
     homeUrl: env.publicSiteUrl,
     confirmUrl: buildAppUrl("/boletin/confirmar", confirmationToken),
+    manageUrl: buildAppUrl("/boletin/gestionar", unsubscribeToken),
     unsubscribeUrl: buildAppUrl("/boletin/salir", unsubscribeToken),
     reactivateUrl: buildAppUrl("/boletin/reactivar", confirmationToken)
   };
@@ -444,12 +445,12 @@ export async function sendNewsletterWelcomeEmail(subscription, { unsubscribeToke
     intro: `${subscription.name}, tu correo ya qued\u00f3 confirmado y el acceso al bolet\u00edn est\u00e1 activo.`,
     bodyLines: [
       "Desde ahora podr\u00e1s recibir nuevas publicaciones, piezas destacadas y acceso r\u00e1pido a la portada del medio.",
-      "Si en alg\u00fan momento quieres salir, el enlace de administraci\u00f3n queda disponible dentro de este mismo correo."
+      "Desde la gesti\u00f3n de la suscripci\u00f3n tambi\u00e9n puedes crear tu cuenta para comentar, editar tus aportes y entrar al sitio con tu propia clave."
     ],
     ctaLabel: "Abrir la portada",
     ctaUrl: links.homeUrl,
-    secondaryLabel: "Administrar suscripci\u00f3n",
-    secondaryUrl: links.unsubscribeUrl,
+    secondaryLabel: "Administrar suscripci\u00f3n y cuenta",
+    secondaryUrl: links.manageUrl,
     footnote: "Este mensaje fue enviado porque activaste el bolet\u00edn de Colombiano Promedio desde el sitio p\u00fablico.",
     preheader: "Tu suscripci\u00f3n a Colombiano Promedio ya est\u00e1 activa.",
     statusLabel: "Suscripci\u00f3n activa",
@@ -460,15 +461,15 @@ export async function sendNewsletterWelcomeEmail(subscription, { unsubscribeToke
         accentColor: "#1548a7"
       },
       {
-        eyebrow: "Control",
-        text: "Tu suscripci\u00f3n sigue bajo tu control y puedes salir cuando quieras.",
+        eyebrow: "Cuenta",
+        text: "El mismo correo te permite crear tu acceso para comentar y gestionar tus publicaciones.",
         accentColor: "#c93535"
       }
     ]
   });
 
   if (!env.mailConfigured) {
-    console.info(`[newsletter-links] home=${links.homeUrl} unsubscribe=${links.unsubscribeUrl}`);
+    console.info(`[newsletter-links] home=${links.homeUrl} manage=${links.manageUrl} unsubscribe=${links.unsubscribeUrl}`);
   }
 
   await deliverMail({

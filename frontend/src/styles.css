@@ -2955,6 +2955,298 @@ h3 {
   -webkit-backdrop-filter: blur(18px) saturate(135%);
 }
 
+.article-comments {
+  display: grid;
+  gap: 1rem;
+  padding: 1.25rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: var(--shadow-soft);
+  backdrop-filter: blur(18px) saturate(135%);
+  -webkit-backdrop-filter: blur(18px) saturate(135%);
+}
+
+.article-comments__header,
+.article-comments__form-header,
+.article-comment__meta,
+.article-share-inline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.85rem;
+  flex-wrap: wrap;
+}
+
+.article-comments__summary,
+.dashboard-comment-summary {
+  display: flex;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+}
+
+.article-comments__form,
+.article-comments__list,
+.dashboard-comment-list {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.article-comments__form-grid {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.article-comments__reader-chip,
+.article-comments__guest-note,
+.subscription-manage-card,
+.reader-account-card {
+  border-radius: 22px;
+  border: 1px solid var(--border);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent),
+    rgba(255, 255, 255, 0.02);
+}
+
+.article-comments__reader-chip {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.9rem;
+  align-items: center;
+  padding: 0.95rem 1rem;
+}
+
+.article-comments__reader-avatar,
+.reader-account-avatar {
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: rgba(102, 137, 255, 0.16);
+  color: var(--text);
+  font-weight: 700;
+}
+
+.article-comments__reader-avatar {
+  width: 2.9rem;
+  height: 2.9rem;
+  border-radius: 16px;
+}
+
+.article-comments__reader-avatar img,
+.article-comment__avatar--image img,
+.reader-account-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.article-comments__guest-note {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.95rem 1rem;
+  border-style: dashed;
+}
+
+.article-comment__avatar--image {
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: transparent;
+}
+
+.article-comment {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1rem;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent),
+    rgba(255, 255, 255, 0.02);
+}
+
+.article-comment--editorial {
+  border-color: rgba(102, 137, 255, 0.26);
+  background:
+    linear-gradient(135deg, rgba(102, 137, 255, 0.08), rgba(248, 196, 0, 0.08)),
+    rgba(255, 255, 255, 0.03);
+}
+
+.article-comment--featured {
+  border-color: rgba(248, 196, 0, 0.34);
+  box-shadow: inset 0 0 0 1px rgba(248, 196, 0, 0.08);
+}
+
+.article-comment p,
+.dashboard-comment-card p {
+  margin: 0;
+  line-height: 1.62;
+}
+
+.article-comment__avatar {
+  display: inline-grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 12px;
+  background: rgba(102, 137, 255, 0.16);
+  color: var(--text);
+  font-weight: 700;
+  font-size: 0.82rem;
+}
+
+.reader-login-note {
+  display: grid;
+  gap: 0.8rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--border);
+}
+
+.auth-card--reader {
+  width: min(100%, 760px);
+}
+
+.reader-account-shell {
+  width: min(100%, 1120px);
+  margin: 2rem auto 0;
+  display: grid;
+  gap: 1rem;
+}
+
+.reader-account-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(0, 1.12fr) minmax(320px, 0.88fr);
+}
+
+.reader-account-card {
+  display: grid;
+  gap: 1rem;
+  padding: 1.45rem;
+  box-shadow: var(--shadow-soft);
+  backdrop-filter: blur(18px) saturate(135%);
+  -webkit-backdrop-filter: blur(18px) saturate(135%);
+}
+
+.reader-account-card--profile {
+  background:
+    linear-gradient(135deg, rgba(95, 132, 255, 0.1), rgba(255, 190, 105, 0.07)),
+    var(--surface);
+}
+
+.reader-account-card__header,
+.reader-comment-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.reader-account-status {
+  display: flex;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+}
+
+.reader-account-profile {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 1rem;
+  align-items: center;
+}
+
+.reader-account-avatar {
+  width: 4.75rem;
+  height: 4.75rem;
+  border-radius: 24px;
+  font-size: 1.25rem;
+}
+
+.reader-account-profile__copy {
+  display: grid;
+  gap: 0.28rem;
+}
+
+.reader-account-form {
+  display: grid;
+  gap: 1rem;
+}
+
+.reader-account-form__upload {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 1rem;
+  border-radius: 20px;
+  border: 1px dashed var(--border);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.reader-account-form__upload-button {
+  position: relative;
+  overflow: hidden;
+}
+
+.reader-account-form__upload-button input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.reader-account-name-lock {
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.95rem 1rem;
+  border-radius: 18px;
+  border: 1px solid var(--border);
+  background: rgba(255, 190, 105, 0.08);
+}
+
+.reader-account-comments {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.reader-comment-card {
+  display: grid;
+  gap: 0.85rem;
+  padding: 1rem;
+  border-radius: 22px;
+  border: 1px solid var(--border);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent),
+    rgba(255, 255, 255, 0.02);
+}
+
+.reader-comment-card__article {
+  color: var(--text);
+  text-decoration: none;
+  font-weight: 700;
+}
+
+.reader-comment-card__article:hover {
+  color: var(--accent);
+}
+
+.reader-comment-card__actions {
+  justify-content: flex-start;
+}
+
+.reader-account-loading {
+  width: min(100%, 760px);
+  margin: 2rem auto 0;
+}
+
+.subscription-manage-card {
+  display: grid;
+  gap: 1rem;
+  padding: 1.05rem;
+}
+
 .share-buttons {
   display: flex;
   gap: 0.75rem;
@@ -2976,6 +3268,28 @@ h3 {
   box-shadow: var(--shadow-soft);
   backdrop-filter: blur(18px) saturate(135%);
   -webkit-backdrop-filter: blur(18px) saturate(135%);
+}
+
+.dashboard-comment-panel {
+  gap: 1rem;
+}
+
+.dashboard-comment-card {
+  display: grid;
+  gap: 0.8rem;
+  padding: 1rem;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent),
+    rgba(255, 255, 255, 0.02);
+}
+
+.dashboard-comment-card__meta {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
 }
 
 .article-next__card {
@@ -3136,6 +3450,17 @@ h3 {
 .subscription-status-steps {
   display: grid;
   gap: 0.9rem;
+}
+
+:root[data-theme="dark"] .article-comments__guest-note,
+:root[data-theme="dark"] .reader-account-form__upload,
+:root[data-theme="dark"] .subscription-manage-card,
+:root[data-theme="dark"] .reader-comment-card,
+:root[data-theme="dark"] .reader-account-card,
+:root[data-theme="dark"] .article-comments__reader-chip {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent),
+    rgba(5, 10, 18, 0.42);
 }
 
 .auth-card,
@@ -4904,10 +5229,13 @@ h3 {
   .article-header,
   .article-body,
   .article-meta,
+  .article-comments,
   .article-share,
   .article-next,
   .auth-card,
-  .dashboard-panel {
+  .dashboard-panel,
+  .reader-account-card,
+  .subscription-manage-card {
     padding: 1.1rem;
   }
 
@@ -4944,6 +5272,39 @@ h3 {
   .article-actions .button,
   .section-heading .button,
   .share-buttons .button {
+    width: 100%;
+  }
+
+  .article-comments__header,
+  .article-comments__form-header,
+  .article-comment__meta,
+  .dashboard-comment-card__meta,
+  .reader-account-card__header,
+  .reader-comment-card__header {
+    align-items: flex-start;
+  }
+
+  .article-comments__reader-chip,
+  .reader-account-profile,
+  .reader-account-grid,
+  .subscription-status-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .article-comments__guest-note .button-row,
+  .reader-comment-card__actions,
+  .reader-account-form__upload {
+    width: 100%;
+  }
+
+  .reader-account-form__upload,
+  .reader-comment-card__actions {
+    justify-content: stretch;
+  }
+
+  .reader-account-form__upload .button,
+  .reader-comment-card__actions .button,
+  .article-comments__guest-note .button {
     width: 100%;
   }
 

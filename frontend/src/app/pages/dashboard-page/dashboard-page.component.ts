@@ -15,6 +15,7 @@ import {
   AuditEntry,
   Category,
   DashboardArticle,
+  DashboardArticleComment,
   DashboardOverview,
   SiteCommunication,
   SubscriptionEntry,
@@ -892,6 +893,54 @@ function createEditorialUploadAdapterPlugin(
               <strong>{{ formatModerationAction(event.action) }}</strong>
               <span>{{ formatRole(event.role) }} | {{ event.createdAt | date: "short" }}</span>
               <p *ngIf="event.note">{{ event.note }}</p>
+            </div>
+          </section>
+
+          <section class="history-panel dashboard-comment-panel" *ngIf="currentUser.role === 'admin' && selectedArticleId">
+            <div class="panel-heading">
+              <div>
+                <h3>Comentarios del artículo</h3>
+                <p class="panel-subtitle">Moderación rápida para la caja pública del final de la noticia.</p>
+              </div>
+
+              <div class="dashboard-comment-summary">
+                <span class="count-pill">Total {{ articleCommentSummary.total }}</span>
+                <span class="count-pill count-pill--warm">Pendientes {{ articleCommentSummary.pending }}</span>
+                <span class="count-pill">Aprobados {{ articleCommentSummary.approved }}</span>
+                <span class="count-pill">Destacados {{ articleCommentSummary.featured }}</span>
+              </div>
+            </div>
+
+            <p class="helper-text" *ngIf="loadingArticleComments">Cargando comentarios editoriales...</p>
+            <p class="empty-state" *ngIf="!loadingArticleComments && articleComments.length === 0">Aún no hay comentarios registrados para este artículo.</p>
+
+            <div class="dashboard-comment-list" *ngIf="articleComments.length > 0">
+              <article class="dashboard-comment-card" *ngFor="let comment of articleComments">
+                <div class="dashboard-comment-card__meta">
+                  <strong>{{ comment.authorName }}</strong>
+                  <span class="tag">{{ formatArticleCommentStatus(comment.status) }}</span>
+                  <span class="tag tag--category" *ngIf="comment.featured">Destacado</span>
+                  <span>{{ comment.createdAt | date: "short" }}</span>
+                </div>
+
+                <p>{{ comment.body }}</p>
+
+                <p class="helper-text" *ngIf="comment.moderationNote">Nota interna: {{ comment.moderationNote }}</p>
+                <p class="helper-text" *ngIf="comment.moderatedBy">
+                  Moderó {{ comment.moderatedBy.name }}<span *ngIf="comment.moderatedAt"> | {{ comment.moderatedAt | date: "short" }}</span>
+                </p>
+
+                <div class="button-row">
+                  <button class="button button--secondary" type="button" (click)="moderateComment(comment.id, 'approve')" [disabled]="moderatingCommentId === comment.id">
+                    {{ moderatingCommentId === comment.id ? "Procesando..." : "Aprobar" }}
+                  </button>
+                  <button class="button" type="button" (click)="moderateComment(comment.id, comment.featured ? 'unfeature' : 'feature')" [disabled]="moderatingCommentId === comment.id">
+                    {{ comment.featured ? "Quitar destacado" : "Destacar" }}
+                  </button>
+                  <button class="button button--ghost" type="button" (click)="moderateComment(comment.id, 'hide')" [disabled]="moderatingCommentId === comment.id">Ocultar</button>
+                  <button class="button button--ghost" type="button" (click)="moderateComment(comment.id, 'reject')" [disabled]="moderatingCommentId === comment.id">Rechazar</button>
+                </div>
+              </article>
             </div>
           </section>
         </section>
@@ -3546,6 +3595,17 @@ export class DashboardPageComponent {
   auditEntries: AuditEntry[] = [];
   selectedArticle: DashboardArticle | null = null;
   selectedArticleId: string | null = null;
+  articleComments: DashboardArticleComment[] = [];
+  articleCommentSummary = {
+    total: 0,
+    pending: 0,
+    approved: 0,
+    hidden: 0,
+    rejected: 0,
+    featured: 0
+  };
+  loadingArticleComments = false;
+  moderatingCommentId: string | null = null;
   deletingArticle = false;
   selectedSubscriptionId: string | null = null;
   articleSearch = "";
@@ -3979,7 +4039,7 @@ export class DashboardPageComponent {
       .join("");
   }
 
-  formatRole(role: "admin" | "journalist"): string {
+  formatRole(role: UserSession["role"]): string {
     return role === "admin" ? "Administrador" : "Periodista";
   }
 
@@ -4009,6 +4069,17 @@ export class DashboardPageComponent {
 
   formatModerationAction(action: string): string {
     return this.moderationActionLabels[action] ?? this.humanizeToken(action);
+  }
+
+  formatArticleCommentStatus(status: DashboardArticleComment["status"]): string {
+    return (
+      {
+        pending: "Pendiente",
+        approved: "Aprobado",
+        hidden: "Oculto",
+        rejected: "Rechazado"
+      } as const
+    )[status] ?? this.humanizeToken(status);
   }
 
   formatAuditAction(action: string): string {
@@ -6300,6 +6371,42 @@ export class DashboardPageComponent {
     }
   }
 
+  private async loadSelectedArticleComments(articleId: string): Promise<void> {
+    if (!articleId || !this.authService.isAdmin()) {
+      this.articleComments = [];
+      this.articleCommentSummary = {
+        total: 0,
+        pending: 0,
+        approved: 0,
+        hidden: 0,
+        rejected: 0,
+        featured: 0
+      };
+      return;
+    }
+
+    try {
+      this.loadingArticleComments = true;
+      const response = await this.dashboardApi.getArticleComments(articleId);
+      this.articleComments = response.items;
+      this.articleCommentSummary = response.summary;
+    } catch (error) {
+      this.articleComments = [];
+      this.articleCommentSummary = {
+        total: 0,
+        pending: 0,
+        approved: 0,
+        hidden: 0,
+        rejected: 0,
+        featured: 0
+      };
+      this.notifyError(error, "No fue posible cargar los comentarios del artículo.");
+    } finally {
+      this.loadingArticleComments = false;
+      this.cdr.markForCheck();
+    }
+  }
+
   applyUsersFilters(): void {
     void this.loadUsersPage(1);
   }
@@ -6665,6 +6772,9 @@ export class DashboardPageComponent {
     this.articleAutosavePendingMessage = "";
     this.articleAutosaveState = "idle";
     this.hydratingArticleForm = false;
+    if (this.authService.isAdmin()) {
+      void this.loadSelectedArticleComments(article.id);
+    }
     this.cdr.markForCheck();
   }
 
@@ -6690,6 +6800,17 @@ export class DashboardPageComponent {
     this.articleAutosaveErrorMessage = "";
     this.articleAutosavePendingMessage = "";
     this.articleAutosaveState = "idle";
+    this.articleComments = [];
+    this.articleCommentSummary = {
+      total: 0,
+      pending: 0,
+      approved: 0,
+      hidden: 0,
+      rejected: 0,
+      featured: 0
+    };
+    this.loadingArticleComments = false;
+    this.moderatingCommentId = null;
     this.hydratingArticleForm = false;
     this.cdr.markForCheck();
   }
@@ -6765,6 +6886,24 @@ export class DashboardPageComponent {
       this.editArticle(updated);
     } catch (error) {
       this.notifyError(error, "No fue posible aplicar la moderación.");
+      this.cdr.markForCheck();
+    }
+  }
+
+  async moderateComment(commentId: string, action: "approve" | "feature" | "unfeature" | "hide" | "reject"): Promise<void> {
+    if (!this.selectedArticleId || !commentId || this.moderatingCommentId) {
+      return;
+    }
+
+    try {
+      this.moderatingCommentId = commentId;
+      await this.dashboardApi.moderateArticleComment(this.selectedArticleId, commentId, action);
+      this.notifySuccess("Comentario actualizado.");
+      await this.loadSelectedArticleComments(this.selectedArticleId);
+    } catch (error) {
+      this.notifyError(error, "No fue posible actualizar el comentario.");
+    } finally {
+      this.moderatingCommentId = null;
       this.cdr.markForCheck();
     }
   }
@@ -6897,12 +7036,14 @@ export class DashboardPageComponent {
   }
 
   editUser(user: UserSession): void {
+    const internalRole = user.role === "admin" ? "admin" : "journalist";
+
     this.userForm = {
       id: user.id,
       name: user.name,
       email: user.email,
       password: "",
-      role: user.role,
+      role: internalRole,
       status: user.status === "disabled" ? "disabled" : user.status
     };
     this.passwordVisibility.user = false;

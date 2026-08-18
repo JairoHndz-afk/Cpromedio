@@ -2,8 +2,12 @@ export interface UserSession {
   id: string;
   name: string;
   email: string;
-  role: "admin" | "journalist";
+  role: "admin" | "journalist" | "reader";
   status: "active" | "blocked" | "disabled";
+  avatar: {
+    url: string;
+    alt: string;
+  };
   lastLoginAt: string | null;
   createdAt: string;
 }
@@ -115,6 +119,23 @@ export interface PublicArticleDetailPayload {
   nextArticle: PublicArticlePreview | null;
 }
 
+export interface PublicArticleComment {
+  id: string;
+  authorName: string;
+  authorAvatarUrl: string;
+  authorAvatarAlt: string;
+  body: string;
+  featured: boolean;
+  createdAt: string;
+  isOwner: boolean;
+}
+
+export interface PublicArticleCommentsPayload {
+  editorialNote: string;
+  total: number;
+  items: PublicArticleComment[];
+}
+
 export interface PublicAuthorProfile {
   id: string;
   name: string;
@@ -139,6 +160,40 @@ export interface DashboardArticle extends PublicArticle {
     note: string;
     createdAt: string;
   }>;
+}
+
+export interface DashboardArticleComment {
+  id: string;
+  articleId: string;
+  authorName: string;
+  authorAvatarUrl: string;
+  authorAvatarAlt: string;
+  body: string;
+  status: "pending" | "approved" | "hidden" | "rejected";
+  censored: boolean;
+  censoredTerms: string[];
+  featured: boolean;
+  moderationNote: string;
+  createdAt: string;
+  moderatedAt: string | null;
+  moderatedBy: {
+    id: string;
+    name: string;
+    email: string;
+    role: "admin" | "journalist";
+  } | null;
+}
+
+export interface DashboardArticleCommentsPayload {
+  items: DashboardArticleComment[];
+  summary: {
+    total: number;
+    pending: number;
+    approved: number;
+    hidden: number;
+    rejected: number;
+    featured: number;
+  };
 }
 
 export interface SiteCommunication {
@@ -239,6 +294,56 @@ export interface PublicArticleFilters {
 
 export interface SubscriptionActionPayload {
   message: string;
+}
+
+export interface ReaderSubscriptionAccessPayload {
+  subscription: {
+    id: string;
+    name: string;
+    email: string;
+    plan: "newsletter" | "premium";
+    status: "pending" | "active" | "paused" | "cancelled";
+    createdAt: string;
+    confirmedAt: string | null;
+  } | null;
+  readerAccount: {
+    exists: boolean;
+    name: string;
+    createdAt: string | null;
+  };
+}
+
+export interface ReaderAccountPayload {
+  user: UserSession;
+  subscription: {
+    id: string;
+    name: string;
+    email: string;
+    plan: "newsletter" | "premium";
+    status: "pending" | "active" | "paused" | "cancelled";
+    createdAt: string;
+    confirmedAt: string | null;
+  } | null;
+  permissions: {
+    canChangeNameNow: boolean;
+    nameChangeAvailableAt: string | null;
+  };
+}
+
+export interface ReaderOwnComment {
+  id: string;
+  article: {
+    id: string;
+    slug: string;
+    title: string;
+  } | null;
+  body: string;
+  status: "pending" | "approved" | "hidden" | "rejected";
+  featured: boolean;
+  censored: boolean;
+  createdAt: string;
+  updatedAt: string;
+  canEdit: boolean;
 }
 
 export interface DashboardArticlePage {
