@@ -49,6 +49,24 @@ const articleCommentSchema = new mongoose.Schema(
       type: Boolean,
       default: false
     },
+    likedBy: {
+      type: [
+        {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User"
+        }
+      ],
+      default: []
+    },
+    dislikedBy: {
+      type: [
+        {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User"
+        }
+      ],
+      default: []
+    },
     moderationNote: {
       type: String,
       default: "",

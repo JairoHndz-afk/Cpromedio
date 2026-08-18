@@ -41,6 +41,21 @@ export class PublicApiService {
     );
   }
 
+  reactToArticleComment(
+    slug: string,
+    commentId: string,
+    reaction: "like" | "dislike"
+  ): Promise<{ message: string; comment: PublicArticleCommentsPayload["items"][number] }> {
+    return firstValueFrom(
+      this.http.post<{ message: string; comment: PublicArticleCommentsPayload["items"][number] }>(
+        `${API_BASE_URL}/public/articles/${slug}/comments/${commentId}/reaction`,
+        {
+          reaction
+        }
+      )
+    );
+  }
+
   getAuthorProfile(authorId: string, page = 1, limit = 12): Promise<PublicAuthorProfilePayload> {
     const params = new HttpParams()
       .set("page", page)

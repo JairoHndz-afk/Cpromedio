@@ -23,7 +23,7 @@ import { User } from "../models/User.js";
 import { paragraphBlocksFromBody, sanitizeContentBlocks, sanitizeEditorialMediaUrl, sanitizeOwnedMediaUrl, sanitizeTags, sanitizeText } from "../utils/content.js";
 import { buildAllowedFeedHosts } from "../lib/allied-feeds.js";
 import { readBoundedPositiveInt } from "../utils/request.js";
-import { publicCommentInputSchema } from "../validators/comment.validator.js";
+import { commentReactionSchema, publicCommentInputSchema } from "../validators/comment.validator.js";
 import { subscriptionInputSchema, subscriptionTokenSchema } from "../validators/subscription.validator.js";
 
 const recentArticleViewsCookieName = "cp_recent_views";
@@ -455,7 +455,33 @@ function buildEditorialCommentNote(article) {
   return sanitizeText(article?.moderationNote ?? "", 400) || defaultEditorialCommentNote;
 }
 
+function normalizeReactionMemberIds(values) {
+  return [...new Set((Array.isArray(values) ? values : []).map((value) => String(value ?? "")).filter(Boolean))];
+}
+
+function resolveCommentViewerReaction(comment, currentUserId = "") {
+  if (!currentUserId) {
+    return null;
+  }
+
+  const likedBy = normalizeReactionMemberIds(comment?.likedBy);
+  const dislikedBy = normalizeReactionMemberIds(comment?.dislikedBy);
+
+  if (likedBy.includes(currentUserId)) {
+    return "like";
+  }
+
+  if (dislikedBy.includes(currentUserId)) {
+    return "dislike";
+  }
+
+  return null;
+}
+
 function serializePublicArticleComment(comment, currentUserId = "") {
+  const likedBy = normalizeReactionMemberIds(comment.likedBy);
+  const dislikedBy = normalizeReactionMemberIds(comment.dislikedBy);
+
   return {
     id: comment._id.toString(),
     authorName: sanitizeText(comment.authorName ?? "", 80),
@@ -464,7 +490,10 @@ function serializePublicArticleComment(comment, currentUserId = "") {
     body: sanitizeText(comment.body ?? "", 1600),
     featured: comment.featured === true,
     createdAt: comment.createdAt,
-    isOwner: Boolean(currentUserId) && String(comment.authorUser ?? "") === currentUserId
+    isOwner: Boolean(currentUserId) && String(comment.authorUser ?? "") === currentUserId,
+    likeCount: likedBy.length,
+    dislikeCount: dislikedBy.length,
+    viewerReaction: resolveCommentViewerReaction(comment, currentUserId)
   };
 }
 
@@ -1120,6 +1149,71 @@ export async function createPublicArticleComment(req, res, next) {
         ? "Tu comentario quedó publicado. Algunas expresiones fueron censuradas automáticamente."
         : "Tu comentario quedó publicado.",
       comment: serializePublicArticleComment(comment, req.user?._id?.toString?.() ?? "")
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function reactToPublicArticleComment(req, res, next) {
+  try {
+    const payload = commentReactionSchema.parse(req.body);
+
+    if (!isValidObjectId(req.params.commentId)) {
+      return res.status(404).json({
+        message: "Comentario no encontrado."
+      });
+    }
+
+    const article = await Article.findOne({
+      slug: req.params.slug,
+      status: "published",
+      deletedAt: null
+    }).select("_id");
+
+    if (!article) {
+      return res.status(404).json({
+        message: "Artículo no encontrado."
+      });
+    }
+
+    const comment = await ArticleComment.findOne({
+      _id: req.params.commentId,
+      article: article._id,
+      status: "approved"
+    });
+
+    if (!comment) {
+      return res.status(404).json({
+        message: "Comentario no encontrado."
+      });
+    }
+
+    const currentUserId = req.user?._id?.toString?.() ?? "";
+    const currentReaction = resolveCommentViewerReaction(comment, currentUserId);
+    const likedBy = normalizeReactionMemberIds(comment.likedBy).filter((memberId) => memberId !== currentUserId);
+    const dislikedBy = normalizeReactionMemberIds(comment.dislikedBy).filter((memberId) => memberId !== currentUserId);
+
+    if (payload.reaction === "like" && currentReaction !== "like") {
+      likedBy.push(currentUserId);
+    }
+
+    if (payload.reaction === "dislike" && currentReaction !== "dislike") {
+      dislikedBy.push(currentUserId);
+    }
+
+    comment.likedBy = likedBy;
+    comment.dislikedBy = dislikedBy;
+    await comment.save();
+
+    res.json({
+      message:
+        payload.reaction === currentReaction
+          ? "Tu reacción fue retirada."
+          : payload.reaction === "like"
+            ? "Marcaste este comentario con me gusta."
+            : "Marcaste este comentario con no me gusta.",
+      comment: serializePublicArticleComment(comment, currentUserId)
     });
   } catch (error) {
     next(error);

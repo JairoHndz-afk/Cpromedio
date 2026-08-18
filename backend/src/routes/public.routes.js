@@ -1,5 +1,6 @@
 import { Router } from "express";
 
+import { requireAuth } from "../middlewares/auth.js";
 import { commentCreateRateLimit, subscriptionCreateRateLimit, subscriptionTokenRateLimit } from "../middlewares/rate-limit.js";
 import {
   confirmPublicSubscription,
@@ -14,6 +15,7 @@ import {
   getSitemapXml,
   getPublicSite,
   listPublicArticles,
+  reactToPublicArticleComment,
   reactivatePublicSubscription,
   unsubscribePublicSubscription
 } from "../controllers/public.controller.js";
@@ -26,6 +28,7 @@ router.get("/archive-filters", getPublicArchiveFilters);
 router.get("/articles", listPublicArticles);
 router.get("/articles/:slug/comments", getPublicArticleComments);
 router.post("/articles/:slug/comments", commentCreateRateLimit, createPublicArticleComment);
+router.post("/articles/:slug/comments/:commentId/reaction", requireAuth, reactToPublicArticleComment);
 router.get("/articles/:slug", getPublicArticle);
 router.get("/authors/:authorId", getPublicAuthor);
 router.post("/subscriptions", subscriptionCreateRateLimit, createPublicSubscription);

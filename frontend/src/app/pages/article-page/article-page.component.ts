@@ -223,6 +223,10 @@ type ShareChannel = "whatsapp" | "telegram" | "x" | "facebook" | "copy";
           </div>
         </div>
 
+        <p class="helper-text article-comments__reaction-note" *ngIf="!authService.isAuthenticated() && articleComments.length > 0">
+          Inicia sesión o regístrate para valorar los comentarios.
+        </p>
+
         <form class="article-comments__form" (ngSubmit)="submitComment()">
           <div class="article-comments__form-header">
             <strong>Participa en la conversación</strong>
@@ -298,6 +302,32 @@ type ShareChannel = "whatsapp" | "telegram" | "x" | "facebook" | "copy";
               <span class="tag">{{ comment.createdAt | date: "d MMM y, h:mm a" }}</span>
             </div>
             <p>{{ comment.body }}</p>
+            <div class="article-comment__actions">
+              <button
+                class="article-comment__reaction"
+                type="button"
+                [class.is-active]="comment.viewerReaction === 'like'"
+                [disabled]="!authService.isAuthenticated() || reactingCommentId === comment.id"
+                [attr.aria-pressed]="comment.viewerReaction === 'like'"
+                [attr.title]="authService.isAuthenticated() ? 'Marcar me gusta' : 'Inicia sesión para reaccionar'"
+                (click)="reactToComment(comment, 'like')"
+              >
+                <span>Me gusta</span>
+                <strong class="article-comment__reaction-count">{{ comment.likeCount }}</strong>
+              </button>
+              <button
+                class="article-comment__reaction article-comment__reaction--dislike"
+                type="button"
+                [class.is-active]="comment.viewerReaction === 'dislike'"
+                [disabled]="!authService.isAuthenticated() || reactingCommentId === comment.id"
+                [attr.aria-pressed]="comment.viewerReaction === 'dislike'"
+                [attr.title]="authService.isAuthenticated() ? 'Marcar no me gusta' : 'Inicia sesión para reaccionar'"
+                (click)="reactToComment(comment, 'dislike')"
+              >
+                <span>No me gusta</span>
+                <strong class="article-comment__reaction-count">{{ comment.dislikeCount }}</strong>
+              </button>
+            </div>
           </article>
         </div>
 
@@ -358,6 +388,7 @@ export class ArticlePageComponent {
   commentMessage = "";
   commentsLoading = false;
   submittingComment = false;
+  reactingCommentId: string | null = null;
   commentForm = {
     authorName: "",
     body: ""
@@ -616,7 +647,7 @@ export class ArticlePageComponent {
       const status = typeof error === "object" && error && "status" in error ? Number(error.status) : 0;
 
       if (status !== 404) {
-        this.errorMessage = "No fue posible cargar el artÃ­culo.";
+        this.errorMessage = "No fue posible cargar el artículo.";
         this.seo.setArticleFallback({
           slug: currentSlug
         });
@@ -675,6 +706,27 @@ export class ArticlePageComponent {
       this.commentsErrorMessage = "No fue posible enviar tu comentario.";
     } finally {
       this.submittingComment = false;
+      this.cdr.markForCheck();
+    }
+  }
+
+  async reactToComment(comment: PublicArticleComment, reaction: "like" | "dislike"): Promise<void> {
+    if (!this.article || !this.authService.isAuthenticated() || this.reactingCommentId === comment.id) {
+      return;
+    }
+
+    this.commentsErrorMessage = "";
+    this.commentMessage = "";
+    this.reactingCommentId = comment.id;
+
+    try {
+      const response = await this.publicApi.reactToArticleComment(this.article.slug, comment.id, reaction);
+      this.articleComments = this.articleComments.map((item) => (item.id === comment.id ? response.comment : item));
+      this.commentMessage = response.message;
+    } catch {
+      this.commentsErrorMessage = "No fue posible registrar tu reacción.";
+    } finally {
+      this.reactingCommentId = null;
       this.cdr.markForCheck();
     }
   }

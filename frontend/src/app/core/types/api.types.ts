@@ -128,6 +128,9 @@ export interface PublicArticleComment {
   featured: boolean;
   createdAt: string;
   isOwner: boolean;
+  likeCount: number;
+  dislikeCount: number;
+  viewerReaction: "like" | "dislike" | null;
 }
 
 export interface PublicArticleCommentsPayload {

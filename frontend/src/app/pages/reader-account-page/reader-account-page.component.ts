@@ -20,10 +20,10 @@ type ReaderPasswordField = "current" | "next" | "confirm";
       <div class="reader-account-grid">
         <article class="reader-account-card reader-account-card--profile">
           <div class="reader-account-card__header">
-            <div>
+            <div class="reader-account-card__copy-block">
               <p class="eyebrow">Mi cuenta</p>
-              <h1>Tu espacio de participación</h1>
-              <p class="helper-text">Aquí administras tu nombre visible, tu foto y los comentarios que dejas en las noticias.</p>
+              <h1>Tu perfil</h1>
+              <p class="helper-text">Actualiza cómo apareces al comentar y mantén ordenado el acceso ligado a tu cuenta.</p>
             </div>
             <div class="reader-account-status" *ngIf="account?.subscription as subscription">
               <span class="tag tag--category">{{ subscription.plan === "premium" ? "Premium" : "Boletín" }}</span>
@@ -46,25 +46,27 @@ type ReaderPasswordField = "current" | "next" | "confirm";
             <div class="reader-account-profile__copy">
               <strong>{{ account.user.name }}</strong>
               <span>{{ account.user.email }}</span>
-              <span class="helper-text">Tu cuenta sigue asociada a la suscripción editorial de este correo.</span>
+              <span class="helper-text">Tu correo conserva el acceso, la suscripción y la autoría de tus comentarios.</span>
             </div>
           </div>
 
           <form class="reader-account-form" (ngSubmit)="saveProfile()">
-            <label>
-              <span>Nombre visible</span>
-              <input type="text" [(ngModel)]="profileForm.name" name="readerProfileName" [disabled]="savingProfile" required />
-            </label>
+            <div class="reader-account-form__grid">
+              <label>
+                <span>Nombre visible</span>
+                <input type="text" [(ngModel)]="profileForm.name" name="readerProfileName" [disabled]="savingProfile" required />
+              </label>
 
-            <label>
-              <span>Correo asociado</span>
-              <input type="email" [value]="account.user.email" readonly />
-            </label>
+              <label>
+                <span>Correo asociado</span>
+                <input type="email" [value]="account.user.email" readonly />
+              </label>
+            </div>
 
             <div class="reader-account-form__upload">
               <div>
                 <span>Foto de perfil</span>
-                <p class="helper-text">Puedes subir PNG, JPG, WEBP, GIF o AVIF. Luego guarda el perfil para dejarla activa.</p>
+                <p class="helper-text">Admite PNG, JPG, WEBP, GIF o AVIF. Después guarda el perfil para publicarla.</p>
               </div>
               <label class="button button--ghost reader-account-form__upload-button">
                 {{ uploadingAvatar ? "Subiendo..." : "Subir foto" }}
@@ -86,16 +88,17 @@ type ReaderPasswordField = "current" | "next" | "confirm";
               </button>
             </div>
 
-            <p class="helper-text" *ngIf="profileMessage">{{ profileMessage }}</p>
-            <p class="error-text" *ngIf="profileError">{{ profileError }}</p>
+            <p class="form-status form-status--success" *ngIf="profileMessage">{{ profileMessage }}</p>
+            <p class="form-status form-status--error" *ngIf="profileError">{{ profileError }}</p>
           </form>
         </article>
 
         <article class="reader-account-card">
           <div class="reader-account-card__header">
-            <div>
+            <div class="reader-account-card__copy-block">
               <p class="eyebrow">Seguridad</p>
-              <h2>Cambiar contraseña</h2>
+              <h2>Contraseña</h2>
+              <p class="helper-text">Cambia tu clave cuando lo necesites sin afectar tu perfil ni tus comentarios.</p>
             </div>
           </div>
 
@@ -206,25 +209,25 @@ type ReaderPasswordField = "current" | "next" | "confirm";
               </button>
             </div>
 
-            <p class="helper-text" *ngIf="passwordMessage">{{ passwordMessage }}</p>
-            <p class="error-text" *ngIf="passwordError">{{ passwordError }}</p>
+            <p class="form-status form-status--success" *ngIf="passwordMessage">{{ passwordMessage }}</p>
+            <p class="form-status form-status--error" *ngIf="passwordError">{{ passwordError }}</p>
           </form>
         </article>
       </div>
 
       <article class="reader-account-card reader-account-card--comments">
         <div class="reader-account-card__header">
-          <div>
+          <div class="reader-account-card__copy-block">
             <p class="eyebrow">Tus comentarios</p>
-            <h2>Gestiona lo que ya publicaste</h2>
-            <p class="helper-text">Los cambios se guardan al instante y la censura automática vuelve a aplicarse si detecta insultos fuertes.</p>
+            <h2>Comentarios publicados</h2>
+            <p class="helper-text">Edita o retira tus comentarios visibles. Si detectamos insultos fuertes otra vez, se censurarán automáticamente.</p>
           </div>
-          <a class="button button--ghost" routerLink="/">Ir a portada</a>
+          <a class="button button--ghost" routerLink="/">Volver al inicio</a>
         </div>
 
         <p class="helper-text" *ngIf="loadingComments">Cargando tus comentarios...</p>
-        <p class="helper-text" *ngIf="commentsMessage">{{ commentsMessage }}</p>
-        <p class="error-text" *ngIf="commentsError">{{ commentsError }}</p>
+        <p class="form-status form-status--success" *ngIf="commentsMessage">{{ commentsMessage }}</p>
+        <p class="form-status form-status--error" *ngIf="commentsError">{{ commentsError }}</p>
 
         <div class="reader-account-comments" *ngIf="comments.length > 0; else readerCommentsEmpty">
           <article class="reader-comment-card" *ngFor="let comment of comments; trackBy: trackComment">

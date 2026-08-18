@@ -1,4 +1,4 @@
-import { NgIf } from "@angular/common";
+import { NgFor, NgIf } from "@angular/common";
 import { ChangeDetectionStrategy, Component, inject } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { ActivatedRoute, Router, RouterLink } from "@angular/router";
@@ -6,22 +6,28 @@ import { ActivatedRoute, Router, RouterLink } from "@angular/router";
 import { AuthService } from "../../core/services/auth.service";
 import { ReaderApiService } from "../../core/services/reader-api.service";
 import { SeoService } from "../../core/services/seo.service";
-import { PASSWORD_REQUIREMENTS_MESSAGE, passwordMeetsPolicy } from "../../core/utils/password-policy";
+import {
+  PASSWORD_REQUIREMENTS_MESSAGE,
+  evaluatePasswordRequirements,
+  evaluatePasswordStrength,
+  passwordMeetsPolicy
+} from "../../core/utils/password-policy";
 
 type ReaderRegisterPasswordField = "password" | "confirm";
+type PasswordGuidanceState = "idle" | "progress" | "success";
 
 @Component({
   selector: "app-reader-register-page",
   standalone: true,
-  imports: [FormsModule, NgIf, RouterLink],
+  imports: [FormsModule, NgIf, NgFor, RouterLink],
   template: `
     <section class="auth-shell">
       <article class="auth-card auth-card--reader">
         <p class="eyebrow">Registro</p>
-        <h1>Crea tu cuenta</h1>
+        <h1>Regístrate para participar</h1>
         <p class="helper-text">
-          Al registrarte quedas suscrito por defecto al boletín editorial. Desde aquí podrás comentar, editar tus aportes,
-          cambiar tu contraseña y subir tu foto de perfil.
+          Tu cuenta quedará suscrita al boletín editorial por defecto. Desde aquí podrás comentar, editar tus aportes,
+          cambiar tu contraseña y publicar tu foto de perfil.
         </p>
 
         <form class="reader-register-form" (ngSubmit)="submit()">
@@ -68,7 +74,35 @@ type ReaderRegisterPasswordField = "password" | "confirm";
                 </ng-template>
               </button>
             </div>
-            <p class="helper-text">{{ passwordRequirementsMessage }}</p>
+            <div class="password-feedback" [attr.data-tone]="passwordStrength.tone">
+              <div class="password-strength-card" [attr.data-tone]="passwordStrength.tone">
+                <div class="password-strength-card__header">
+                  <span>Fuerza de la contraseña</span>
+                  <strong>{{ passwordStrength.label }}</strong>
+                </div>
+                <div class="password-strength-card__bar" aria-hidden="true">
+                  <span [style.width.%]="passwordStrength.progress"></span>
+                </div>
+              </div>
+
+              <div class="password-guidance" [attr.data-state]="passwordGuidance.state">
+                <span class="password-guidance__icon" aria-hidden="true">{{ passwordGuidance.icon }}</span>
+                <div class="password-guidance__copy">
+                  <strong>{{ passwordGuidance.title }}</strong>
+                  <span>{{ passwordGuidance.message }}</span>
+                </div>
+              </div>
+
+              <div class="password-requirement-rail" aria-label="Progreso de requisitos de contraseña">
+                <span
+                  *ngFor="let requirement of passwordRequirements; let requirementIndex = index"
+                  [class.is-met]="requirement.met"
+                  [class.is-active]="requirementIndex === nextPasswordRequirementIndex"
+                >
+                  {{ requirement.met ? "✓" : requirementIndex + 1 }}
+                </span>
+              </div>
+            </div>
           </label>
 
           <label>
@@ -104,23 +138,24 @@ type ReaderRegisterPasswordField = "password" | "confirm";
                 </ng-template>
               </button>
             </div>
+            <p class="form-hint form-hint--danger" *ngIf="passwordConfirmationState === 'mismatch'">La confirmación todavía no coincide.</p>
+            <p class="form-hint form-hint--success" *ngIf="passwordConfirmationState === 'match'">La confirmación coincide con la contraseña.</p>
           </label>
 
           <p class="helper-text form-legal-note">
             Al registrarte aceptas nuestra <a routerLink="/privacidad">política de privacidad</a>.
           </p>
 
-          <button class="button" type="submit" [disabled]="submitting">
-            {{ submitting ? "Creando cuenta..." : "Registrarme" }}
-          </button>
+          <div class="reader-register-actions">
+            <button class="button" type="submit" [disabled]="submitting">
+              {{ submitting ? "Creando cuenta..." : "Registrarme" }}
+            </button>
+            <a class="button button--ghost" [routerLink]="['/login']" [queryParams]="redirectQueryParams">Ya tengo una cuenta</a>
+          </div>
 
-          <p class="helper-text" *ngIf="successMessage">{{ successMessage }}</p>
-          <p class="error-text" *ngIf="errorMessage">{{ errorMessage }}</p>
+          <p class="form-status form-status--success" *ngIf="successMessage">{{ successMessage }}</p>
+          <p class="form-status form-status--error" *ngIf="errorMessage">{{ errorMessage }}</p>
         </form>
-
-        <div class="button-row">
-          <a class="button button--ghost" [routerLink]="['/login']" [queryParams]="redirectQueryParams">Ya tengo cuenta</a>
-        </div>
       </article>
     </section>
   `,
@@ -155,6 +190,58 @@ export class ReaderRegisterPageComponent {
   get redirectQueryParams(): Record<string, string> {
     const redirect = this.redirectTarget();
     return redirect ? { redirect } : {};
+  }
+
+  get passwordRequirements() {
+    return evaluatePasswordRequirements(this.form.password);
+  }
+
+  get passwordStrength() {
+    return evaluatePasswordStrength(this.form.password);
+  }
+
+  get nextPasswordRequirementIndex(): number {
+    const nextRequirementIndex = this.passwordRequirements.findIndex((requirement) => !requirement.met);
+    return nextRequirementIndex >= 0 ? nextRequirementIndex : this.passwordRequirements.length - 1;
+  }
+
+  get passwordGuidance(): { state: PasswordGuidanceState; icon: string; title: string; message: string } {
+    const requirements = this.passwordRequirements;
+    const nextRequirement = requirements.find((requirement) => !requirement.met);
+    const completedCount = requirements.filter((requirement) => requirement.met).length;
+
+    if (!this.form.password.trim()) {
+      return {
+        state: "idle",
+        icon: "1",
+        title: "Empieza por el primer requisito",
+        message: requirements[0]?.label ?? this.passwordRequirementsMessage
+      };
+    }
+
+    if (!nextRequirement) {
+      return {
+        state: "success",
+        icon: "✓",
+        title: "Contraseña lista",
+        message: "Todos los requisitos están correctos. Ya puedes confirmar la clave."
+      };
+    }
+
+    return {
+      state: "progress",
+      icon: String(Math.min(this.nextPasswordRequirementIndex + 1, requirements.length)),
+      title: `${completedCount} de ${requirements.length} requisitos completos`,
+      message: nextRequirement.label
+    };
+  }
+
+  get passwordConfirmationState(): "idle" | "match" | "mismatch" {
+    if (!this.form.confirmPassword) {
+      return "idle";
+    }
+
+    return this.form.password === this.form.confirmPassword ? "match" : "mismatch";
   }
 
   togglePassword(field: ReaderRegisterPasswordField): void {
