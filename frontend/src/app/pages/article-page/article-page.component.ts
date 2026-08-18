@@ -212,7 +212,9 @@ type ShareChannel = "whatsapp" | "telegram" | "x" | "facebook" | "copy";
           <div>
             <p class="eyebrow">Comentarios</p>
             <h2>La conversación de esta noticia</h2>
-            <p class="helper-text">Publicación inmediata para aportes útiles, con censura automática de insultos fuertes y opción de gestión desde tu cuenta.</p>
+            <p class="helper-text article-comments__privacy-note">
+              Al comentar aceptas nuestras pautas de participación y la <a routerLink="/privacidad">política de privacidad</a>.
+            </p>
           </div>
 
           <div class="article-comments__summary">
@@ -221,19 +223,9 @@ type ShareChannel = "whatsapp" | "telegram" | "x" | "facebook" | "copy";
           </div>
         </div>
 
-        <article class="article-comment article-comment--editorial" *ngIf="editorialCommentNote">
-          <div class="article-comment__meta">
-            <span class="article-comment__avatar">CP</span>
-            <strong>Redacción</strong>
-            <span class="tag tag--category">Nota editorial</span>
-          </div>
-          <p>{{ editorialCommentNote }}</p>
-        </article>
-
         <form class="article-comments__form" (ngSubmit)="submitComment()">
           <div class="article-comments__form-header">
             <strong>Participa en la conversación</strong>
-            <span class="tag">Publicación inmediata con censura automática de insultos fuertes</span>
           </div>
 
           <div class="article-comments__reader-chip" *ngIf="authService.user() as currentReader; else anonymousCommenter">
@@ -360,7 +352,6 @@ export class ArticlePageComponent {
   nextArticle: PublicArticlePreview | null = null;
   articleComments: PublicArticleComment[] = [];
   articleCommentTotal = 0;
-  editorialCommentNote = "Los comentarios aparecen de inmediato. Si detectamos groserías o insultos frecuentes, el sistema los censura con símbolos antes de publicarlos.";
   errorMessage = "";
   shareMessage = "";
   commentsErrorMessage = "";
@@ -598,7 +589,6 @@ export class ArticlePageComponent {
     this.nextArticle = null;
     this.articleComments = [];
     this.articleCommentTotal = 0;
-    this.editorialCommentNote = "Los comentarios aparecen de inmediato. Si detectamos groserías o insultos frecuentes, el sistema los censura con símbolos antes de publicarlos.";
     this.errorMessage = "";
     this.shareMessage = "";
     this.commentsErrorMessage = "";
@@ -706,7 +696,6 @@ export class ArticlePageComponent {
   }
 
   private applyArticleComments(payload: PublicArticleCommentsPayload): void {
-    this.editorialCommentNote = payload.editorialNote?.trim() || this.editorialCommentNote;
     this.articleComments = payload.items;
     this.articleCommentTotal = Math.max(Number(payload.total ?? 0), this.articleComments.length);
   }

@@ -106,6 +106,10 @@ type ReaderRegisterPasswordField = "password" | "confirm";
             </div>
           </label>
 
+          <p class="helper-text form-legal-note">
+            Al registrarte aceptas nuestra <a routerLink="/privacidad">política de privacidad</a>.
+          </p>
+
           <button class="button" type="submit" [disabled]="submitting">
             {{ submitting ? "Creando cuenta..." : "Registrarme" }}
           </button>

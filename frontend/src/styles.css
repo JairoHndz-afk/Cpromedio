@@ -2985,6 +2985,34 @@ h3 {
   flex-wrap: wrap;
 }
 
+.article-comments__privacy-note {
+  margin: 0.2rem 0 0;
+}
+
+.article-comments__privacy-note a {
+  color: var(--accent);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.article-comments__privacy-note a:hover {
+  text-decoration: underline;
+}
+
+.form-legal-note {
+  margin: -0.1rem 0 0.15rem;
+}
+
+.form-legal-note a {
+  color: var(--accent);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.form-legal-note a:hover {
+  text-decoration: underline;
+}
+
 .article-comments__form,
 .article-comments__list,
 .dashboard-comment-list {
