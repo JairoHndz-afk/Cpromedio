@@ -412,7 +412,6 @@ export class HomePageComponent {
       this.syncHomeCollections();
       this.seedHomeRecentFromSite();
       this.seo.setHome({
-        description: this.homeFeatured?.excerpt || "Lecturas, archivo editorial y nuevas publicaciones en Colombiano Promedio.",
         imageUrl: this.homeFeatured?.cover.url
       });
     } catch {

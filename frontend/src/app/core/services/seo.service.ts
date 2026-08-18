@@ -10,6 +10,10 @@ interface SeoArticlePayload {
   publishedAt?: string | null;
   updatedAt?: string | null;
   authorName?: string;
+  authorId?: string;
+  categoryName?: string;
+  tags?: string[];
+  isPremium?: boolean;
 }
 
 interface SeoAuthorPayload {
@@ -25,10 +29,10 @@ export class SeoService {
   private readonly title = inject(Title);
 
   setHome(payload: { title?: string; description?: string; imageUrl?: string } = {}): void {
-    const title = payload.title?.trim() || "Colombiano Promedio | Periodismo digital";
+    const title = payload.title?.trim() || "Colombiano Promedio | Noticias de Colombia, politica, poder y regiones";
     const description =
       payload.description?.trim() ||
-      "Colombiano Promedio: periodismo digital, archivo editorial, autores y lecturas recientes con identidad colombiana.";
+      "Noticias de Colombia, politica, poder regional, justicia y opinion en Colombiano Promedio. Periodismo independiente con contexto y archivo editorial propio.";
     const url = this.absoluteUrl("/");
     const imageUrl = this.toAbsoluteMediaUrl(payload.imageUrl) || this.siteLogoUrl();
 
@@ -40,6 +44,7 @@ export class SeoService {
       type: "website",
       robots: "index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1"
     });
+    this.clearArticleMeta();
 
     this.setJsonLd([
       {
@@ -47,7 +52,7 @@ export class SeoService {
         "@type": "Organization",
         "@id": `${url}#organization`,
         name: "Colombiano Promedio",
-        alternateName: "colombianopromedio",
+        alternateName: "ColombianoPromedio",
         url,
         logo: {
           "@type": "ImageObject",
@@ -60,7 +65,7 @@ export class SeoService {
         "@id": `${url}#website`,
         url,
         name: "Colombiano Promedio",
-        alternateName: "colombianopromedio",
+        alternateName: "ColombianoPromedio",
         description,
         inLanguage: "es-CO",
         publisher: {
@@ -72,9 +77,10 @@ export class SeoService {
   }
 
   setArticle(payload: SeoArticlePayload): void {
-    const description = payload.description.trim() || "Lectura editorial de Colombiano Promedio.";
+    const description = payload.description.trim() || "Noticias, analisis y contexto editorial de Colombiano Promedio.";
     const url = this.absoluteUrl(`/articulo/${payload.slug}`);
     const imageUrl = this.toAbsoluteMediaUrl(payload.imageUrl);
+    const rootUrl = this.absoluteUrl("/");
 
     this.applyCommonMeta({
       title: `${payload.title} | Colombiano Promedio`,
@@ -84,13 +90,16 @@ export class SeoService {
       type: "article",
       robots: "index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1"
     });
+    this.applyArticleMeta(payload);
 
     this.setJsonLd({
       "@context": "https://schema.org",
       "@type": "NewsArticle",
+      "@id": `${url}#article`,
       headline: payload.title,
       description,
       url,
+      inLanguage: "es-CO",
       image: imageUrl ? [imageUrl] : undefined,
       mainEntityOfPage: {
         "@type": "WebPage",
@@ -98,16 +107,24 @@ export class SeoService {
       },
       datePublished: payload.publishedAt || undefined,
       dateModified: payload.updatedAt || payload.publishedAt || undefined,
+      articleSection: payload.categoryName || undefined,
+      keywords: payload.tags?.filter(Boolean).join(", ") || undefined,
+      isAccessibleForFree: payload.isPremium === undefined ? undefined : !payload.isPremium,
       author: payload.authorName
         ? {
             "@type": "Person",
-            name: payload.authorName
+            name: payload.authorName,
+            url: payload.authorId ? this.absoluteUrl(`/autor/${payload.authorId}`) : undefined
           }
         : undefined,
+      isPartOf: {
+        "@id": `${rootUrl}#website`
+      },
       publisher: {
         "@type": "Organization",
+        "@id": `${rootUrl}#organization`,
         name: "Colombiano Promedio",
-        url: this.absoluteUrl("/"),
+        url: rootUrl,
         logo: {
           "@type": "ImageObject",
           url: this.siteLogoUrl()
@@ -128,6 +145,7 @@ export class SeoService {
       type: "article",
       robots: "index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1"
     });
+    this.clearArticleMeta();
     this.clearJsonLd();
   }
 
@@ -141,6 +159,7 @@ export class SeoService {
       type: "profile",
       robots: "index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1"
     });
+    this.clearArticleMeta();
 
     this.setJsonLd({
       "@context": "https://schema.org",
@@ -160,6 +179,7 @@ export class SeoService {
       type: "profile",
       robots: "index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1"
     });
+    this.clearArticleMeta();
     this.clearJsonLd();
   }
 
@@ -167,7 +187,7 @@ export class SeoService {
     const page = Math.max(Number(payload.page ?? 1), 1);
     const description =
       payload.description?.trim() ||
-      "Archivo completo de Colombiano Promedio con acceso a todas las publicaciones ordenadas de la más reciente a la más antigua.";
+      "Archivo de noticias, politica, opinion y analisis de Colombiano Promedio, ordenado de la mas reciente a la mas antigua.";
     const title = page > 1 ? `Archivo de noticias | Página ${page} | Colombiano Promedio` : "Archivo de noticias | Colombiano Promedio";
     const url = page > 1 ? this.absoluteUrl(`/archivo?page=${page}`) : this.absoluteUrl("/archivo");
 
@@ -178,6 +198,7 @@ export class SeoService {
       type: "website",
       robots: "index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1"
     });
+    this.clearArticleMeta();
 
     this.setJsonLd({
       "@context": "https://schema.org",
@@ -185,6 +206,7 @@ export class SeoService {
       name: "Archivo de noticias",
       description,
       url,
+      inLanguage: "es-CO",
       isPartOf: {
         "@type": "WebSite",
         name: "Colombiano Promedio",
@@ -203,6 +225,7 @@ export class SeoService {
       type: "website",
       robots: "noindex,nofollow,noarchive"
     });
+    this.clearArticleMeta();
     this.clearJsonLd();
   }
 
@@ -239,6 +262,31 @@ export class SeoService {
 
   private updatePropertyTag(property: string, content: string): void {
     this.meta.updateTag({ property, content });
+  }
+
+  private updateOptionalPropertyTag(property: string, content?: string | null): void {
+    const normalized = content?.trim();
+
+    if (normalized) {
+      this.updatePropertyTag(property, normalized);
+      return;
+    }
+
+    this.meta.removeTag(`property='${property}'`);
+  }
+
+  private applyArticleMeta(payload: SeoArticlePayload): void {
+    this.updateOptionalPropertyTag("article:published_time", payload.publishedAt);
+    this.updateOptionalPropertyTag("article:modified_time", payload.updatedAt || payload.publishedAt);
+    this.updateOptionalPropertyTag("article:author", payload.authorName);
+    this.updateOptionalPropertyTag("article:section", payload.categoryName);
+  }
+
+  private clearArticleMeta(): void {
+    this.meta.removeTag("property='article:published_time'");
+    this.meta.removeTag("property='article:modified_time'");
+    this.meta.removeTag("property='article:author'");
+    this.meta.removeTag("property='article:section'");
   }
 
   private setCanonical(url: string): void {

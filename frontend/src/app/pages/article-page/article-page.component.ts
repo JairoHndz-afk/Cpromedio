@@ -439,7 +439,11 @@ export class ArticlePageComponent {
       imageUrl: article.cover.url,
       publishedAt: article.publishedAt,
       updatedAt: article.updatedAt,
-      authorName: article.author?.name || "Colombiano Promedio"
+      authorName: article.author?.name || "Colombiano Promedio",
+      authorId: article.author?.id,
+      categoryName: article.category?.name || undefined,
+      tags: article.tags,
+      isPremium: article.isPremium
     });
   }
 
