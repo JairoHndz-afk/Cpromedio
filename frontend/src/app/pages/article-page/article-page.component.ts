@@ -29,16 +29,40 @@ type ShareChannel = "whatsapp" | "telegram" | "x" | "facebook" | "copy";
         <p class="eyebrow">Lectura editorial</p>
         <h1>{{ article.title }}</h1>
         <p class="hero-copy">{{ article.subtitle || article.excerpt }}</p>
-        <div class="meta-row meta-row--featured">
-          <a class="meta-pill meta-pill--author" *ngIf="article.author?.id; else plainAuthorPill" [routerLink]="['/autor', article.author?.id]">
-            {{ article.author?.name || "Redacción" }}
-          </a>
-          <ng-template #plainAuthorPill>
-            <span class="meta-pill meta-pill--author">{{ article.author?.name || "Redacción" }}</span>
-          </ng-template>
-          <span class="meta-pill" *ngIf="article.publishedAt">{{ article.publishedAt | date: "d MMM y, h:mm a" }}</span>
-          <span class="meta-pill meta-pill--warm">{{ article.readingTime }} min de lectura</span>
-          <span class="meta-pill meta-pill--soft">{{ article.metrics.views }} vistas</span>
+        <div class="article-lead-meta">
+          <div class="article-byline-card">
+            <span class="article-byline-card__eyebrow">Firma editorial</span>
+            <div class="article-byline-card__body">
+              <span class="article-byline-card__avatar">{{ initials(article.author?.name || "Redacción") }}</span>
+              <div class="article-byline-card__copy">
+                <a class="article-byline-card__name" *ngIf="article.author?.id; else plainAuthorLead" [routerLink]="['/autor', article.author?.id]">
+                  {{ article.author?.name || "Redacción" }}
+                </a>
+                <ng-template #plainAuthorLead>
+                  <strong class="article-byline-card__name">{{ article.author?.name || "Redacción" }}</strong>
+                </ng-template>
+                <span class="article-byline-card__role">{{ article.author?.role || "Mesa de redacción" }}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="article-facts">
+            <div class="article-fact article-fact--accent" *ngIf="article.publishedAt">
+              <span class="article-fact__label">Publicado</span>
+              <strong>{{ article.publishedAt | date: "d MMM y" }}</strong>
+              <small>{{ article.publishedAt | date: "h:mm a" }}</small>
+            </div>
+            <div class="article-fact article-fact--warm">
+              <span class="article-fact__label">Lectura</span>
+              <strong>{{ article.readingTime }} min</strong>
+              <small>tiempo estimado</small>
+            </div>
+            <div class="article-fact article-fact--soft article-fact--views">
+              <span class="article-fact__label">Vistas</span>
+              <strong>{{ article.metrics.views }}</strong>
+              <small>{{ article.metrics.views === 1 ? "lectura registrada" : "lecturas registradas" }}</small>
+            </div>
+          </div>
         </div>
       </div>
 
