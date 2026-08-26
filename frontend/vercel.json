@@ -35,6 +35,10 @@
       "destination": "https://colombiano-promedio-backend.onrender.com/api/public/seo/sitemap.xml"
     },
     {
+      "source": "/rss.xml",
+      "destination": "https://colombiano-promedio-backend.onrender.com/api/public/seo/rss.xml"
+    },
+    {
       "source": "/((?!api/|assets/|.*\\..*).*)",
       "destination": "/index.html"
     }

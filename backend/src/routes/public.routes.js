@@ -11,6 +11,7 @@ import {
   getPublicArchiveFilters,
   getPublicAuthor,
   getPublicCommunication,
+  getRssXml,
   getRobotsTxt,
   getSitemapXml,
   getPublicSite,
@@ -37,5 +38,6 @@ router.post("/subscriptions/reactivate", subscriptionTokenRateLimit, reactivateP
 router.post("/subscriptions/unsubscribe", subscriptionTokenRateLimit, unsubscribePublicSubscription);
 router.get("/seo/robots.txt", getRobotsTxt);
 router.get("/seo/sitemap.xml", getSitemapXml);
+router.get("/seo/rss.xml", getRssXml);
 
 export default router;

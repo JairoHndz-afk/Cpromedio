@@ -9,6 +9,7 @@ import {
   dispatchPublishedArticleBulletin,
   getPublicArticle,
   getPublicArchiveFilters,
+  getRssXml,
   listPublicArticles,
   getSitemapXml,
   reactivatePublicSubscription,
@@ -947,6 +948,62 @@ test("audita que el sitemap publico incluya la portada, el archivo y los articul
   assert.match(response.payload ?? "", /<loc>https:\/\/www\.colombianopromedio\.co\/archivo<\/loc>/);
   assert.match(response.payload ?? "", /<loc>https:\/\/www\.colombianopromedio\.co\/autor\/author-sitemap-1<\/loc>/);
   assert.match(response.payload ?? "", /<loc>https:\/\/www\.colombianopromedio\.co\/articulo\/daniel-coronell-gana-el-premio-maria-moors-de-periodismo<\/loc>/);
+});
+
+test("audita que el RSS publico exponga articulos publicados con metadatos editoriales", async (t) => {
+  const originalFind = Article.find;
+  const originalPublicSiteUrl = env.publicSiteUrl;
+
+  env.publicSiteUrl = "https://www.colombianopromedio.co";
+  Article.find = () => ({
+    select() {
+      return this;
+    },
+    populate() {
+      return this;
+    },
+    sort() {
+      return this;
+    },
+    async limit() {
+      return [
+        {
+          slug: "noticia-rss-publica",
+          title: "Noticia RSS pública",
+          subtitle: "",
+          excerpt: "Resumen editorial para lectores RSS.",
+          cover: {
+            url: "/uploads/news/noticia.jpg",
+            type: "image"
+          },
+          author: { name: "Redacción CP" },
+          category: { name: "Actualidad" },
+          publishedAt: new Date("2026-08-26T12:00:00.000Z"),
+          updatedAt: new Date("2026-08-26T12:30:00.000Z")
+        }
+      ];
+    }
+  });
+
+  t.after(() => {
+    Article.find = originalFind;
+    env.publicSiteUrl = originalPublicSiteUrl;
+  });
+
+  const request = createMockRequest();
+  const response = createMockResponse();
+
+  await getRssXml(request, response, (error) => {
+    throw error;
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.contentType, "application/rss+xml; charset=utf-8");
+  assert.match(response.payload ?? "", /<rss version="2\.0"/);
+  assert.match(response.payload ?? "", /<link>https:\/\/www\.colombianopromedio\.co\/articulo\/noticia-rss-publica<\/link>/);
+  assert.match(response.payload ?? "", /<dc:creator>Redacción CP<\/dc:creator>/);
+  assert.match(response.payload ?? "", /<category>Actualidad<\/category>/);
+  assert.match(response.payload ?? "", /media:content url="https:\/\/www\.colombianopromedio\.co\/uploads\/news\/noticia\.jpg"/);
 });
 
 test("audita que destacar un articulo retire el destacado previo para mantener una unica portada activa", async (t) => {

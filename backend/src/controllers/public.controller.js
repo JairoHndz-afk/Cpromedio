@@ -32,6 +32,7 @@ const recentArticleViewWindowMs = 1000 * 60 * 45;
 const recentArticleViewLimit = 24;
 const publicArchiveTagLimit = 12;
 const publicHomeLatestLimit = 9;
+const publicRssArticleLimit = 30;
 const publicCommentApprovedLimit = 60;
 const defaultEditorialCommentNote = "Los comentarios aparecen de inmediato. Si detectamos groserias o insultos frecuentes, el sistema los censura con simbolos antes de publicarlos.";
 const publicSubscriptionAcceptedMessage = "Si el correo es válido, revisa tu bandeja para continuar con el boletín.";
@@ -527,6 +528,11 @@ function formatSeoDate(value) {
   return date && !Number.isNaN(date.getTime()) ? date.toISOString() : "";
 }
 
+function formatRssDate(value) {
+  const date = value ? new Date(value) : null;
+  return date && !Number.isNaN(date.getTime()) ? date.toUTCString() : "";
+}
+
 function buildPublicArticleUrl(slug) {
   return new URL(`/articulo/${slug}`, `${env.publicSiteUrl}/`).toString();
 }
@@ -541,6 +547,24 @@ function buildPublicAuthorUrl(authorId) {
 
 function buildPublicArchiveUrl() {
   return new URL("/archivo", `${env.publicSiteUrl}/`).toString();
+}
+
+function buildPublicRssUrl() {
+  return new URL("/rss.xml", `${env.publicSiteUrl}/`).toString();
+}
+
+function buildRssImageUrl(article) {
+  const cover = serializeCover(article?.cover);
+
+  if (!cover.url || !["image", "infographic"].includes(cover.type)) {
+    return "";
+  }
+
+  try {
+    return new URL(cover.url, `${env.publicSiteUrl}/`).toString();
+  } catch {
+    return "";
+  }
 }
 
 function serializeSubscriptionMessage(message) {
@@ -1345,6 +1369,56 @@ ${urls
 </urlset>`;
 
     res.type("application/xml; charset=utf-8").send(xml);
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function getRssXml(_req, res, next) {
+  try {
+    const articles = await Article.find(publishedVisibleArticleFilter())
+      .select("slug title subtitle excerpt cover author category publishedAt updatedAt seo")
+      .populate(articlePopulate())
+      .sort({ publishedAt: -1, updatedAt: -1, _id: -1 })
+      .limit(publicRssArticleLimit);
+    const feedUrl = buildPublicRssUrl();
+    const latestPublishedAt = articles[0]?.publishedAt ?? articles[0]?.updatedAt ?? new Date();
+    const items = articles
+      .map((article) => {
+        const url = buildPublicArticleUrl(article.slug);
+        const publicationDate = formatRssDate(article.publishedAt ?? article.updatedAt);
+        const description = article.excerpt || article.subtitle || "";
+        const authorName = sanitizeText(article.author?.name ?? "Redacción", 120);
+        const categoryName = sanitizeText(article.category?.name ?? "", 120);
+        const imageUrl = buildRssImageUrl(article);
+
+        return `  <item>
+    <title>${escapeXml(article.title)}</title>
+    <link>${escapeXml(url)}</link>
+    <guid isPermaLink="true">${escapeXml(url)}</guid>
+    <description>${escapeXml(description)}</description>
+    <dc:creator>${escapeXml(authorName)}</dc:creator>${categoryName ? `
+    <category>${escapeXml(categoryName)}</category>` : ""}${publicationDate ? `
+    <pubDate>${escapeXml(publicationDate)}</pubDate>` : ""}${imageUrl ? `
+    <media:content url="${escapeXml(imageUrl)}" medium="image" />` : ""}
+  </item>`;
+      })
+      .join("\n");
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:media="http://search.yahoo.com/mrss/">
+  <channel>
+    <title>Colombiano Promedio</title>
+    <link>${escapeXml(buildPublicHomeUrl())}</link>
+    <description>Periodismo digital colombiano con contexto, archivo y actualidad.</description>
+    <language>es-CO</language>
+    <lastBuildDate>${escapeXml(formatRssDate(latestPublishedAt))}</lastBuildDate>
+    <generator>Colombiano Promedio</generator>
+    <atom:link href="${escapeXml(feedUrl)}" rel="self" type="application/rss+xml" />
+${items}
+  </channel>
+</rss>`;
+
+    res.type("application/rss+xml; charset=utf-8").send(xml);
   } catch (error) {
     next(error);
   }
