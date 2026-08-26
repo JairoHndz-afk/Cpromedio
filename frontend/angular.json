@@ -20,7 +20,15 @@
               "zone.js"
             ],
             "tsConfig": "tsconfig.app.json",
-            "assets": ["src/assets", "src/site.webmanifest"],
+            "assets": [
+              "src/assets",
+              "src/site.webmanifest",
+              {
+                "glob": "robots.txt",
+                "input": "public",
+                "output": "/"
+              }
+            ],
             "styles": ["src/styles.css"],
             "scripts": []
           },

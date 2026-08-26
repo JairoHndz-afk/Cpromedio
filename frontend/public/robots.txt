@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Disallow: /dashboard
+Disallow: /login
+Disallow: /cuenta
+Disallow: /lectores
+Disallow: /boletin
+Disallow: /api/
+Sitemap: https://www.colombianopromedio.co/sitemap.xml

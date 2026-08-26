@@ -127,7 +127,7 @@ import { NewsCardComponent } from "../../shared/components/news-card/news-card.c
               [disabled]="submittingSubscription"
               required
             />
-            <button class="button" type="submit" [disabled]="submittingSubscription">
+            <button class="button home-newsletter-strip__submit" type="submit" [disabled]="submittingSubscription">
               {{ submittingSubscription ? "Enviando..." : "Suscribirme" }}
             </button>
             <p class="helper-text home-newsletter-strip__message" *ngIf="subscriptionMessage">{{ subscriptionMessage }}</p>
